@@ -2,15 +2,15 @@
 import React from 'react';
 import { CartProvider } from './CartContext';
 import { AuthProvider } from './AuthContext';
-import { WishlistProvider } from './WishlistContext';
+import { PrintProvider } from './PrintContext';
 
 export default function AppProviders({ children }) {
   return (
     <AuthProvider>
       <CartProvider>
-        <WishlistProvider>
+        <PrintProvider>
           {children}
-        </WishlistProvider>
+        </PrintProvider>
       </CartProvider>
     </AuthProvider>
   );

@@ -31,6 +31,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'left',
     justifyContent: 'space-between',
+    paddingTop: 25,
     paddingHorizontal: 15,
     elevation: 4, // shadow on Android
   },

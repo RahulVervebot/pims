@@ -1,44 +1,44 @@
-// src/screens/CartScreen.js
+// src/screens/printScreen.js
 import React, { useEffect, useContext } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
-import { CartContext } from '../context/CartContext';
+import { PrintContext } from '../context/PrintContext';
 
 const THEME = { primary: '#2C1E70', secondary: '#F57200', price: '#27ae60' };
 
-export default function CartScreen() {
+export default function PrintScreen() {
   const navigation = useNavigation();
-  const { cart, increaseQty, decreaseQty, removeFromCart, setCart } = useContext(CartContext);
+  const { print, increasePrintQty, decreasePrintQty, removeFromprint, setPrint } = useContext(PrintContext);
 
   useEffect(() => {
     (async () => {
-      const storedCart = await AsyncStorage.getItem('cart');
-      setCart(storedCart ? JSON.parse(storedCart) : []);
+      const storedprint = await AsyncStorage.getItem('print');
+      setPrint(storedprint ? JSON.parse(storedprint) : []);
     })();
-  }, [setCart]);
+  }, [setPrint]);
 
   const getSubtotal = () =>
-    cart.reduce((sum, item) => sum + Number(item.price) * Number(item.qty || 1), 0);
+    print.reduce((sum, item) => sum + Number(item.price) * Number(item.qty || 1), 0);
 
   const getTotal = () => (getSubtotal()).toFixed(2);
 
   const renderItem = ({ item }) => (
-    <View style={styles.cartItem}>
+    <View style={styles.printItem}>
       <Text style={styles.name}>{item.name}</Text>
       <Text style={styles.price}>${Number(item.price).toFixed(2)}</Text>
 
       <View style={styles.qtyRow}>
-        <TouchableOpacity style={styles.qtyBtn} onPress={() => decreaseQty(item._id)}>
+        <TouchableOpacity style={styles.qtyBtn} onPress={() => decreasePrintQty(item._id)}>
           <Text style={styles.qtyText}>-</Text>
         </TouchableOpacity>
         <Text style={styles.qtyValue}>{item.qty}</Text>
-        <TouchableOpacity style={styles.qtyBtn} onPress={() => increaseQty(item._id)}>
+        <TouchableOpacity style={styles.qtyBtn} onPress={() => increasePrintQty(item._id)}>
           <Text style={styles.qtyText}>+</Text>
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.removeBtn} onPress={() => removeFromCart(item._id)}>
+      <TouchableOpacity style={styles.removeBtn} onPress={() => removeFromprint(item._id)}>
         <Text style={{ color: '#fff' }}>Remove</Text>
       </TouchableOpacity>
     </View>
@@ -47,20 +47,19 @@ export default function CartScreen() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={cart}
+        data={print}
         keyExtractor={(item) => String(item._id)}
         renderItem={renderItem}
-        ListEmptyComponent={<Text style={styles.empty}>Your cart is empty</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>Your print is empty</Text>}
       />
 
-      {cart.length > 0 && (
+      {print.length > 0 && (
         <View style={styles.footer}>
-          <Text style={styles.total}>Total: ${getTotal()}</Text>
           <TouchableOpacity
             style={styles.checkoutBtn}
-            onPress={() => navigation.navigate('Checkout', { cart })}
+            onPress={() => navigation.navigate('Print', { print })}
           >
-            <Text style={styles.checkoutText}>Checkout</Text>
+            <Text style={styles.checkoutText}>Print</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -70,7 +69,7 @@ export default function CartScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  cartItem: { flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  printItem: { flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
   name: { fontWeight: '600', fontSize: 15, color: THEME.primary },
   price: { fontWeight: 'bold', color: THEME.price },
   empty: { textAlign: 'center', marginTop: 50, fontSize: 16, color: '#888' },

@@ -7,11 +7,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   FlatList,
-  Platform
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -20,13 +17,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
-import CategoryProductsScreen from './src/screens/CategoryProductsScreen';
 import SignupScreen from './src/screens/SignupScreen';
 import ReportScreen from './src/screens/ReportScreen';
 import UserScreen from './src/screens/UserScreen';
 import CartScreen from './src/screens/CartScreen';
-import CheckoutScreen from './src/screens/CheckoutScreen';
-import PrintScreen from './src/screens/PrintScreen';
+import WishlistScreen from './src/screens/PrintScreen';
 import AppProviders from './src/context/AppProviders';
 //icons 
 import HomeIcon from './src/assets/icons/HomeIcon.svg';
@@ -62,93 +57,36 @@ function CustomDrawerContent(props) {
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
     </DrawerContentScrollView>
-  ); 
+  );
 }
-
 // ---------- Bottom Tabs ----------
 function BottomTabs() {
-  const insets = useSafeAreaInsets();
-
-  const BAR_PAD_BOTTOM = Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0);
-  const BAR_HEIGHT = 60 + BAR_PAD_BOTTOM;
-
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarShowLabel: false,
-
-        // Tab bar container
-        tabBarStyle: {
-          backgroundColor: '#fff',
-          height: BAR_HEIGHT,             // ensures consistent bar height
-          paddingBottom: BAR_PAD_BOTTOM,  // safe-area / gesture-nav
-          borderTopWidth: 0,              // we'll draw our own top strip
-          elevation: 10,
-          shadowColor: '#000',
-          shadowOpacity: 0.06,
-          shadowRadius: 6,
-          shadowOffset: { width: 0, height: -2 },
-        },
-
-        // Center the icon in each tab item
-        tabBarItemStyle: {
-          justifyContent: 'center',
-          alignItems: 'center',
-        },
-
-        // Render icon + internal top strip
-        tabBarIcon: ({ focused, size }) => {
-          let IconComp;
-          switch (route.name) {
-            case 'Home':   IconComp = HomeIcon; break;
-            case 'Report': IconComp = ReportIcon; break;
-            case 'Cart':   IconComp = CartIcon; break;
-            case 'Print':  IconComp = PromotionIcon; break;
-            default: return null;
-          }
-
-          return (
-            <View
-              style={{
-                position: 'relative',
-                width: '100%',
-                height: '100%',
-                alignItems: 'center',
-                justifyContent: 'center', // 👈 centers the icon vertically & horizontally
-                overflow: 'hidden',       // keep strip inside the bar
-              }}
-            >
-              {/* Top strip ATTACHED to the bar’s inner top edge */}
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 0, left: 0, right: 0,
-                  height: 3,
-                  backgroundColor: focused ? '#F57200' : 'transparent',
-                }}
-              />
-
-              {/* Icon */}
-              <IconComp
-                width={size ?? 24}
-                height={size ?? 24}
-                fill={focused ? '#F57200' : 'gray'}
-              />
-            </View>
-          );
+      screenOptions={({ route, navigation }) => ({
+        tabBarShowLabel: false,   // 👈 hides the text labels
+        headerShown: false,    // optional: hides header
+        tabBarActiveTintColor: '#F57200',
+        tabBarInactiveTintColor: 'gray',
+        tabBarStyle: { backgroundColor: '#fff', height: 60 },
+        tabBarIcon: ({ color, size }) => {
+          const icons = {
+            Home: <HomeIcon width={size} height={size} fill={color} />,
+            Report: <ReportIcon width={size} height={size} fill={color} />,
+            Cart: <CartIcon width={size} height={size} fill={color} />,
+            Wishlist: <PromotionIcon width={size} height={size} fill={color} />,
+          };
+          return icons[route.name] || null;
         },
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Report" component={ReportScreen} />
       <Tab.Screen name="Cart" component={CartScreen} />
-      <Tab.Screen name="Print" component={PrintScreen} />
+      <Tab.Screen name="Wishlist" component={WishlistScreen} />
     </Tab.Navigator>
   );
 }
-
-
 // ---------- Drawer (kept same, Tabs inside) ----------
 function MainDrawer() {
   return (
@@ -158,8 +96,7 @@ function MainDrawer() {
       screenOptions={{ headerShown: false }}
     >
       <Drawer.Screen name="Profile" component={UserScreen} />
-     <Drawer.Screen name="Checkout" component={CheckoutScreen} /> 
-     <Drawer.Screen name="Tabs" component={BottomTabs} />
+      <Drawer.Screen name="Tabs" component={BottomTabs} />
     </Drawer.Navigator>
   );
 }
@@ -193,13 +130,7 @@ export default function App() {
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="SignupScreen" component={SignupScreen} />
           <Stack.Screen name="MainDrawer" component={MainDrawer} />
-      <Stack.Screen
-        name="CategoryProducts"
-        component={CategoryProductsScreen}
-        options={({ route }) => ({
-          title: route?.params?.category || "Category",
-        })}
-      />
+
     
         </Stack.Navigator>
       </NavigationContainer>

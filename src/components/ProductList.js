@@ -1,143 +1,225 @@
-import React, { useEffect, useState, useContext } from 'react';
-import { FlatList, View, Text, StyleSheet, Image, TouchableOpacity, RefreshControl } from 'react-native';
-import { API_URL } from '@env';
-import { CartContext } from '../context/CartContext';
+// src/components/ProductList.js
+import React, { useEffect, useState, useContext, useRef, useMemo } from 'react';
+import {
+  FlatList,
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  RefreshControl,
+  useWindowDimensions,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { CartContext } from '../context/CartContext';
+import { PrintContext } from '../context/PrintContext';
+import { getCategoryProducts, getProducts } from '../functions/function';
+import fallbackBg from '../assets/images/green-bg.jpg';
+import ProductBottomSheet from './ProductBottomSheet';
 
-export default function ProductList() {
+export default function ProductList({ category, backgroundUri, showFloatingCart = false }) {
   const navigation = useNavigation();
   const [products, setProducts] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const { cart, addToCart, increaseQty, decreaseQty } = useContext(CartContext);
+  const { print, addToPrint, increasePrintQty, decreasePrintQty } = useContext(PrintContext);
+  const sheetRef = useRef(null);
 
-  // ✅ Fetch products only once on first mount
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
+
+  // --- Responsive layout math ---
+  const COLS = isTablet ? 5 : 3;                   // <- requirement
+  const GAP = isTablet ? 14 : 10;                  // space between cards
+  const H_PADDING = 12;                            // list horizontal padding
+  const bannerHeight = Math.min(isTablet ? 260 : 200, Math.round((width * 9) / 16));
+
+  const CARD_WIDTH = useMemo(() => {
+    const inner = width - H_PADDING * 2 - GAP * (COLS - 1);
+    return Math.floor(inner / COLS);
+  }, [width, COLS]);
+
+  const IMAGE_HEIGHT = Math.round(CARD_WIDTH * 0.55);    // keep a nice ratio
+  const FLOATING_BOTTOM = isTablet ? 28 : 20;
+
   useEffect(() => {
-    if (products.length === 0) {
-      fetchProducts();
-    }
-  }, []);
+    fetchProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category]);
 
-  const fetchProducts = () => {
-    setRefreshing(true);
-    fetch(`${API_URL}/api/products`)
-      .then(res => res.json())
-      .then(data => setProducts(data))
-      .catch(err => console.error('Failed to fetch products:', err))
-      .finally(() => setRefreshing(false));
+  const fetchProducts = async () => {
+    try {
+      setRefreshing(true);
+      const data = category === 'all' ? await getProducts() : await getCategoryProducts(category);
+      setProducts(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(`Failed to fetch products for ${category}:`, err?.message);
+      setProducts([]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
+  const openDetails = (item) => sheetRef.current?.open(item);
+
   const renderProduct = ({ item }) => {
-    const inCart = cart.find(p => p._id === item._id);
+    const inCart = cart.find((p) => p._id === item._id);
+    const inPrint = print.find((p) => p._id === item._id);
 
     return (
-      <View style={styles.productCard}>
-        <Image source={{ uri: item.image }} style={styles.productImage} />
-        <Text style={styles.productName}>{item.name}</Text>
-        <Text>{item.size}</Text>
-        <Text style={styles.price}>${item.price}</Text>
-        <Text>{item.category}</Text>
-
-        {inCart ? (
-          <View style={styles.qtyRow}>
-            <TouchableOpacity style={styles.qtyBtn} onPress={() => decreaseQty(item._id)}>
-              <Text style={styles.qtyText}>-</Text>
-            </TouchableOpacity>
-            <Text style={styles.qtyValue}>{inCart.qty}</Text>
-            <TouchableOpacity style={styles.qtyBtn} onPress={() => increaseQty(item._id)}>
-              <Text style={styles.qtyText}>+</Text>
-            </TouchableOpacity>
+      <TouchableOpacity activeOpacity={0.9} onPress={() => openDetails(item)} style={{ width: CARD_WIDTH }}>
+        <View style={styles.productCard}>
+          {/* Top info */}
+          <View>
+            <Image source={{ uri: item.image }} style={[styles.productImage, { height: IMAGE_HEIGHT }]} />
+            <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+            {!!item.size && <Text style={styles.metaText}>{item.size}</Text>}
+            <Text style={styles.price}>₹{Number(item.price || 0).toFixed(2)}</Text>
+            {!!item.category && <Text style={styles.metaText} numberOfLines={1}>{item.category}</Text>}
           </View>
-        ) : (
-          <TouchableOpacity style={styles.cartBtn} onPress={() => addToCart(item)}>
-            <Text style={styles.cartBtnText}>Add to Cart</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+
+          {/* Bottom actions pinned */}
+          <View>
+            {inCart ? (
+              <View style={styles.qtyRow}>
+                <TouchableOpacity style={styles.qtyBtn} onPress={() => decreaseQty(item._id)}>
+                  <Text style={styles.qtyText}>-</Text>
+                </TouchableOpacity>
+                <Text style={styles.qtyValue}>{inCart.qty}</Text>
+                <TouchableOpacity style={styles.qtyBtn} onPress={() => increaseQty(item._id)}>
+                  <Text style={styles.qtyText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.cartBtn} onPress={() => addToCart(item)}>
+                <Text style={styles.cartBtnText}>Add to Cart</Text>
+              </TouchableOpacity>
+            )}
+
+            {inPrint ? (
+              <View style={[styles.qtyRow, { marginTop: 8 }]}>
+                <TouchableOpacity style={styles.qtyBtn} onPress={() => decreasePrintQty(item._id)}>
+                  <Text style={styles.qtyText}>-</Text>
+                </TouchableOpacity>
+                <Text style={styles.qtyValue}>{inPrint.qty}</Text>
+                <TouchableOpacity style={styles.qtyBtn} onPress={() => increasePrintQty(item._id)}>
+                  <Text style={styles.qtyText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.cartBtn, { marginTop: 8, backgroundColor: '#2c1e70' }]}
+                onPress={() => addToPrint(item)}
+              >
+                <Text style={styles.cartBtnText}>Add to Print</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
     );
   };
 
+  const bgSource = backgroundUri ? { uri: backgroundUri } : fallbackBg;
+
   return (
-    <View style={{ flex: 1, backgroundColor: "#4c669f" }}>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      {/* Banner BEFORE list */}
+      <Image source={bgSource} style={styles.banner(bannerHeight)} resizeMode="cover" />
+
+      {/* Grid list */}
       <FlatList
+        key={COLS}                                 // force layout recalculation when COLS changes
         data={products}
-        keyExtractor={(item) => item._id}
-        renderItem={renderProduct}
         horizontal
-        showsHorizontalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={fetchProducts} />
-        }
+        keyExtractor={(item) => String(item._id)}
+        renderItem={renderProduct}
+        // numColumns={COLS}
+        // columnWrapperStyle={{ gap: GAP }}          // horizontal gap between items
+        contentContainerStyle={{
+          paddingHorizontal: H_PADDING,
+          paddingTop: 10,
+          paddingBottom: (showFloatingCart ? FLOATING_BOTTOM + 80 : 16),
+          gap: GAP,                                // vertical gap between rows
+        }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchProducts} />}
+        showsVerticalScrollIndicator={false}
       />
 
-      {/* Floating Cart Icon */}
-      {cart.length > 0 && (
+      {/* Floating Cart */}
+      {showFloatingCart && cart.length > 0 && (
         <TouchableOpacity
-          style={styles.floatingCart}
+          style={[styles.floatingCart, { bottom: FLOATING_BOTTOM, right: isTablet ? 28 : 20 }]}
           onPress={() => navigation.navigate('Cart')}
         >
-          <Text style={{ color: '#fff' }}>🛒 {cart.length}</Text>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>🛒 {cart.length}</Text>
         </TouchableOpacity>
       )}
+
+      {/* Bottom Sheet */}
+      <ProductBottomSheet
+        ref={sheetRef}
+        onAddToCart={(p) => addToCart(p)}
+        onAddToPrint={(p) => addToPrint(p)}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  banner: (height) => ({
+    width: '100%',
+    height,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 8,
+  }),
+
   productCard: {
-    padding: 10,
-    marginRight: 10,
     backgroundColor: '#fff',
-    borderRadius: 8,
-    width: 180,
-    height: 300,
-    elevation: 2,
+    borderRadius: 10,
+    padding: 10,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    justifyContent: 'space-between',
+    minHeight: 220,
   },
   productImage: {
     width: '100%',
-    height: 100,
     resizeMode: 'cover',
-    borderRadius: 6,
+    borderRadius: 8,
+    marginBottom: 6,
   },
-  productName: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginTop: 8,
-  },
-  price: {
-    color: 'green',
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  productName: { fontWeight: 'bold', fontSize: 14, marginTop: 2, color: '#000' },
+  metaText: { color: '#555', marginTop: 2, fontSize: 12 },
+  price: { color: 'green', fontSize: 14, fontWeight: '600', marginTop: 4 },
+
   cartBtn: {
-    marginTop: 10,
-    backgroundColor: '#F57200',
-    padding: 8,
-    borderRadius: 6,
+    backgroundColor: 'rgba(245, 114, 0, 1)',
+    paddingVertical: 10,
+    borderRadius: 8,
     alignItems: 'center',
   },
-  cartBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  qtyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  qtyBtn: {
-    backgroundColor: '#2c1e70',
-    padding: 6,
-    borderRadius: 5,
-  },
+  cartBtnText: { color: '#fff', fontWeight: 'bold' },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  qtyBtn: { backgroundColor: '#2c1e70', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 },
   qtyText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  qtyValue: { marginHorizontal: 10, fontSize: 16, fontWeight: 'bold', color: "#000" },
+  qtyValue: { marginHorizontal: 10, fontSize: 16, fontWeight: 'bold', color: '#000' },
+
   floatingCart: {
     position: 'absolute',
-    bottom: 20,
-    right: 20,
     backgroundColor: '#2c1e70',
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 30,
-    elevation: 5,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
 });
