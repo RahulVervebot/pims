@@ -79,7 +79,7 @@ function BottomTabs() {
         tabBarShowLabel: false,
 
         // Tab bar container
-        tabBarStyle: {
+          tabBarStyle: {
           backgroundColor: '#fff',
           height: BAR_HEIGHT,             // ensures consistent bar height
           paddingBottom: BAR_PAD_BOTTOM,  // safe-area / gesture-nav
@@ -116,15 +116,17 @@ function BottomTabs() {
                 height: '100%',
                 alignItems: 'center',
                 justifyContent: 'center', // 👈 centers the icon vertically & horizontally
-                overflow: 'hidden',       // keep strip inside the bar
+                overflow: 'hidden', 
+                      // keep strip inside the bar
               }}
             >
               {/* Top strip ATTACHED to the bar’s inner top edge */}
               <View
                 style={{
                   position: 'absolute',
-                  top: 0, left: 0, right: 0,
-                  height: 3,
+                  top: 0, left: 0, right: 0,            // ensures consistent bar height
+             
+                  height: 2,
                   backgroundColor: focused ? '#F57200' : 'transparent',
                 }}
               />
@@ -142,7 +144,7 @@ function BottomTabs() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Report" component={ReportScreen} />
-      <Tab.Screen name="Cart" component={CartScreen} />
+      {/* <Tab.Screen name="Cart" component={CartScreen} /> */}
       <Tab.Screen name="Print" component={PrintScreen} />
     </Tab.Navigator>
   );
@@ -158,7 +160,6 @@ function MainDrawer() {
       screenOptions={{ headerShown: false }}
     >
       <Drawer.Screen name="Profile" component={UserScreen} />
-     <Drawer.Screen name="Checkout" component={CheckoutScreen} /> 
      <Drawer.Screen name="Tabs" component={BottomTabs} />
     </Drawer.Navigator>
   );
@@ -191,7 +192,9 @@ export default function App() {
       <NavigationContainer>
         <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="SignupScreen" component={SignupScreen} />
+          <Stack.Screen name="Cart" component={CartScreen} />
+          <Stack.Screen name="Checkout" component={CheckoutScreen} />      
+           <Stack.Screen name="SignupScreen" component={SignupScreen} />
           <Stack.Screen name="MainDrawer" component={MainDrawer} />
       <Stack.Screen
         name="CategoryProducts"

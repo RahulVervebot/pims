@@ -8,19 +8,20 @@ import {
   Image,
   TouchableOpacity,
   RefreshControl,
-  useWindowDimensions,
+  useWindowDimensions
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { CartContext } from '../context/CartContext';
 import { PrintContext } from '../context/PrintContext';
-import { getCategoryProducts, getProducts } from '../functions/function';
+import { getCategoryProducts, getLatestProducts } from '../functions/function';
 import fallbackBg from '../assets/images/green-bg.jpg';
 import ProductBottomSheet from './ProductBottomSheet';
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
 export default function ProductList({ category, backgroundUri, showFloatingCart = false }) {
   const navigation = useNavigation();
   const [products, setProducts] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+    const [userrole, setUserRole] = useState('');
   const { cart, addToCart, increaseQty, decreaseQty } = useContext(CartContext);
   const { print, addToPrint, increasePrintQty, decreasePrintQty } = useContext(PrintContext);
   const sheetRef = useRef(null);
@@ -49,8 +50,10 @@ export default function ProductList({ category, backgroundUri, showFloatingCart 
 
   const fetchProducts = async () => {
     try {
+  const userRole =    await AsyncStorage.getItem('userRole');
+  setUserRole(userRole);
       setRefreshing(true);
-      const data = category === 'all' ? await getProducts() : await getCategoryProducts(category);
+      const data = category === 'all' ? await getLatestProducts() : await getCategoryProducts(category);
       setProducts(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(`Failed to fetch products for ${category}:`, err?.message);

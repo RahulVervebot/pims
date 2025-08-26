@@ -9,8 +9,6 @@ export default function ReportScreen() {
         address="123, MG Road"
         backgroundType="image"
         backgroundValue="https://picsum.photos/800/200"
-        onProfilePress={() => console.log("Profile clicked")}
-        onAddressPress={() => console.log("Address clicked")}
       />
     <View style={styles.container}>
       <Text style={styles.title}>📊 Demo Report</Text>

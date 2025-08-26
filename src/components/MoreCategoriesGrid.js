@@ -86,21 +86,21 @@ export default function MoreCategoriesGrid() {
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2C1E70" />
-      </View>
-    );
-  }
+  // if (loading) {
+  //   return (
+  //     <View style={styles.center}>
+  //       <ActivityIndicator size="large" color="#2C1E70" />
+  //     </View>
+  //   );
+  // }
 
-  if (!allCats?.length) {
-    return (
-      <View style={styles.center}>
-        <Text style={{ color: "#666" }}>No categories available.</Text>
-      </View>
-    );
-  }
+  // if (!allCats?.length) {
+  //   return (
+  //     <View style={styles.center}>
+  //       <Text style={{ color: "#666" }}>No categories available.</Text>
+  //     </View>
+  //   );
+  // }
 
   return (
     <View style={{ paddingBottom: 16 }}>

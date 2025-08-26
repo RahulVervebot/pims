@@ -12,7 +12,9 @@ export default function CategoryProductsScreen({ route }) {
         <AppHeader
         title={category}
         />
+        <View style={styles.searchbar}>
         <ProductSearch/>
+        </View>
       
     <View style={styles.container}>
       
@@ -24,4 +26,5 @@ export default function CategoryProductsScreen({ route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
+  searchbar:{marginHorizontal: 25}
 });

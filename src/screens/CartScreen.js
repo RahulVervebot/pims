@@ -4,7 +4,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { CartContext } from '../context/CartContext';
-
+import AppHeader from '../ProfileHeader';
 const THEME = { primary: '#2C1E70', secondary: '#F57200', price: '#27ae60' };
 
 export default function CartScreen() {
@@ -45,6 +45,8 @@ export default function CartScreen() {
   );
 
   return (
+    <>
+  < AppHeader  title="Cart" />
     <View style={styles.container}>
       <FlatList
         data={cart}
@@ -65,6 +67,7 @@ export default function CartScreen() {
         </View>
       )}
     </View>
+    </>
   );
 }
 

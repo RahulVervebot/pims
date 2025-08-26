@@ -328,7 +328,7 @@ export default function ProductSearch() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, position: "relative" },
+  container: { paddingTop: 16,paddingBottom: 16, position: "relative" },
   searchRow: {
     flexDirection: "row",
     alignItems: "center",

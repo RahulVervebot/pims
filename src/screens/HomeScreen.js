@@ -18,8 +18,11 @@ import MoreCategoriesGrid from "../components/MoreCategoriesGrid";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CartContext } from "../context/CartContext";  // ✅ use cart count here
 import { SvgUri } from "react-native-svg";
+import CreateProductModal from "../components/CreateProductModal";
+import { useNavigation } from '@react-navigation/native';
+import TulsiScreen from "../assets/images/LoginScreen.png"
 // Tab button supporting SVG or raster icon
-function TabButton({ label, iconUri, active, onPress, activeColor, inactiveColor = "#444" }) {
+function TabButton({ label, iconUri, active, onPress, activeColor, inactiveColor = "#444"}) {
   const iconSize = 20;
   const tint = active ? activeColor : inactiveColor;
   const isSvg = looksLikeSvg(iconUri || "");
@@ -39,9 +42,12 @@ function TabButton({ label, iconUri, active, onPress, activeColor, inactiveColor
 }
 
 export default function HomeScreen() {
+    const navigation = useNavigation();
+    const [showCreate, setShowCreate] = useState(false);
+    const [showScreen, setShowScreen] = useState(false);
       const insets = useSafeAreaInsets();
         const { cart } = useContext(CartContext);         // ✅ get cart length
-
+    const [address, setAdress] = useState("123 mg road");  
   const [tabs, setTabs] = useState([]);           // normalized tabs [{value,label,topicon,topbanner,topbannerbottom,...}]
   const [activeTab, setActiveTab] = useState(""); // string (category value)
   const activeIconColor = "#F57200";
@@ -49,18 +55,16 @@ export default function HomeScreen() {
   useEffect(() => {
     (async () => {
       try {
+        setShowScreen(true);
         const all = await getTopCategories();
-
         // Find 'all' (case-insensitive)
         const allCat = all.find(c => (c.category || '').toLowerCase() === 'all');
         // Other categories with toplist true, excluding 'all'
         const others = all.filter(c => c.toplist && (c.category || '').toLowerCase() !== 'all');
-
         // Build final tabs array: 'all' first (if exists), then others
         const ordered = [];
         if (allCat) ordered.push(allCat);
         ordered.push(...others);
-
         // Normalize to {value,label,...}
         const normalized = ordered.map(c => ({
           _id: c._id,
@@ -70,12 +74,12 @@ export default function HomeScreen() {
           topbanner: c.topbanner || null,
           topbannerbottom: c.topbannerbottom || null,
         }));
-
         setTabs(normalized);
         if (normalized.length > 0) {
           setActiveTab(prev =>
             prev && normalized.some(t => t.value === prev) ? prev : normalized[0].value
           );
+           setShowScreen(false);
         } else {
           setActiveTab("");
         }
@@ -83,6 +87,7 @@ export default function HomeScreen() {
         console.error("Failed to load categories:", e?.message);
         setTabs([]);
         setActiveTab("");
+         setShowScreen(false);
       }
     })();
   }, []);
@@ -92,6 +97,7 @@ export default function HomeScreen() {
     [tabs, activeTab]
   );
 
+
   // Header background: use topbanner (image). If missing, fallback to color.
   const currentBackground = useMemo(() => {
     if (currentTab?.topbanner) {
@@ -99,6 +105,18 @@ export default function HomeScreen() {
     }
     return { type: "color", value: "#2CA32C" };
   }, [currentTab]);
+
+if (showScreen) {
+  return (
+    <>
+      <Image 
+        source={TulsiScreen}  // if TulsiScreen is a require/import image
+        style={{ width: "100%", height: "100%" }} // add style to make it visible
+        resizeMode="cover" // or 'cover' based on your need
+      />
+    </>
+  );
+}
 
   return (
     <SafeAreaView
@@ -117,7 +135,7 @@ export default function HomeScreen() {
       />
 
       <CustomHeader
-        address="Tulsi"
+        // address={address}
         backgroundType={currentBackground.type}
         backgroundValue={currentBackground.value}
       >
@@ -158,6 +176,7 @@ export default function HomeScreen() {
         )}
       <MoreCategoriesGrid/>
       </ScrollView>
+
        {/* ✅ Global floating cart overlay */}
         {cart.length > 0 && (
           <View
@@ -192,6 +211,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         )}
+
          <View
             pointerEvents="box-none"
             style={{
@@ -203,7 +223,7 @@ export default function HomeScreen() {
             }}
           >
             <TouchableOpacity
-              onPress={() => navigation.navigate("Cart")}
+              onPress={() => setShowCreate(true)}
               style={{
                 alignSelf: "flex-end",
                 marginRight: 16,
@@ -223,8 +243,16 @@ export default function HomeScreen() {
               <Text style={{ color: "#fff", fontWeight: "700" }}>Create products +</Text>
             </TouchableOpacity>
           </View>
-      </View>
 
+      </View>
+  <CreateProductModal
+        visible={showCreate}
+        onClose={() => setShowCreate(false)}
+        onCreated={(p) => {
+          // TODO: refresh your product list if needed
+          setShowCreate(false);
+        }}
+      />
     </SafeAreaView>
   );
 }

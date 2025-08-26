@@ -16,6 +16,19 @@ export async function getProducts() {
   return Array.isArray(data) ? data : [];
 }
 
+export async function getLatestProducts() {
+  const url = `${API_URL}/api/latest-products`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch products (${res.status}): ${text || 'No details'}`);
+  }
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+
+
 export function capitalizeWords(str = '') {
   if (!str) return '';
   return str

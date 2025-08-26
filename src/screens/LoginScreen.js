@@ -11,12 +11,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '@env';
-
+import TulsiLogo from '../assets/images/Tulsi.svg'
 // 👉 Replace with your logo asset
 // import logo from '../assets/logo.png';
 
@@ -49,7 +50,7 @@ export default function LoginScreen({ navigation }) {
         await AsyncStorage.setItem('userName', data.user.name);
         await AsyncStorage.setItem('userEmail', data.user.email);
         await AsyncStorage.setItem('userRole', data.user.role);
-        navigation.replace('MainDrawer', { userInfo: data.user });
+        navigation.navigate('MainDrawer', { userInfo: data.user });
       } else {
         Alert.alert('Login Failed', data.error || 'Invalid credentials');
       }
@@ -67,6 +68,7 @@ export default function LoginScreen({ navigation }) {
     try {
       await GoogleSignin.hasPlayServices();
       const { user } = await GoogleSignin.signIn();
+      console.log('user:', user);
       const res = await fetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -79,7 +81,7 @@ export default function LoginScreen({ navigation }) {
       });
       const data = await res.json();
       if (res.ok) {
-        navigation.replace('MainDrawer', { userInfo: data.user });
+        navigation.navigate('MainDrawer', { userInfo: data.user });
       } else {
         Alert.alert('Error', data.error || 'Google login failed');
       }
@@ -92,92 +94,115 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F5F7FB" />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        {/* Header / Logo Area */}
-        <View style={styles.header}>
-          {/* If you have a logo image, uncomment below and remove the text */}
-          {/* <Image source={logo} style={styles.logo} resizeMode="contain" /> */}
-          <View style={styles.logoCircle}>
-            <Text style={styles.logoText}>V</Text>
-          </View>
-          <Text style={styles.appTitle}>Welcome to TULSI</Text>
-          <Text style={styles.subtitle}>Sign in to continue</Text>
+      <StatusBar barStyle="dark-content" backgroundColor={GREEN} />
+      {/* Top 30% green area with logo */}
+      <View style={styles.headerArea}>
+        {/* If you have a logo image, uncomment below and remove the circle */}
+        {/* <Image source={logo} style={styles.logo} resizeMode="contain" /> */}
+        <View style={styles.logoCircle}>
+          <TulsiLogo/>
         </View>
+        <Text style={styles.appTitle}>Welcome to TULSI</Text>
+        <Text style={styles.subtitle}>Sign in to continue</Text>
+      </View>
 
-        {/* Login Card */}
-        <View style={styles.card}>
-          {signingIn && (
-            <View style={styles.loadingOverlay}>
-              <ActivityIndicator size="large" />
+      {/* Bottom white rounded panel */}
+      <View style={styles.panel}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.panelContent}
+          >
+            <Text style={styles.heading}>Login</Text>
+            <Text style={styles.subtext}>Enter your credentials below.</Text>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="you@example.com"
+                placeholderTextColor="#9AA3AF"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoCorrect={false}
+              />
             </View>
-          )}
 
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="you@example.com"
-            placeholderTextColor="#9AA3AF"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoCorrect={false}
-          />
+            <View style={styles.field}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="••••••••"
+                placeholderTextColor="#9AA3AF"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+              />
+            </View>
 
-          <Text style={[styles.label, { marginTop: 12 }]}>Password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="••••••••"
-            placeholderTextColor="#9AA3AF"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              onPress={handleManualLogin}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.primaryBtnText}>Login</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.primaryBtn} onPress={handleManualLogin} activeOpacity={0.8}>
-            <Text style={styles.primaryBtnText}>Login</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.googleBtn}
+              onPress={handleGoogleLogin}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.googleBtnText}>Sign in with Google</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.googleBtn} onPress={handleGoogleLogin} activeOpacity={0.8}>
-            {/* You can add a small Google icon at left if you have one */}
-            <Text style={styles.googleBtnText}>Sign in with Google</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SignupScreen')}
+              style={{ marginTop: 14 }}
+            >
+              <Text style={styles.linkText}>
+                Don&apos;t have an account? <Text style={styles.linkStrong}>Sign up</Text>
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => navigation.navigate('Signup')} style={{ marginTop: 14 }}>
-            <Text style={styles.linkText}>
-              Don&apos;t have an account? <Text style={styles.linkStrong}>Sign up</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
+            {signingIn && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="large" />
+              </View>
+            )}
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
 
-        {/* Footer / Legal */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>© {new Date().getFullYear()} VerveBot</Text>
-        </View>
-      </KeyboardAvoidingView>
+      {/* Footer */}
+  
     </SafeAreaView>
   );
 }
 
-const CARD_BG = '#FFFFFF';
-const BG = '#F5F7FB';
-const PRIMARY = '#3478F5';
-const TEXT = '#111827';
-const MUTED = '#6B7280';
+const GREEN = '#E6FAE6';
+const PANEL_RADIUS = 28;
+const PRIMARY = '#2ECC71';
+const TEXT = '#1C2833';
+const MUTED = '#5D6D7E';
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: GREEN,
   },
-  header: {
+
+  /** Header (top 30%) */
+  headerArea: {
+    height: '30%',
     alignItems: 'center',
-    paddingTop: 16,
-    paddingBottom: 8,
+    justifyContent: 'center',
+    paddingTop: 8,
   },
   logo: {
     width: 96,
@@ -185,23 +210,25 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   logoCircle: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: '#E6EEFF',
+    width: 120,
+    height: 120,
+    borderRadius: 44,
+    backgroundColor: '#F5FFF5',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
+    borderWidth: 2,
+    borderColor: '#BDE6BD',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowRadius: 10,
     elevation: 3,
   },
   logoText: {
-    fontSize: 36,
+    fontSize: 38,
     fontWeight: '800',
-    color: PRIMARY,
+    color: '#2E7D32',
   },
   appTitle: {
     fontSize: 20,
@@ -214,25 +241,38 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  card: {
-    backgroundColor: CARD_BG,
-    marginHorizontal: 20,
-    marginTop: 16,
-    borderRadius: 16,
-    padding: 16,
+  /** Panel (bottom 70%) */
+  panel: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: PANEL_RADIUS,
+    borderTopRightRadius: PANEL_RADIUS,
+    paddingTop: 18,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -2 },
+    elevation: 8,
   },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    zIndex: 2,
+  panelContent: {
+    paddingHorizontal: 22,
+    paddingBottom: 30,
+  },
+  heading: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: TEXT,
+    marginTop: 6,
+  },
+  subtext: {
+    color: MUTED,
+    marginTop: 6,
+    marginBottom: 18,
+  },
+
+  /** Fields & buttons */
+  field: {
+    marginBottom: 14,
   },
   label: {
     fontSize: 13,
@@ -245,30 +285,36 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FBFBFD',
-    borderRadius: 10,
+    borderColor: '#D5DBDB',
+    backgroundColor: '#FBFBFB',
+    borderRadius: 12,
     color: TEXT,
   },
   primaryBtn: {
-    marginTop: 16,
+    marginTop: 10,
     backgroundColor: PRIMARY,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 14,
+    borderRadius: 14,
     alignItems: 'center',
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
   },
   primaryBtnText: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
   googleBtn: {
     marginTop: 10,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 14,
+    borderRadius: 14,
     alignItems: 'center',
   },
   googleBtnText: {
@@ -276,22 +322,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
-  linkText: {
-    color: MUTED,
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  linkStrong: {
-    color: PRIMARY,
-    fontWeight: '700',
-  },
-  footer: {
+
+  /** Overlay while signing in */
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.6)',
     alignItems: 'center',
-    marginTop: 14,
-    marginBottom: 6,
+    justifyContent: 'center',
+    borderTopLeftRadius: PANEL_RADIUS,
+    borderTopRightRadius: PANEL_RADIUS,
+    zIndex: 2,
   },
-  footerText: {
-    color: MUTED,
-    fontSize: 12,
-  },
+
+  /** Footer */
+
 });

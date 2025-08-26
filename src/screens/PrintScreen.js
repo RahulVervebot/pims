@@ -4,7 +4,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { PrintContext } from '../context/PrintContext';
-
+import CustomHeader from '../components/CustomHeader';
 const THEME = { primary: '#2C1E70', secondary: '#F57200', price: '#27ae60' };
 
 export default function PrintScreen() {
@@ -25,6 +25,13 @@ export default function PrintScreen() {
 
   const renderItem = ({ item }) => (
     <View style={styles.printItem}>
+         <CustomHeader
+        address="123, MG Road"
+        backgroundType="image"
+        backgroundValue="https://picsum.photos/800/200"
+        onProfilePress={() => console.log("Profile clicked")}
+        onAddressPress={() => console.log("Address clicked")}
+      />
       <Text style={styles.name}>{item.name}</Text>
       <Text style={styles.price}>${Number(item.price).toFixed(2)}</Text>
 

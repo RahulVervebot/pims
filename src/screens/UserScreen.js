@@ -1,14 +1,14 @@
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import Ionicons from 'react-native-vector-icons/Ionicons'; // back arrow
 import AppHeader from '../ProfileHeader';
 
 export default function UserScreen({ navigation }) {
   const [user_id, setUserID] = useState('');
   const [user_name, setUserName] = useState('');
   const [user_email, setUserEmail] = useState('');
+  const [user_role, setUserRole] = useState('');
 
   const handleLogout = async () => {
     try {
@@ -16,9 +16,8 @@ export default function UserScreen({ navigation }) {
     } catch (e) {
       console.log('Google signout error:', e);
     }
-    await AsyncStorage.removeItem('userId');
+    await AsyncStorage.multiRemove(['userId', 'userRole', 'userEmail', 'userName']);
 
-    // Reset to Login screen
     navigation.reset({
       index: 0,
       routes: [{ name: 'Login' }],
@@ -31,10 +30,12 @@ export default function UserScreen({ navigation }) {
         const userId = await AsyncStorage.getItem('userId');
         const userName = await AsyncStorage.getItem('userName');
         const userEmail = await AsyncStorage.getItem('userEmail');
+        const userRole = await AsyncStorage.getItem('userRole');
+
         setUserID(userId);
         setUserEmail(userEmail);
         setUserName(userName);
-        console.log('userId:', userId);
+        setUserRole(userRole);
       } catch (e) {
         navigation.replace('Login');
       }
@@ -44,27 +45,41 @@ export default function UserScreen({ navigation }) {
 
   return (
     <>
-      <AppHeader
-        title="Profile"
-        backgroundColor="#fff"
-      />
-    <View style={styles.container}>
-      {/* 🔹 Profile Info */}
-      {user_id ? (
-        <View style={styles.profileBox}>
-          <Text style={styles.name}>{user_id}</Text>
-          {/* <Image source={{ uri: userInfo.picture }} style={styles.image} /> */}
-          <Text style={styles.name}>{user_name}</Text>
-          <Text>{user_email}</Text>
+      <AppHeader title="Profile" backgroundColor="#fff" />
 
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <Text style={styles.logoutText}>Logout</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <Text style={{ marginTop: 20 }}>No user data available.</Text>
-      )}
-    </View>
+      <View style={styles.container}>
+        {user_id ? (
+          <View style={styles.profileBox}>
+            <Text style={styles.name}>{user_name}</Text>
+            <Text style={styles.email}>{user_email}</Text>
+
+            {/* 🔹 Settings Button */}
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => navigation.navigate('Settings')}
+            >
+              <Text style={styles.btnText}>Go to Settings</Text>
+            </TouchableOpacity>
+
+            {/* 🔹 Show Signup only if not customer */}
+            {user_role !== 'customer' && (
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => navigation.navigate('SignupScreen')}
+              >
+                <Text style={styles.btnText}>Go to Signup</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* 🔹 Logout Button */}
+            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={{ marginTop: 20 }}>No user data available.</Text>
+        )}
+      </View>
     </>
   );
 }
@@ -75,43 +90,45 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     backgroundColor: '#fff',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  backBtn: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-  },
   profileBox: {
     alignItems: 'center',
-    marginTop: 20,
-  },
-  image: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 10,
+    marginTop: 30,
+    padding: 20,
   },
   name: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  email: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 4,
+  },
+  userId: {
+    fontSize: 14,
+    color: '#999',
+    marginBottom: 20,
+  },
+  actionBtn: {
+    width: '80%',
+    paddingVertical: 12,
+    marginVertical: 8,
+    backgroundColor: '#007bff',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  btnText: {
+    color: '#fff',
+    fontWeight: '600',
   },
   logoutBtn: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    marginTop: 30,
+    width: '80%',
+    paddingVertical: 12,
     backgroundColor: 'red',
     borderRadius: 8,
+    alignItems: 'center',
   },
   logoutText: {
     color: '#fff',
