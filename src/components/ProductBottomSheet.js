@@ -1,7 +1,12 @@
 // src/components/ProductBottomSheet.js
-import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { forwardRef, useImperativeHandle, useRef, useState, useMemo, useEffect } from 'react';
+import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, Platform, Modal } from 'react-native';
 import RBSheet from 'react-native-raw-bottom-sheet';
+import { API_URL } from '@env';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import { Camera, CameraType } from 'react-native-camera-kit';
 
 const THEME = {
   primary: '#2C1E70',
@@ -13,115 +18,387 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   const sheetRef = useRef(null);
   const [product, setProduct] = useState(null);
 
+  // Editable fields
+  const [name, setName] = useState('');
+  const [size, setSize] = useState('');
+  const [category, setCategory] = useState('');
+  const [price, setPrice] = useState('');  // keep as string, convert on submit
+  const [sale, setSale] = useState('');    // keep as string, convert on submit
+  const [newBarcode, setNewBarcode] = useState(''); // new scanned/typed barcode
+
+  // Image (base64)
+  const [imgBase64, setImgBase64] = useState('');
+  const [imgMime, setImgMime] = useState('image/jpeg');
+
+  // Scanner
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState(false);
+
+  // UI
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const perm = Platform.OS === 'ios' ? PERMISSIONS.IOS.CAMERA : PERMISSIONS.ANDROID.CAMERA;
+        const result = await request(perm);
+        setHasCameraPermission(result === RESULTS.GRANTED);
+      } catch {
+        setHasCameraPermission(false);
+      }
+    })();
+  }, []);
+
   useImperativeHandle(ref, () => ({
     open: (p) => {
       setProduct(p || null);
+      // seed edit fields from product
+      if (p) {
+        setName(p.name || '');
+        setSize(p.size || '');
+        setCategory(p.category || '');
+        setPrice(String(p.price ?? ''));
+        setSale(p.sale != null ? String(p.sale) : '');
+        setNewBarcode(''); // blank until user scans/types a replacement
+        setImgBase64('');
+        setImgMime('image/jpeg');
+      }
       sheetRef.current?.open();
     },
     close: () => sheetRef.current?.close(),
   }));
 
+  const imageDataUri = useMemo(
+    () => (imgBase64 ? `data:${imgMime};base64,${imgBase64}` : ''),
+    [imgBase64, imgMime]
+  );
+
+  const pickFromGallery = async () => {
+    try {
+      const res = await launchImageLibrary({
+        mediaType: 'photo',
+        includeBase64: true,
+        quality: 0.8,
+        maxWidth: 1280,
+        maxHeight: 1280,
+      });
+      if (res.didCancel) return;
+      const asset = res.assets?.[0];
+      if (!asset?.base64) {
+        Alert.alert('Image', 'Could not read image data.');
+        return;
+      }
+      setImgBase64(asset.base64);
+      setImgMime(asset.type || 'image/jpeg');
+    } catch (e) {
+      Alert.alert('Image', e.message || 'Failed to pick image.');
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      const res = await launchCamera({
+        mediaType: 'photo',
+        includeBase64: true,
+        quality: 0.8,
+        maxWidth: 1280,
+        maxHeight: 1280,
+        saveToPhotos: false,
+      });
+      if (res.didCancel) return;
+      const asset = res.assets?.[0];
+      if (!asset?.base64) {
+        Alert.alert('Camera', 'Could not read image data from camera.');
+        return;
+      }
+      setImgBase64(asset.base64);
+      setImgMime(asset.type || 'image/jpeg');
+    } catch (e) {
+      Alert.alert('Camera', e.message || 'Failed to take photo.');
+    }
+  };
+
+  const onReadCode = (event) => {
+    const value = event?.nativeEvent?.codeStringValue;
+    if (value) setNewBarcode(value);
+    setScannerVisible(false);
+  };
+
+  const handleUpdate = async () => {
+    if (!product?.barcode) {
+      Alert.alert('Error', 'Original product barcode is missing.');
+      return;
+    }
+    // Build payload—only include fields user can update
+    const payload = {
+      name: name?.trim() || undefined,
+      newBarcode: newBarcode?.trim() || undefined,
+      size: size?.trim() || undefined,
+      image: imageDataUri || undefined, // base64 data URI if user picked/took a new one
+      price: price?.trim() !== '' ? Number(price) : undefined,
+      sale: sale?.trim() !== '' ? Number(sale) : undefined,
+      category: category?.trim() || undefined,
+    };
+    console.log(":payload",payload);
+
+    // Basic validation
+    if (payload.price != null && !Number.isFinite(payload.price)) {
+      Alert.alert('Validation', 'Price must be a valid number.');
+      return;
+    }
+    if (payload.sale != null && !Number.isFinite(payload.sale)) {
+      Alert.alert('Validation', 'Sale must be a valid number.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const url = `${API_URL}/api/products/by-barcode/${encodeURIComponent(product.barcode)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // show specific server message if present
+        throw new Error(data?.error || data?.message || 'Failed to update product');
+      }
+
+      Alert.alert('Success', 'Product updated successfully.');
+
+      // reflect local UI changes immediately
+      const updated = {
+        ...product,
+        ...data?.product, // if backend returns updated product
+        name: payload.name ?? product.name,
+        size: payload.size ?? product.size,
+        category: payload.category ?? product.category,
+        price: payload.price ?? product.price,
+        sale: payload.sale ?? product.sale,
+        barcode: payload.newBarcode ?? product.barcode,
+        image: imageDataUri || product.image,
+      };
+      setProduct(updated);
+
+      // reset transient image state (keep fields editable)
+      setImgBase64('');
+      setImgMime('image/jpeg');
+    } catch (e) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <RBSheet
-      ref={sheetRef}
-      height={460}
-      openDuration={220}
-      closeOnDragDown
-      customStyles={{
-        container: styles.sheetContainer,
-        draggableIcon: { backgroundColor: '#ccc', width: 60 },
-      }}
-    >
-      {!product ? (
-        <View style={styles.emptyBox}>
-          <Text style={{ color: '#888' }}>No product selected.</Text>
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 16 }}>
-          {/* Image */}
-          {product.image ? (
-            <Image source={{ uri: product.image }} style={styles.image} />
-          ) : (
-            <View style={[styles.image, styles.imagePlaceholder]}>
-              <Text style={{ color: '#aaa' }}>No Image</Text>
+    <>
+      <RBSheet
+        ref={sheetRef}
+        height={560}
+        openDuration={220}
+        closeOnDragDown
+        customStyles={{
+          container: styles.sheetContainer,
+          draggableIcon: { backgroundColor: '#ccc', width: 60 },
+        }}
+      >
+        {!product ? (
+          <View style={styles.emptyBox}>
+            <Text style={{ color: '#888' }}>No product selected.</Text>
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+            {/* Image / Preview */}
+            {imageDataUri ? (
+              <Image source={{ uri: imageDataUri }} style={styles.image} />
+            ) : product.image ? (
+              <Image source={{ uri: product.image }} style={styles.image} />
+            ) : (
+              <View style={[styles.image, styles.imagePlaceholder]}>
+                <Text style={{ color: '#aaa' }}>No Image</Text>
+              </View>
+            )}
+
+            {/* Image actions */}
+            <View style={[styles.row, { marginTop: 8 }]}>
+              <TouchableOpacity style={[styles.smallBtn, styles.ghost]} onPress={pickFromGallery}>
+                <Text style={styles.ghostText}>Pick from Gallery</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.smallBtn} onPress={takePhoto}>
+                <Text style={styles.smallBtnText}>Take Photo</Text>
+              </TouchableOpacity>
             </View>
-          )}
 
-          {/* Title & price */}
-          <View style={styles.headRow}>
-            <Text style={styles.title} numberOfLines={2}>{product.name}</Text>
-            <Text style={styles.price}>₹{Number(product.price || 0).toFixed(2)}</Text>
-          </View>
+            {/* Editable fields */}
+            <View style={{ marginTop: 12, gap: 10 }}>
+              <TextInput
+                style={styles.input}
+                placeholder="Name"
+                value={name}
+                onChangeText={setName}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Size (e.g., 200 ml)"
+                value={size}
+                onChangeText={setSize}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Category"
+                value={category}
+                onChangeText={setCategory}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Price"
+                value={price}
+                onChangeText={setPrice}
+                keyboardType="decimal-pad"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Sale (optional, e.g., 0.2)"
+                value={sale}
+                onChangeText={setSale}
+                keyboardType="decimal-pad"
+                autoCapitalize="none"
+              />
 
-          {/* Meta */}
-          <View style={styles.metaBox}>
-            {!!product.size && <Text style={styles.meta}>Size: {product.size}</Text>}
-            {!!product.category && <Text style={styles.meta}>Category: {product.category}</Text>}
-            {!!product.barcode && <Text style={styles.meta}>Barcode: {product.barcode}</Text>}
-          </View>
+              {/* Original barcode (read-only) */}
+              <View>
+                <Text style={styles.metaLabel}>Original Barcode</Text>
+                <Text style={styles.metaValue}>{product.barcode || '—'}</Text>
+              </View>
 
-          {/* Actions */}
-          <View style={styles.row}>
+              {/* New barcode with scanner icon */}
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.inputWithRightIcon}
+                  placeholder="New Barcode (optional)"
+                  value={newBarcode}
+                  onChangeText={setNewBarcode}
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  style={styles.inputRightIcon}
+                  onPress={() => {
+                    if (hasCameraPermission) setScannerVisible(true);
+                    else Alert.alert('Camera Permission', 'Please allow camera access in Settings.');
+                  }}
+                  hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                >
+                  <Icon name="camera-alt" size={22} color="#333" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Actions */}
+            <View style={[styles.row, { marginTop: 16 }]}>
+              <TouchableOpacity
+                style={[styles.btn, { backgroundColor: THEME.secondary }]}
+                onPress={() => onAddToCart?.(product)}
+              >
+                <Text style={styles.btnText}>Add to Cart</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.btn, { backgroundColor: THEME.primary }]}
+                onPress={() => onAddToPrint?.(product)}
+              >
+                <Text style={styles.btnText}>Add to Print</Text>
+              </TouchableOpacity>
+            </View>
+
             <TouchableOpacity
-              style={[styles.btn, { backgroundColor: THEME.secondary }]}
-              onPress={() => onAddToCart?.(product)}
+              style={[styles.btn, { marginTop: 10, backgroundColor: '#1B9C85', opacity: submitting ? 0.6 : 1 }]}
+              disabled={submitting}
+              onPress={handleUpdate}
             >
-              <Text style={styles.btnText}>Add to Cart</Text>
+              <Text style={styles.btnText}>{submitting ? 'Updating…' : 'Update Product'}</Text>
             </TouchableOpacity>
+          </ScrollView>
+        )}
+      </RBSheet>
 
-            <TouchableOpacity
-              style={[styles.btn, { backgroundColor: THEME.primary }]}
-              onPress={() => onAddToPrint?.(product)}
-            >
-              <Text style={styles.btnText}>Add to Print</Text>
+      {/* Fullscreen Scanner */}
+      <Modal visible={scannerVisible} animationType="slide">
+        {hasCameraPermission ? (
+          <View style={{ flex: 1 }}>
+            <Camera
+              style={styles.camera}
+              cameraType={CameraType.Back}
+              scanBarcode
+              onReadCode={onReadCode}
+            />
+            <View style={styles.controls}>
+              <TouchableOpacity style={styles.controlBtn} onPress={() => setScannerVisible(false)}>
+                <Text style={styles.controlText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.permissionDenied}>
+            <Text style={{ color: 'red' }}>
+              Camera permission denied. Please allow access in settings.
+            </Text>
+            <TouchableOpacity style={[styles.controlBtn, { marginTop: 16 }]} onPress={() => setScannerVisible(false)}>
+              <Text style={styles.controlText}>Close</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
-      )}
-    </RBSheet>
+        )}
+      </Modal>
+    </>
   );
 });
 
 export default ProductBottomSheet;
 
 const styles = StyleSheet.create({
-  sheetContainer: {
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    padding: 12,
-  },
+  sheetContainer: { borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 12 },
   emptyBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  image: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-    resizeMode: 'cover',
-  },
-  imagePlaceholder: {
-    backgroundColor: '#f2f2f2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headRow: {
-    marginTop: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  title: { flex: 1, color: '#111', fontWeight: '700', fontSize: 18 },
-  price: { color: '#27ae60', fontWeight: '800', fontSize: 16 },
+
+  image: { width: '100%', height: 200, borderRadius: 12, resizeMode: 'contain'},
+  imagePlaceholder: { backgroundColor: '#f2f2f2', alignItems: 'center', justifyContent: 'center' },
+
   metaBox: { marginTop: 6, gap: 4 },
   meta: { color: '#555' },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-  },
-  btn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
+  metaLabel: { color: '#666', fontSize: 12 },
+  metaValue: { color: '#111', fontWeight: '600', marginTop: 2 },
+
+  row: { flexDirection: 'row', gap: 12 },
+  btn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: '700' },
+
+  smallBtn: { backgroundColor: THEME.secondary, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 },
+  smallBtnText: { color: '#fff', fontWeight: '700' },
+  ghost: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd' },
+  ghostText: { color: '#333', fontWeight: '700' },
+
+  input: {
+    borderWidth: 1, borderColor: '#ddd', borderRadius: 8,
+    paddingVertical: 10, paddingHorizontal: 12, color: '#333',
+  },
+  inputWrapper: { position: 'relative', marginTop: 0 },
+  inputWithRightIcon: {
+    borderWidth: 1, borderColor: '#ddd', borderRadius: 8,
+    paddingVertical: 10, paddingLeft: 12, paddingRight: 44, color: '#333', backgroundColor: '#fff',
+  },
+  inputRightIcon: {
+    position: 'absolute', right: 12, top: '50%', marginTop: -14,
+    justifyContent: 'center', alignItems: 'center', height: 28, width: 28,
+  },
+
+  camera: { flex: 1 },
+  controls: {
+    position: 'absolute', bottom: 30, width: '100%',
+    flexDirection: 'row', justifyContent: 'center', gap: 10,
+  },
+  controlBtn: {
+    backgroundColor: '#000000AA', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8,
+  },
+  controlText: { color: '#fff', fontWeight: '700' },
+  permissionDenied: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
 });
