@@ -1,15 +1,13 @@
-// components/CustomHeader.js
+// components/ReportHeader.js
 import React,{useEffect,useState} from 'react';
 import { View, StyleSheet, ImageBackground, TouchableOpacity,Image,Text  } from 'react-native';
 import Profile from "../assets/icons/Profile.svg";
-import TulsiLogo from '../assets/images/Tulsi.svg';
-import TulsiWhiteLogo from '../assets/icons/Icon_Tulsi.png'
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
 
-  
-const CustomHeader = ({ 
+const AppHeader = ({ 
   Title, 
   backgroundType = "color", 
   backgroundValue = "#fff", 
@@ -67,14 +65,15 @@ const CustomHeader = ({
 const renderContent = () => (
   <View style={styles.content}>
     {/* Left */}
-    <View style={styles.logo}>
-      <Image source={TulsiWhiteLogo} style={styles.rowIcon} />
-      <View>
-        <Text style={styles.headerUser}>Hello,</Text>
-        <Text style={styles.headerName}>{toTitleCase(user_name)}</Text>
-      </View>
-    </View>
-
+      <TouchableOpacity  onPress={() => {
+       if (navigation.canGoBack()) {
+         navigation.goBack();
+       } else {
+         navigation.navigate('Tabs'); // fallback screen
+       }
+     }} style={styles.leftIcon}>
+           <Ionicons name="arrow-back-outline" size={24} color="#000" />
+         </TouchableOpacity>
     {/* Center (absolute) */}
     <View style={styles.titleOverlay} pointerEvents="none">
       <Text
@@ -86,10 +85,6 @@ const renderContent = () => (
       </Text>
     </View>
 
-    {/* Right */}
-    <TouchableOpacity style={styles.profileBtn} onPress={() => navigation.navigate('Profile')}>
-      <Profile width={36} height={36} />
-    </TouchableOpacity>
   </View>
 );
 
@@ -101,7 +96,7 @@ const styles = StyleSheet.create({
   logo: { flexDirection: 'row' },
   headerContainer: {
     paddingHorizontal: 25,
-    paddingVertical: 20,
+    paddingVertical: 10,
   },
   content: {
     position: 'relative',
@@ -133,4 +128,4 @@ const styles = StyleSheet.create({
 });
 
 
-export default CustomHeader;
+export default AppHeader;

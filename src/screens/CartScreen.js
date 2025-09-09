@@ -1,16 +1,17 @@
 // src/screens/CartScreen.js
 import React, { useEffect, useContext } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet,ImageBackground } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { CartContext } from '../context/CartContext';
-import AppHeader from '../ProfileHeader';
+import AppHeader from '../components/AppHeader';
+import reportbg from '../assets/images/report-bg.png';
 const THEME = { primary: '#2C1E70', secondary: '#F57200', price: '#27ae60' };
 
 export default function CartScreen() {
   const navigation = useNavigation();
   const { cart, increaseQty, decreaseQty, removeFromCart, setCart } = useContext(CartContext);
-
+    const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
   useEffect(() => {
     (async () => {
       const storedCart = await AsyncStorage.getItem('cart');
@@ -45,8 +46,15 @@ export default function CartScreen() {
   );
 
   return (
-    <>
-  < AppHeader  title="Cart" />
+  <ImageBackground
+              source={getImageSource(reportbg)}
+              style={styles.screen}
+              resizeMode="cover"
+            >
+      <AppHeader  Title="CART"
+      backgroundType="image" backgroundValue={reportbg}>
+
+      </AppHeader>
     <View style={styles.container}>
       <FlatList
         data={cart}
@@ -67,11 +75,14 @@ export default function CartScreen() {
         </View>
       )}
     </View>
-    </>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  screen:{
+    flex: 1
+  },
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
   cartItem: { flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
   name: { fontWeight: '600', fontSize: 15, color: THEME.primary },

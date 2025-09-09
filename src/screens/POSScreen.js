@@ -10,7 +10,7 @@ import TopSellingCategories from '../assets/icons/Top-Selling-Categories.png'
 import { useNavigation } from '@react-navigation/native';
 const PANEL_RADIUS = 28;
 
-export default function ReportScreen() {
+export default function POSScreen() {
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const styles = getStyles(isTablet);
@@ -29,25 +29,23 @@ export default function ReportScreen() {
   );
 
   return (
-      <ImageBackground
-              source={getImageSource(reportbg)}
-              style={styles.screen}
-              resizeMode="cover"
-            >
-      <CustomHeader Title="REPORTS"
+<ImageBackground
+ source={getImageSource(reportbg)}
+ style={styles.screen}
+resizeMode="cover"
+>
+      <CustomHeader Title="POS FEATURES"
       backgroundType="image" backgroundValue={reportbg}>
       </CustomHeader>  
         <View style={styles.panelInner}>
            <TouchableOpacity
                       style={styles.checkoutBtn}
-                      onPress={() => navigation.navigate('SaleSummaryReport')}
+                      onPress={() => navigation.navigate('OcrScreen')}
                     >
-                  <Row icon={SaleSummaryReport} label="Sales Summary Reports" isFirst />
+                  <Row icon={SaleSummaryReport} label="Create New Invoice" isFirst />
                     </TouchableOpacity>
-          <Row icon={HourlyReport} label="Hourly Reports" />
-          <Row icon={TopCustumerList} label="Top Customer List" />
-          <Row icon={TopSellingProducts} label="Top Selling Products" />
-          <Row icon={TopSellingCategories} label="Top Selling Categories" isLast />
+          <Row icon={HourlyReport} label="Vendor List" />
+          <Row icon={TopCustumerList} label="Invoice List" />
         </View>
            
         </ImageBackground>

@@ -1,5 +1,4 @@
-// src/components/ProductBottomSheet.js
-import React, { forwardRef, useImperativeHandle, useRef, useState, useMemo, useEffect } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useState, useMemo, useEffect,useContext } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, Platform, Modal } from 'react-native';
 import RBSheet from 'react-native-raw-bottom-sheet';
 import { API_URL } from '@env';
@@ -7,7 +6,10 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { Camera, CameraType } from 'react-native-camera-kit';
-
+import { getTopCategories } from '../functions/function';
+import { CartContext } from '../context/CartContext';
+import { PrintContext } from '../context/PrintContext';
+import { Picker } from '@react-native-picker/picker';
 const THEME = {
   primary: '#2C1E70',
   secondary: '#F57200',
@@ -15,27 +17,41 @@ const THEME = {
 };
 
 const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
-  const sheetRef = useRef(null);
-  const [product, setProduct] = useState(null);
 
+  const sheetRef = useRef(null);
+  const { cart, addToCart, increaseQty, decreaseQty } = useContext(CartContext);
+  const { print, addToPrint, increasePrintQty, decreasePrintQty } = useContext(PrintContext);
+  const [product, setProduct] = useState(null);
   // Editable fields
   const [name, setName] = useState('');
+    const [id, setID] = useState('');
   const [size, setSize] = useState('');
   const [category, setCategory] = useState('');
   const [price, setPrice] = useState('');  // keep as string, convert on submit
   const [sale, setSale] = useState('');    // keep as string, convert on submit
   const [newBarcode, setNewBarcode] = useState(''); // new scanned/typed barcode
-
   // Image (base64)
   const [imgBase64, setImgBase64] = useState('');
   const [imgMime, setImgMime] = useState('image/jpeg');
-
+  const [allCats, setAllCats] = useState([]);
   // Scanner
   const [scannerVisible, setScannerVisible] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
-
   // UI
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const cats = await getTopCategories();
+        setAllCats((cats));
+      } catch (e) {
+        console.error("Failed to fetch categories:", e?.message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -50,11 +66,12 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   }, []);
 
   useImperativeHandle(ref, () => ({
+    
     open: (p) => {
       setProduct(p || null);
-      // seed edit fields from product
       if (p) {
         setName(p.name || '');
+        setID(p._id || '');
         setSize(p.size || '');
         setCategory(p.category || '');
         setPrice(String(p.price ?? ''));
@@ -139,7 +156,6 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
       sale: sale?.trim() !== '' ? Number(sale) : undefined,
       category: category?.trim() || undefined,
     };
-    console.log(":payload",payload);
 
     // Basic validation
     if (payload.price != null && !Number.isFinite(payload.price)) {
@@ -159,6 +175,7 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      console.log("payload:", payload);
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
@@ -181,7 +198,6 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
         image: imageDataUri || product.image,
       };
       setProduct(updated);
-
       // reset transient image state (keep fields editable)
       setImgBase64('');
       setImgMime('image/jpeg');
@@ -191,6 +207,8 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
       setSubmitting(false);
     }
   };
+      const inCart = cart.find((p) => p._id === id);
+    const inPrint = print.find((p) => p._id === id);
 
   return (
     <>
@@ -245,12 +263,27 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                 value={size}
                 onChangeText={setSize}
               />
-              <TextInput
+              {/* <TextInput
                 style={styles.input}
                 placeholder="Category"
                 value={category}
                 onChangeText={setCategory}
-              />
+              /> */}
+              <View style={styles.pickerWrapper}>
+                <Picker
+                  selectedValue={category}
+                  onValueChange={(itemValue) => setCategory(itemValue)}
+                >
+                  <Picker.Item label="Select Category" value="" />
+                  {allCats.map(cat => (
+                    <Picker.Item
+                      key={cat._id}
+                      label={cat.category}
+                      value={cat.category}
+                    />
+                  ))}
+                </Picker>
+              </View>
               <TextInput
                 style={styles.input}
                 placeholder="Price"
@@ -295,23 +328,45 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
               </View>
             </View>
 
-            {/* Actions */}
             <View style={[styles.row, { marginTop: 16 }]}>
+                {inCart ? (
+                            <View style={styles.qtyRow}>
+                              <TouchableOpacity style={styles.qtyBtn} onPress={() => decreaseQty(product._id)}>
+                                <Text style={styles.qtyText}>-</Text>
+                              </TouchableOpacity>
+                              <Text style={styles.qtyValue}>{inCart.qty}</Text>
+                              <TouchableOpacity style={styles.qtyBtn} onPress={() => increaseQty(product._id)}>
+                                <Text style={styles.qtyText}>+</Text>
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
               <TouchableOpacity
                 style={[styles.btn, { backgroundColor: THEME.secondary }]}
-                onPress={() => onAddToCart?.(product)}
+                onPress={() => addToCart(product)}
               >
                 <Text style={styles.btnText}>Add to Cart</Text>
               </TouchableOpacity>
-
+                          )}
+                          {inPrint ? (
+                                        <View style={[styles.qtyRow, { marginTop: 8 }]}>
+                                          <TouchableOpacity style={styles.qtyBtn} onPress={() => decreasePrintQty(product._id)}>
+                                            <Text style={styles.qtyText}>-</Text>
+                                          </TouchableOpacity>
+                                          <Text style={styles.qtyValue}>{inPrint.qty}</Text>
+                                          <TouchableOpacity style={styles.qtyBtn} onPress={() => increasePrintQty(product._id)}>
+                                            <Text style={styles.qtyText}>+</Text>
+                                          </TouchableOpacity>
+                                        </View>
+                                      ) : (
               <TouchableOpacity
                 style={[styles.btn, { backgroundColor: THEME.primary }]}
-                onPress={() => onAddToPrint?.(product)}
+                onPress={() => addToPrint(product)}
               >
                 <Text style={styles.btnText}>Add to Print</Text>
               </TouchableOpacity>
+                )}
             </View>
-
+           
             <TouchableOpacity
               style={[styles.btn, { marginTop: 10, backgroundColor: '#1B9C85', opacity: submitting ? 0.6 : 1 }]}
               disabled={submitting}
@@ -352,6 +407,7 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
       </Modal>
     </>
   );
+
 });
 
 export default ProductBottomSheet;
@@ -360,7 +416,7 @@ const styles = StyleSheet.create({
   sheetContainer: { borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 12 },
   emptyBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  image: { width: '100%', height: 200, borderRadius: 12, resizeMode: 'contain'},
+  image: { width: '100%', height: 200, borderRadius: 12, resizeMode: 'contain' },
   imagePlaceholder: { backgroundColor: '#f2f2f2', alignItems: 'center', justifyContent: 'center' },
 
   metaBox: { marginTop: 6, gap: 4 },
@@ -401,4 +457,17 @@ const styles = StyleSheet.create({
   },
   controlText: { color: '#fff', fontWeight: '700' },
   permissionDenied: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  pickerWrapper: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    marginTop: 10,
+    overflow: 'hidden',
+  },
+    cartBtnText: { color: '#fff', fontWeight: 'bold' },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  qtyBtn: { backgroundColor: '#2c1e70', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 },
+  qtyText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  qtyValue: { marginHorizontal: 10, fontSize: 16, fontWeight: 'bold', color: '#000' },
+
 });

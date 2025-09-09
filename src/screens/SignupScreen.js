@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { API_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import AppHeader from '../ProfileHeader';
+import AppHeader from '../components/AppHeader';
 import TulsiLogo from '../assets/images/Tulsi.svg'
 export default function SignupScreen({ navigation }) {
   const [name, setName] = useState('');

@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -26,12 +25,17 @@ import ReportScreen from './src/screens/ReportScreen';
 import UserScreen from './src/screens/UserScreen';
 import CartScreen from './src/screens/CartScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
+import SaleSummaryReport from './src/screens/SalesSummaryReport';
 import PrintScreen from './src/screens/PrintScreen';
 import AppProviders from './src/context/AppProviders';
+import OcrScreen from './src/components/icms/OcrCameraScreen';
+import SettingScreen from './src/screens/SettingScreen';
+import POSScreen from './src/screens/POSScreen';
+import ICMSScreen from './src/screens/ICMSScreen';
 //icons 
 import HomeIcon from './src/assets/icons/HomeIcon.svg';
 import CartIcon from './src/assets/icons/Carticon.svg';
-import PromotionIcon from './src/assets/icons/Promotionicon.svg';
+import PrinterIcon from './src/assets/icons/Printericon.svg';
 import ReportIcon from './src/assets/icons/Reportsicon.svg';
 const Stack = createNativeStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -75,22 +79,21 @@ function BottomTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarShowLabel: false,
-
+         headerShown: false,
+         tabBarShowLabel: false,
         // Tab bar container
-          tabBarStyle: {
-          backgroundColor: '#fff',
-          height: BAR_HEIGHT,             // ensures consistent bar height
-          paddingBottom: BAR_PAD_BOTTOM,  // safe-area / gesture-nav
-          borderTopWidth: 0,              // we'll draw our own top strip
-          elevation: 10,
-          shadowColor: '#000',
-          shadowOpacity: 0.06,
-          shadowRadius: 6,
-          shadowOffset: { width: 0, height: -2 },
-        },
-
+        //        tabBarStyle: {
+        //   backgroundColor: '#fff',
+        //   height: BAR_HEIGHT,
+        //   paddingBottom: BAR_PAD_BOTTOM, 
+        //   borderTopWidth: 0,            
+        //   elevation: 10,
+        //   shadowColor: '#000',
+        //   shadowOpacity: 0.06,
+        //   shadowRadius: 6,
+        //   shadowOffset: { width: 0, height: -2 },
+        // },
+   
         // Center the icon in each tab item
         tabBarItemStyle: {
           justifyContent: 'center',
@@ -103,8 +106,8 @@ function BottomTabs() {
           switch (route.name) {
             case 'Home':   IconComp = HomeIcon; break;
             case 'Report': IconComp = ReportIcon; break;
-            case 'Cart':   IconComp = CartIcon; break;
-            case 'Print':  IconComp = PromotionIcon; break;
+            case 'ICMSScreen':   IconComp = CartIcon; break;
+            case 'POSScreen':  IconComp = PrinterIcon; break;
             default: return null;
           }
 
@@ -115,22 +118,19 @@ function BottomTabs() {
                 width: '100%',
                 height: '100%',
                 alignItems: 'center',
-                justifyContent: 'center', // 👈 centers the icon vertically & horizontally
+                justifyContent: 'center',
                 overflow: 'hidden', 
-                      // keep strip inside the bar
               }}
             >
               {/* Top strip ATTACHED to the bar’s inner top edge */}
               <View
-                style={{
-                  position: 'absolute',
-                  top: 0, left: 0, right: 0,            // ensures consistent bar height
-             
-                  height: 2,
-                  backgroundColor: focused ? '#F57200' : 'transparent',
-                }}
+                // style={{
+                //   position: 'absolute',
+                //   top: 0, left: 0, right: 0,            // ensures consistent bar height
+                //   height: 2,
+                //   backgroundColor: focused ? '#F57200' : 'transparent',
+                // }}
               />
-
               {/* Icon */}
               <IconComp
                 width={size ?? 24}
@@ -142,10 +142,11 @@ function BottomTabs() {
         },
       })}
     >
+
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Report" component={ReportScreen} />
-      {/* <Tab.Screen name="Cart" component={CartScreen} /> */}
-      <Tab.Screen name="Print" component={PrintScreen} />
+      <Tab.Screen name="POSScreen" component={POSScreen} />
+       <Tab.Screen name="ICMSScreen" component={ICMSScreen} />
     </Tab.Navigator>
   );
 }
@@ -193,8 +194,12 @@ export default function App() {
         <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Cart" component={CartScreen} />
-          <Stack.Screen name="Checkout" component={CheckoutScreen} />      
-           <Stack.Screen name="SignupScreen" component={SignupScreen} />
+       <Stack.Screen name="Checkout" component={CheckoutScreen} />    
+      <Stack.Screen name="SaleSummaryReport" component={SaleSummaryReport} />     
+      <Stack.Screen name="OcrScreen" component={OcrScreen} />     
+       <Stack.Screen name="SettingScreen" component={SettingScreen} />    
+     <Stack.Screen name="PrintScreen" component={PrintScreen} />    
+      <Stack.Screen name="SignupScreen" component={SignupScreen} />
           <Stack.Screen name="MainDrawer" component={MainDrawer} />
       <Stack.Screen
         name="CategoryProducts"

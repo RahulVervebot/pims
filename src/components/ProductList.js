@@ -64,7 +64,13 @@ export default function ProductList({ category, backgroundUri, showFloatingCart 
   };
 
   const openDetails = (item) => sheetRef.current?.open(item);
-
+  const goToCategory = (cat) => {
+    console.log("cat:",cat);
+    navigation.navigate("CategoryProducts", {
+      category: category,
+      backgroundUri: backgroundUri || null,
+    });
+  };
   const renderProduct = ({ item }) => {
     const inCart = cart.find((p) => p._id === item._id);
     const inPrint = print.find((p) => p._id === item._id);
@@ -80,7 +86,6 @@ export default function ProductList({ category, backgroundUri, showFloatingCart 
             <Text style={styles.price}>₹{Number(item.price || 0).toFixed(2)}</Text>
             {!!item.category && <Text style={styles.metaText} numberOfLines={1}>{item.category}</Text>}
           </View>
-
           {/* Bottom actions pinned */}
           <View>
             {inCart ? (
@@ -98,7 +103,7 @@ export default function ProductList({ category, backgroundUri, showFloatingCart 
                 <Text style={styles.cartBtnText}>Add to Cart</Text>
               </TouchableOpacity>
             )}
-
+            
             {inPrint ? (
               <View style={[styles.qtyRow, { marginTop: 8 }]}>
                 <TouchableOpacity style={styles.qtyBtn} onPress={() => decreasePrintQty(item._id)}>
@@ -128,18 +133,23 @@ export default function ProductList({ category, backgroundUri, showFloatingCart 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
       {/* Banner BEFORE list */}
+        <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => goToCategory(category)}
+             
+            >
       <Image source={bgSource} style={styles.banner(bannerHeight)} resizeMode="cover" />
-
+</TouchableOpacity>
       {/* Grid list */}
       <FlatList
         key={COLS}                                 // force layout recalculation when COLS changes
         data={products}
-        horizontal
+         horizontal
         keyExtractor={(item) => String(item._id)}
         renderItem={renderProduct}
         // numColumns={COLS}
         // columnWrapperStyle={{ gap: GAP }}          // horizontal gap between items
-        contentContainerStyle={{
+         contentContainerStyle={{
           paddingHorizontal: H_PADDING,
           paddingTop: 10,
           paddingBottom: (showFloatingCart ? FLOATING_BOTTOM + 80 : 16),
@@ -167,6 +177,7 @@ export default function ProductList({ category, backgroundUri, showFloatingCart 
       />
     </View>
   );
+
 }
 
 const styles = StyleSheet.create({

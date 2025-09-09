@@ -18,6 +18,9 @@ import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { request, PERMISSIONS, RESULTS } from "react-native-permissions";
 import { Camera, CameraType } from "react-native-camera-kit";
+import { getTopCategories } from '../functions/function';
+import { Picker } from '@react-native-picker/picker';
+
 export default function CreateProductModal({ visible, onClose, onCreated }) {
   const [name, setName] = useState('');
   const [size, setSize] = useState('');
@@ -31,7 +34,9 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
   const isHandlingScanRef = useRef(false);
   const [imgBase64, setImgBase64] = useState('');
   const [imgMime, setImgMime] = useState('image/jpeg');
+  const [allCats, setAllCats] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+
   useEffect(() => {
     (async () => {
       let result;
@@ -43,6 +48,20 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
       setHasCameraPermission(result === RESULTS.GRANTED);
     })();
   }, []);
+
+    useEffect(() => {
+      (async () => {
+        try {
+          const cats = await getTopCategories();
+          setAllCats((cats));
+        } catch (e) {
+          console.error("Failed to fetch categories:", e?.message);
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }, []);
+
   const priceNumber = useMemo(() => {
     const n = parseFloat(price);
     return Number.isFinite(n) ? n : NaN;
@@ -129,7 +148,6 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
         return;
       }
       setSubmitting(true);
-
       // If your backend wants RAW base64 (no data URI), use imgBase64 instead of imageDataUri.
       const body = {
         name: name.trim(),
@@ -140,13 +158,12 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
         sale: saleNumber || undefined,
         category: category.trim() || undefined,
       };
-      console.log("body:",body);
       const res = await fetch(`${API_URL}/api/products`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-
+console.log("body:",body);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to create product');
 
@@ -155,10 +172,12 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
       onCreated?.(data?.product || body);
       onClose?.();
     } catch (e) {
+      console.log("error",e);
       Alert.alert('Error', e.message);
     } finally {
       setSubmitting(false);
     }
+
   };
 
   return (
@@ -247,12 +266,27 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
             onChangeText={setSale}
             autoCapitalize="none"
 />
-          <TextInput
+          {/* <TextInput
             style={styles.input}
             placeholder="Category (e.g., Hair Care)"
             value={category}
             onChangeText={setCategory}
-          />
+          /> */}
+<View style={styles.pickerWrapper}>
+  <Picker
+    selectedValue={category}
+    onValueChange={(itemValue) => setCategory(itemValue)}
+  >
+    <Picker.Item label="Select Category" value="" />
+    {allCats.map(cat => (
+      <Picker.Item 
+        key={cat._id} 
+        label={cat.category} 
+        value={cat.category} 
+      />
+    ))}
+  </Picker>
+</View>
           <View style={styles.rowRight}>
             <TouchableOpacity style={[styles.btn, styles.btnGhost]} onPress={onClose} disabled={submitting}>
               <Text style={[styles.btnText, styles.btnGhostText]}>Cancel</Text>
@@ -386,5 +420,11 @@ inputRightIcon: {
   height: 28,
   width: 28,
 },
-
+pickerWrapper: {
+  borderWidth: 1,
+  borderColor: '#ddd',
+  borderRadius: 8,
+  marginTop: 10,
+  overflow: 'hidden',
+}
 });

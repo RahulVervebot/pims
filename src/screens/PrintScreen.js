@@ -1,16 +1,17 @@
 // src/screens/printScreen.js
 import React, { useEffect, useContext } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet,ImageBackground } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { PrintContext } from '../context/PrintContext';
-import CustomHeader from '../components/CustomHeader';
+import AppHeader from '../components/AppHeader';
+import reportbg from '../assets/images/report-bg.png';
 const THEME = { primary: '#2C1E70', secondary: '#F57200', price: '#27ae60' };
 
 export default function PrintScreen() {
   const navigation = useNavigation();
   const { print, increasePrintQty, decreasePrintQty, removeFromprint, setPrint } = useContext(PrintContext);
-
+  const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
   useEffect(() => {
     (async () => {
       const storedprint = await AsyncStorage.getItem('print');
@@ -25,13 +26,6 @@ export default function PrintScreen() {
 
   const renderItem = ({ item }) => (
     <View style={styles.printItem}>
-         <CustomHeader
-        address="123, MG Road"
-        backgroundType="image"
-        backgroundValue="https://picsum.photos/800/200"
-        onProfilePress={() => console.log("Profile clicked")}
-        onAddressPress={() => console.log("Address clicked")}
-      />
       <Text style={styles.name}>{item.name}</Text>
       <Text style={styles.price}>${Number(item.price).toFixed(2)}</Text>
 
@@ -52,6 +46,15 @@ export default function PrintScreen() {
   );
 
   return (
+     <ImageBackground
+              source={getImageSource(reportbg)}
+              style={styles.screen}
+              resizeMode="cover"
+            >
+      <AppHeader Title="PRINT"
+      backgroundType="image" backgroundValue={reportbg}>
+
+      </AppHeader>
     <View style={styles.container}>
       <FlatList
         data={print}
@@ -71,10 +74,14 @@ export default function PrintScreen() {
         </View>
       )}
     </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  screen:{
+flex: 1
+  },
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
   printItem: { flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' },
   name: { fontWeight: '600', fontSize: 15, color: THEME.primary },

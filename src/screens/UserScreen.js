@@ -1,9 +1,9 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity,ImageBackground } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import AppHeader from '../ProfileHeader';
-
+import AppHeader from "../components/AppHeader"; 
+import reportbg from '../assets/images/report-bg.png';
 export default function UserScreen({ navigation }) {
   const [user_id, setUserID] = useState('');
   const [user_name, setUserName] = useState('');
@@ -23,7 +23,7 @@ export default function UserScreen({ navigation }) {
       routes: [{ name: 'Login' }],
     });
   };
-
+  const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
   useEffect(() => {
     const checkLogin = async () => {
       try {
@@ -44,9 +44,15 @@ export default function UserScreen({ navigation }) {
   }, []);
 
   return (
-    <>
-      <AppHeader title="Profile" backgroundColor="#fff" />
+        <ImageBackground
+              source={getImageSource(reportbg)}
+              style={styles.screen}
+              resizeMode="cover"
+            >
+      <AppHeader Title="PROFILE"
+      backgroundType="image" backgroundValue={reportbg}>
 
+      </AppHeader>
       <View style={styles.container}>
         {user_id ? (
           <View style={styles.profileBox}>
@@ -80,11 +86,14 @@ export default function UserScreen({ navigation }) {
           <Text style={{ marginTop: 20 }}>No user data available.</Text>
         )}
       </View>
-    </>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+   screen: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     paddingTop: 40,

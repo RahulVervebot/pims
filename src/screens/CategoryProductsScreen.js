@@ -1,30 +1,35 @@
 // src/screens/CategoryProductsScreen.js
+// src/screens/CategoryProductsScreen.js
 import React from "react";
-import { View, StyleSheet } from "react-native";
-import ProductList from "../components/ProductList";
-import CustomHeader from "../components/CustomHeader";
+import { View, StyleSheet,ImageBackground } from "react-native";
+import CategoryProductList from "../components/CategoryProductList";
 import ProductSearch from "../components/ProductSearch";
-import AppHeader from "../ProfileHeader"; 
+import reportbg from '../assets/images/report-bg.png';
+import AppHeader from "../components/AppHeader"; 
+import {capitalizeWords} from '../functions/function';
 export default function CategoryProductsScreen({ route }) {
   const { category, backgroundUri } = route.params || {};
+    const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
   return (
-    <>
-        <AppHeader
-        title={category}
-        />
+<ImageBackground source={getImageSource(reportbg)} style={styles.screen} resizeMode="cover">
+      <AppHeader
+      Title={category == 'all' ? 'Latest Products':  capitalizeWords(String(category || ""))}
+      backgroundType="image" backgroundValue={reportbg}>
         <View style={styles.searchbar}>
         <ProductSearch/>
         </View>
-      
+        </AppHeader>
     <View style={styles.container}>
-      
-      <ProductList category={category} backgroundUri={backgroundUri} />
+      <CategoryProductList category={category} backgroundUri={backgroundUri} />
     </View>
-    </>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+    screen: {
+    flex: 1,
+  },
+  container: { flex: 1},
   searchbar:{marginHorizontal: 25}
 });

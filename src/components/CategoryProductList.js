@@ -17,7 +17,7 @@ import { getCategoryProducts, getLatestProducts } from '../functions/function';
 import fallbackBg from '../assets/images/green-bg.jpg';
 import ProductBottomSheet from './ProductBottomSheet';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-export default function ProductList({ category, backgroundUri, showFloatingCart = false }) {
+export default function CategoryProductList({ category, backgroundUri, showFloatingCart = false }) {
   const navigation = useNavigation();
   const [products, setProducts] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,7 +30,7 @@ export default function ProductList({ category, backgroundUri, showFloatingCart 
   const isTablet = width >= 768;
 
   // --- Responsive layout math ---
-  const COLS = isTablet ? 5 : 3;                   // <- requirement
+ const COLS = isTablet ? 4 : 3; // ✅ 4 for tablet, 3 for mobile                 // <- requirement
   const GAP = isTablet ? 14 : 10;                  // space between cards
   const H_PADDING = 12;                            // list horizontal padding
   const bannerHeight = Math.min(isTablet ? 260 : 200, Math.round((width * 9) / 16));
@@ -64,7 +64,13 @@ export default function ProductList({ category, backgroundUri, showFloatingCart 
   };
 
   const openDetails = (item) => sheetRef.current?.open(item);
-
+  const goToCategory = (cat) => {
+    console.log("cat:",cat);
+    navigation.navigate("CategoryProducts", {
+      category: category,
+      backgroundUri: backgroundUri || null,
+    });
+  };
   const renderProduct = ({ item }) => {
     const inCart = cart.find((p) => p._id === item._id);
     const inPrint = print.find((p) => p._id === item._id);
@@ -127,26 +133,33 @@ export default function ProductList({ category, backgroundUri, showFloatingCart 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
       {/* Banner BEFORE list */}
+        <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => goToCategory(category)}
+             
+            >
       <Image source={bgSource} style={styles.banner(bannerHeight)} resizeMode="cover" />
-
+</TouchableOpacity>
       {/* Grid list */}
-      <FlatList
-        key={COLS}                                 // force layout recalculation when COLS changes
-        data={products}
-        horizontal
-        keyExtractor={(item) => String(item._id)}
-        renderItem={renderProduct}
-        // numColumns={COLS}
-        // columnWrapperStyle={{ gap: GAP }}          // horizontal gap between items
-        contentContainerStyle={{
-          paddingHorizontal: H_PADDING,
-          paddingTop: 10,
-          paddingBottom: (showFloatingCart ? FLOATING_BOTTOM + 80 : 16),
-          gap: GAP,                                // vertical gap between rows
-        }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchProducts} />}
-        showsVerticalScrollIndicator={false}
-      />
+  <FlatList
+  key={COLS} // re-render if column count changes
+  data={products}
+  keyExtractor={(item) => String(item._id)}
+  renderItem={renderProduct}
+  numColumns={COLS} // ✅ 3 on mobile, 4 on tablet
+  columnWrapperStyle={{ gap: GAP }} // ✅ horizontal gap
+  contentContainerStyle={{
+    paddingHorizontal: H_PADDING,
+    paddingTop: 10,
+    paddingBottom: showFloatingCart ? FLOATING_BOTTOM + 80 : 16,
+    rowGap: GAP, // ✅ vertical gap between rows
+  }}
+  refreshControl={
+    <RefreshControl refreshing={refreshing} onRefresh={fetchProducts} />
+  }
+  showsVerticalScrollIndicator={false}
+/>
+
 
       {/* Floating Cart */}
       {showFloatingCart && cart.length > 0 && (
@@ -166,6 +179,7 @@ export default function ProductList({ category, backgroundUri, showFloatingCart 
       />
     </View>
   );
+
 }
 
 const styles = StyleSheet.create({

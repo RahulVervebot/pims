@@ -28,7 +28,6 @@ export async function getLatestProducts() {
 }
 
 
-
 export function capitalizeWords(str = '') {
   if (!str) return '';
   return str
@@ -36,10 +35,6 @@ export function capitalizeWords(str = '') {
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 }
-/** Example of more APIs you might add later:
-export async function searchProducts(query) { ... }
-export async function createProductCategory(formData) { ... } // with file upload
-*/
 
 export function toAbsoluteUri(input) {
   if (!input) return null;
