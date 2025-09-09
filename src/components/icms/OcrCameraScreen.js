@@ -1,5 +1,6 @@
 // src/screens/OcrScreen.js
 import React, { useRef, useState, useEffect } from 'react';
+import API_ENDPOINTS from '../../../config/api';
 import {
   View,
   TouchableOpacity,
@@ -89,7 +90,7 @@ const uniqueVendors = React.useMemo(() => {
         const temocruploadstore = 'deepanshu_test';
         setOcrUploadStore(temocruploadstore);
         setOcrUrl(temocrurl);
-        const res = await fetch(`${temocrurl}/api/getinvoicelist`);
+        const res = await fetch(API_ENDPOINTS.VENDORS);
         const data = await res.json();
         const cleaned = (data || []).filter(item => item && typeof item.value === 'string');
         const sorted = cleaned.sort((a, b) => a.value.localeCompare(b.value));
@@ -202,17 +203,20 @@ const uniqueVendors = React.useMemo(() => {
       const newImageURLs = [];
       // Upload each image
       for (let i = 0; i < snappedImages.length; i++) {
+        
         const img = snappedImages[i];
+        console.log("image uri",img)
+        const fileOriginalName= `${selectedDatabaseName},jpg`;
         const formData = new FormData();
         formData.append('file', {
           uri: img.uri,
           type: 'image/jpeg',
-           name: `${selectedDatabaseName},jpg`,
+           name: (fileOriginalName)
         });
-
-        const uploadResponse = await fetch(`${ocrurl}/api/upload-image`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'multipart/form-data', store: `${ocruploadstore}` },
+console.log("SelectedDatabaseName",fileOriginalName)
+        const uploadResponse = await fetch(API_ENDPOINTS.UPLOAD_IMAGE, {
+          method: 'POST', 
+          headers: { 'Content-Type': 'multipart/form-data', store: `${ocruploadstore}`, mode : "MOBILE" }, // user-id is missing in the headers
           body: formData,
         });
 

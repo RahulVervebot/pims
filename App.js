@@ -7,12 +7,17 @@ import {
   StyleSheet,
   ActivityIndicator,
   FlatList,
-  Platform
+  Platform,
 } from 'react-native';
+
 import { NavigationContainer } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
+import {
+  createDrawerNavigator,
+  DrawerContentScrollView,
+  DrawerItemList,
+} from '@react-navigation/drawer';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -32,7 +37,12 @@ import OcrScreen from './src/components/icms/OcrCameraScreen';
 import SettingScreen from './src/screens/SettingScreen';
 import POSScreen from './src/screens/POSScreen';
 import ICMSScreen from './src/screens/ICMSScreen';
-//icons 
+
+import ICMS_invoice from './src/screens/ICMS_invoice.js';
+import ICMS_VendorList from './src/screens/ICMS_VendorList.js';
+import InvoiceDetails from './src/screens/InvoiceDetails.js';
+
+//icons
 import HomeIcon from './src/assets/icons/HomeIcon.svg';
 import CartIcon from './src/assets/icons/Carticon.svg';
 import PrinterIcon from './src/assets/icons/Printericon.svg';
@@ -66,34 +76,37 @@ function CustomDrawerContent(props) {
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
     </DrawerContentScrollView>
-  ); 
+  );
 }
 
 // ---------- Bottom Tabs ----------
 function BottomTabs() {
   const insets = useSafeAreaInsets();
 
-  const BAR_PAD_BOTTOM = Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0);
+  const BAR_PAD_BOTTOM = Math.max(
+    insets.bottom,
+    Platform.OS === 'android' ? 8 : 0,
+  );
   const BAR_HEIGHT = 60 + BAR_PAD_BOTTOM;
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-         headerShown: false,
-         tabBarShowLabel: false,
+        headerShown: false,
+        tabBarShowLabel: false,
         // Tab bar container
         //        tabBarStyle: {
         //   backgroundColor: '#fff',
         //   height: BAR_HEIGHT,
-        //   paddingBottom: BAR_PAD_BOTTOM, 
-        //   borderTopWidth: 0,            
+        //   paddingBottom: BAR_PAD_BOTTOM,
+        //   borderTopWidth: 0,
         //   elevation: 10,
         //   shadowColor: '#000',
         //   shadowOpacity: 0.06,
         //   shadowRadius: 6,
         //   shadowOffset: { width: 0, height: -2 },
         // },
-   
+
         // Center the icon in each tab item
         tabBarItemStyle: {
           justifyContent: 'center',
@@ -104,11 +117,20 @@ function BottomTabs() {
         tabBarIcon: ({ focused, size }) => {
           let IconComp;
           switch (route.name) {
-            case 'Home':   IconComp = HomeIcon; break;
-            case 'Report': IconComp = ReportIcon; break;
-            case 'ICMSScreen':   IconComp = CartIcon; break;
-            case 'POSScreen':  IconComp = PrinterIcon; break;
-            default: return null;
+            case 'Home':
+              IconComp = HomeIcon;
+              break;
+            case 'Report':
+              IconComp = ReportIcon;
+              break;
+            case 'ICMSScreen':
+              IconComp = CartIcon;
+              break;
+            case 'POSScreen':
+              IconComp = PrinterIcon;
+              break;
+            default:
+              return null;
           }
 
           return (
@@ -119,17 +141,17 @@ function BottomTabs() {
                 height: '100%',
                 alignItems: 'center',
                 justifyContent: 'center',
-                overflow: 'hidden', 
+                overflow: 'hidden',
               }}
             >
               {/* Top strip ATTACHED to the bar’s inner top edge */}
               <View
-                // style={{
-                //   position: 'absolute',
-                //   top: 0, left: 0, right: 0,            // ensures consistent bar height
-                //   height: 2,
-                //   backgroundColor: focused ? '#F57200' : 'transparent',
-                // }}
+              // style={{
+              //   position: 'absolute',
+              //   top: 0, left: 0, right: 0,            // ensures consistent bar height
+              //   height: 2,
+              //   backgroundColor: focused ? '#F57200' : 'transparent',
+              // }}
               />
               {/* Icon */}
               <IconComp
@@ -142,26 +164,39 @@ function BottomTabs() {
         },
       })}
     >
-
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Report" component={ReportScreen} />
       <Tab.Screen name="POSScreen" component={POSScreen} />
-       <Tab.Screen name="ICMSScreen" component={ICMSScreen} />
+      <Tab.Screen name="ICMSScreen" component={ICMSScreen} />
     </Tab.Navigator>
   );
 }
-
 
 // ---------- Drawer (kept same, Tabs inside) ----------
 function MainDrawer() {
   return (
     <Drawer.Navigator
       initialRouteName="Tabs"
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
+      drawerContent={props => <CustomDrawerContent {...props} />}
       screenOptions={{ headerShown: false }}
     >
       <Drawer.Screen name="Profile" component={UserScreen} />
-     <Drawer.Screen name="Tabs" component={BottomTabs} />
+      <Drawer.Screen name="Tabs" component={BottomTabs} />
+      {/* <Drawer.Screen
+        options={{
+          title: 'ICMS Invoice',
+          style: { borderTopColor: '#CCC', borderTopWidth: 1 },
+          headerStyle: {
+            backgroundColor: '#3478F5',
+          },
+          headerTintColor: '#fff',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+        name="ICMS Invoice"
+        component={ICMS_VendorList}
+      /> */}
     </Drawer.Navigator>
   );
 }
@@ -191,24 +226,54 @@ export default function App() {
   return (
     <AppProviders>
       <NavigationContainer>
-        <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
+        <Stack.Navigator
+          initialRouteName={initialRoute}
+          screenOptions={{ headerShown: false }}
+        >
           <Stack.Screen name="Login" component={LoginScreen} />
+
           <Stack.Screen name="Cart" component={CartScreen} />
-       <Stack.Screen name="Checkout" component={CheckoutScreen} />    
-      <Stack.Screen name="SaleSummaryReport" component={SaleSummaryReport} />     
-      <Stack.Screen name="OcrScreen" component={OcrScreen} />     
-       <Stack.Screen name="SettingScreen" component={SettingScreen} />    
-     <Stack.Screen name="PrintScreen" component={PrintScreen} />    
-      <Stack.Screen name="SignupScreen" component={SignupScreen} />
+          <Stack.Screen name="Checkout" component={CheckoutScreen} />
+          <Stack.Screen
+            name="SaleSummaryReport"
+            component={SaleSummaryReport}
+          />
+          <Stack.Screen name="OcrScreen" component={OcrScreen} />
+          <Stack.Screen name="SettingScreen" component={SettingScreen} />
+          <Stack.Screen name="PrintScreen" component={PrintScreen} />
+          <Stack.Screen name="SignupScreen" component={SignupScreen} />
           <Stack.Screen name="MainDrawer" component={MainDrawer} />
-      <Stack.Screen
-        name="CategoryProducts"
-        component={CategoryProductsScreen}
-        options={({ route }) => ({
-          title: route?.params?.category || "Category",
-        })}
-      />
-    
+          <Stack.Screen
+            name="CategoryProducts"
+            component={CategoryProductsScreen}
+            options={({ route }) => ({
+              title: route?.params?.category || 'Category',
+            })}
+          />
+          <Stack.Screen
+            name="InvoiceDetails"
+            component={InvoiceDetails}
+            options={{ title: 'InvoiceDetails' }}
+          />
+          <Stack.Screen
+            name="VendorList"
+            component={ICMS_VendorList}
+            options={{ title: 'Vendorlist' }}
+          />
+          <Stack.Screen
+            name="InvoiceList"
+            component={ICMS_invoice}
+            options={{
+              title: 'Product Information',
+              headerStyle: {
+                backgroundColor: '#3478F5',
+              },
+              headerTintColor: '#fff',
+              headerTitleStyle: {
+                fontWeight: 'bold',
+              },
+            }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </AppProviders>

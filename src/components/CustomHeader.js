@@ -108,7 +108,8 @@ const styles = StyleSheet.create({
     minHeight: 48,                 // give the row some height to center against
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    paddingTop: 30,
   },
   rowIcon: { width: 36, height: 36 },
 
@@ -125,6 +126,7 @@ const styles = StyleSheet.create({
     color: '#000',
     paddingHorizontal: 80,         // reserves space so it won’t overlap icons
     textAlign: 'center',
+    paddingTop: 30
   },
 
   headerUser: { fontSize: 12, fontWeight: '400', color: '#000', paddingHorizontal: 10 },
