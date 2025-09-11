@@ -27,10 +27,12 @@ export default function ICMS_VendorList() {
   // Fetch vendor list every time screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      console.log('Fetching vendor list:', `${baseUrl}/api/getinvoicelist`);
+      console.log('Fetching vendor list:', API_ENDPOINTS.VENDORS);
       //  fetch(`${baseUrl}/api/getinvoicelist`)//
       fetch(API_ENDPOINTS.GETINVOICELIST)
-        .then(res => res.json())
+        .then(res => 
+          console.log(res) &&
+          res.json())
         .then(data => {
           const cleanedData = data.filter(
             item => item && typeof item.value === 'string',
