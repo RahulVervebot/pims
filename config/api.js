@@ -9,6 +9,10 @@ const API_ENDPOINTS = {
   GETINVOICEDATA: `${API_BASE}/api/getCompletedInvoiceData`,
   GETINVOICELIST: `${API_BASE}/api/getinvoicelist`,
   UPLOAD_IMAGE: `${API_BASE}/api/upload-image`,
+  OCR_RESPONSE : `${API_BASE}/api/ocr`,
+  SETPRODUCTINTABLEFROMOCR:`${API_BASE}/api/setproductintable`,
+  PREVIEW_OCR :`${API_BASE}/api/ocr-preview`,
+  SAVE_INVOICE :`${API_BASE}/api/invoice/scaninvoicedata`,
 };
 
 export default API_ENDPOINTS;

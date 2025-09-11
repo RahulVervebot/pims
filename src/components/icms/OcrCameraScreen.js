@@ -44,7 +44,7 @@ const OcrScreen = () => {
   const cameraRef = useRef(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-
+  const [saveInvoiceVisible, setSaveInvoiceVisible] = useState(false);
   const [invoiceList, setInvoiceList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerate, setIsGenerate] = useState(false);
@@ -70,7 +70,7 @@ const OcrScreen = () => {
 
   // URLs
   const [ocrurl, setOcrUrl] = useState(null);
-  const [ocruploadstore, setOcrUploadStore] = useState(null);
+  const [ocruploadstore, setOcrUploadStore] = useState("deepanshu_test");
   // Dedup vendors by "value" and keep first occuitemrrence
   const uniqueVendors = React.useMemo(() => {
     const map = new Map();
@@ -84,31 +84,7 @@ const OcrScreen = () => {
       a.value.localeCompare(b.value),
     );
   }, [invoiceList]);
-  // useEffect(() => {
-  //   const fetchInitialData = async () => {
-  //     try {
-  //       // const temocrurl = await AsyncStorage.getItem('ocrurl');
-  //        const temocrurl = 'https://icmsfrontend.vervebot.io'
-  //       // const temocruploadstore = await AsyncStorage.getItem('ocruploadstore');
-  //       const temocruploadstore = 'deepanshu_test';
-  //       setOcrUploadStore(temocruploadstore);
-  //       setOcrUrl(temocrurl);
-  //       const res = await fetch(API_ENDPOINTS.GETINVOICELIST);
-  //       const data = await res.json();
-  //       const cleaned = (data || []).filter(item => item && typeof item.value === 'string');
-  //       const sorted = cleaned.sort((a, b) => a.value.localeCompare(b.value));
-  //       setInvoiceList(sorted);
-  //       console.log("sorted:",sorted);
-  //     } catch (e) {
-  //       console.error('Error fetching invoice list:', e?.message);
-  //     } finally {
-  //       setIsLoading(false);
-  //     }
-  //   };
-  //   fetchInitialData();
-  // }, []);
-
-  // search
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
 
@@ -293,7 +269,7 @@ const OcrScreen = () => {
           }, // user-id is missing in the headers
           body: formData,
         });
-
+        console.log("upload responnes", uploadResponse)
         if (!uploadResponse.ok) {
           const t = await uploadResponse.text();
           throw new Error(`Upload failed (${uploadResponse.status}): ${t}`);
@@ -318,7 +294,7 @@ const OcrScreen = () => {
       const tempOcrs = [];
       for (let i = 0; i < newFilenames.length; i++) {
         const fname = newFilenames[i];
-        const ocrResponse = await fetch(`${ocrurl}/api/ocr`, {
+        const ocrResponse = await fetch(API_ENDPOINTS.OCR_RESPONSE, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -355,7 +331,7 @@ const OcrScreen = () => {
         ocrdata: combinedBodies,
       };
 
-      const response = await fetch(`${ocrurl}/api/setproductintable`, {
+      const response = await fetch(API_ENDPOINTS.SETPRODUCTINTABLEFROMOCR, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -423,85 +399,91 @@ const OcrScreen = () => {
       ></AppHeader>
       {/* Controls Card */}
 
-      <View style={styles.row}>
-        {/* Vendor selector (fake input) */}
-        <View style={styles.searchWrap}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search Vendor..."
-            placeholderTextColor="#aaa"
-            value={searchQuery}
-            onChangeText={text => {
-              setSearchQuery(text);
-              debouncedSearch(text);
-            }}
-          />
+    <View style={styles.row}>
+  {/* Vendor Selector */}
+  <View style={styles.searchWrap}>
+    <TextInput
+      style={styles.searchInput}
+      placeholder="Search Vendor..."
+      placeholderTextColor="#aaa"
+      value={searchQuery}
+      onChangeText={text => {
+        setSearchQuery(text);
+        debouncedSearch(text);
+      }}
+    />
 
-          {searchResults.length > 0 && (
-            <View style={styles.dropdownContainer}>
-              <ScrollView
-                style={styles.dropdown}
-                keyboardShouldPersistTaps="handled"
-                nestedScrollEnabled
-              >
-                {searchResults.map((vendor, index) => (
-                  <TouchableOpacity
-                    key={vendor.slug || index}
-                    style={[
-                      styles.dropdownItem,
-                      index % 2 === 0
-                        ? styles.dropdownItemEven
-                        : styles.dropdownItemOdd,
-                    ]}
-                    onPress={() => handleSelectVendor(vendor)}
-                  >
-                    <Text style={styles.dropdownText}>{vendor.value}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-        </View>
-
-        {/* Buttons (unchanged) */}
-        <View style={styles.btnRowInline}>
-          <TouchableOpacity
-            style={[styles.btn, styles.btnPrimary]}
-            onPress={handleOpenCamera}
-          >
-            <Text style={styles.btnText}>Scan Invoice</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.btn, styles.btnAccent]}
-            onPress={pickFromGallery}
-          >
-            <Text style={styles.btnText}>Pick Images</Text>
-          </TouchableOpacity>
-
-          {isGenerate ? (
-            <ActivityIndicator
-              size="small"
-              color={COLORS.primary}
-              style={{ marginHorizontal: 6 }}
-            />
-          ) : (
+    {searchResults.length > 0 && (
+      <View style={styles.dropdownContainer}>
+        <ScrollView
+          style={styles.dropdown}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+        >
+          {searchResults.map((vendor, index) => (
             <TouchableOpacity
-              style={[styles.btn, styles.btnSuccess]}
-              onPress={handleSave}
+              key={vendor.slug || index}
+              style={[
+                styles.dropdownItem,
+                index % 2 === 0
+                  ? styles.dropdownItemEven
+                  : styles.dropdownItemOdd,
+              ]}
+              onPress={() => handleSelectVendor(vendor)}
             >
-              <Text style={styles.btnText}>Generate</Text>
+              <Text style={styles.dropdownText}>{vendor.value}</Text>
             </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={[styles.btn, styles.btnDanger]}
-            onPress={clearAll}
-          >
-            <Text style={styles.btnText}>Clear</Text>
-          </TouchableOpacity>
-        </View>
+          ))}
+        </ScrollView>
       </View>
+    )}
+  </View>
+
+  {/* Button Row */}
+  <View style={styles.btnRowInline}>
+    <TouchableOpacity
+      style={[styles.btn, styles.btnPrimary]}
+      onPress={handleOpenCamera}
+    >
+      <Text style={styles.btnText}>Scan Invoice</Text>
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={[styles.btn, styles.btnAccent]}
+      onPress={pickFromGallery}
+    >
+      <Text style={styles.btnText}>Pick Images</Text>
+    </TouchableOpacity>
+
+    {isGenerate ? (
+      <ActivityIndicator
+        size="small"
+        color={COLORS.primary}
+        style={{ marginHorizontal: 6 }}
+      />
+    ) : (
+      <TouchableOpacity
+        style={[styles.btn, styles.btnSuccess]}
+        onPress={handleSave}
+      >
+        <Text style={styles.btnText}>Generate</Text>
+      </TouchableOpacity>
+    )}
+<TouchableOpacity
+        style={[styles.btn, styles.btnSuccess]}
+        onPress={()=> setSaveInvoiceVisible((s)=>!s)}
+      >
+        <Text style={styles.btnText}>Save</Text>
+      </TouchableOpacity>
+    <TouchableOpacity
+      style={[styles.btn, styles.btnDanger]}
+      onPress={clearAll}
+    >
+      <Text style={styles.btnText}>Clear</Text>
+    </TouchableOpacity>
+  </View>
+</View>
+
 
       {/* Snapped / Selected Images Row OR OCR Preview */}
 
@@ -601,8 +583,8 @@ const OcrScreen = () => {
       {/* Save modal */}
       {tableData.length > 0 && (
         <SaveInvoiceModal
-          isVisible={false /* open via your own trigger if needed */}
-          onClose={() => {}}
+          isVisible={saveInvoiceVisible}
+          onClose={() => {setSaveInvoiceVisible(false);}}
           vendorName={selectedVendorSlug}
           tableData={tableData}
           cleardata={clearAll}
@@ -631,18 +613,36 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  btn: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'transparent',
+ btn: {
+    flexGrow: 1,
+    minWidth: "22%", // keeps uniform sizing in row
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  btnText: { color: '#fff', fontWeight: '700' },
-  btnPrimary: { backgroundColor: COLORS.primary },
-  btnSuccess: { backgroundColor: COLORS.success },
-  btnDanger: { backgroundColor: COLORS.danger },
-  btnAccent: { backgroundColor: COLORS.accent },
+ btnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  btnPrimary: {
+    backgroundColor: "#007bff",
+  },
+  btnAccent: {
+    backgroundColor:COLORS.accent,
+  },
+  btnSuccess: {
+    backgroundColor: "#28a745",
+  },
+  btnDanger: {
+    backgroundColor: "#dc3545",
+  },
+
 
   imageRow: {
     minHeight: 88,
@@ -826,21 +826,21 @@ const styles = StyleSheet.create({
   tick: { fontSize: 16, color: COLORS.primary },
 
   // Keep your existing row + button styles
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flexWrap: 'wrap',
+ row: {
+    flexDirection: "column",
+    gap: 12, // spacing between search and buttons
   },
-  btnRowInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 0,
+    btnRowInline: {
+    flexDirection: "row",
+    flexWrap: "wrap", // allows wrapping if small screen
+    justifyContent: "space-between",
+    gap: 10, // spacing between buttons
+    marginTop: 10,
   },
   searchWrap: {
     position: 'relative',
     width: '100%',
+    padding:10
   },
   searchInput: {
     borderWidth: 1,
@@ -849,6 +849,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#fff',
+     padding:10
   },
   dropdownContainer: {
     position: 'absolute',
@@ -863,6 +864,8 @@ const styles = StyleSheet.create({
     elevation: 5,
     maxHeight: 220,
     zIndex: 100,
+   marginLeft:10,
+   borderRadius:10
   },
   dropdown: {
     paddingVertical: 4,

@@ -2,6 +2,7 @@ import React, { useState,useCallback } from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import API_ENDPOINTS from '../../../config/api';
 const SaveInvoiceModal = ({ isVisible, onClose, vendorName, tableData,cleardata }) => {
   const [savedInvoiceNo, setSavedInvoiceNo] = useState('');
    const baseurl = "https://icmsfrontend.vervebot.io";
@@ -54,7 +55,8 @@ const SaveInvoiceModal = ({ isVisible, onClose, vendorName, tableData,cleardata 
     };
 
     try {
-      const response = await fetch(`${ocrurl}/api/invoice/scaninvoicedata`, {
+      console.log("bodyPayload",bodyPayload);
+      const response = await fetch(API_ENDPOINTS.SAVE_INVOICE, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -64,10 +66,12 @@ const SaveInvoiceModal = ({ isVisible, onClose, vendorName, tableData,cleardata 
       });
 
       const data = await response.json();
+      console.log('saved response', data);
       await handleCreateInvoice();
       onClose();
     } catch (error) {
       Alert.alert('Error', 'Failed to save invoice.');
+      console.log('error', error);
     }
   };
 
