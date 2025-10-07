@@ -13,34 +13,8 @@ const AppHeader = ({
   backgroundValue = "#fff", 
   children
 }) => {
+
   const navigation = useNavigation();
-    const [user_name, setUserName] = useState('');
-  const [user_email, setUserEmail] = useState('');
-  const [user_role, setUserRole] = useState('');
-  const toTitleCase = (s = '') =>
-  s
-    .trim()
-    .toLowerCase()
-    .replace(/(^|[\s\-’'])([a-z])/g, (_, p1, p2) => p1 + p2.toUpperCase());
-  useEffect(() => {
-    const checkLogin = async () => {
-      try {
-        const userId = await AsyncStorage.getItem('userId');
-        const userName = await AsyncStorage.getItem('userName');
-        const userEmail = await AsyncStorage.getItem('userEmail');
-        const userRole = await AsyncStorage.getItem('userRole');
-
-        setUserEmail(userEmail);
-        setUserName(userName);
-        setUserRole(userRole);
-      } catch (e) {
-        navigation.replace('Login');
-      }
-    };
-    checkLogin();
-  }, []);
-
-
   const renderBackground = () => {
     if (backgroundType === "image") {
       return (
@@ -64,7 +38,7 @@ const AppHeader = ({
 
 const renderContent = () => (
   <View style={styles.content}>
-    {/* Left */}
+
       <TouchableOpacity  onPress={() => {
        if (navigation.canGoBack()) {
          navigation.goBack();
@@ -103,7 +77,8 @@ const styles = StyleSheet.create({
     minHeight: 48,                 // give the row some height to center against
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+     paddingTop: 30
   },
   rowIcon: { width: 36, height: 36 },
 
@@ -113,6 +88,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
+    paddingTop: 30
   },
   headerTitle: {
     fontSize: 20,

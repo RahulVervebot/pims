@@ -14,14 +14,17 @@ import {
 import CustomHeader from "../components/CustomHeader";
 import ProductSearch from "../components/ProductSearch";
 import ProductList from "../components/ProductList";
-import { getTopCategories, looksLikeSvg, capitalizeWords } from "../functions/function";
+import { getTopCategories, looksLikeSvg, capitalizeWords } from "../functions/product-function";
 import MoreCategoriesGrid from "../components/MoreCategoriesGrid";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CartContext } from "../context/CartContext";
+import { PrintContext } from "../context/PrintContext";
 import { SvgUri } from "react-native-svg";
 import CreateProductModal from "../components/CreateProductModal";
 import { useNavigation } from "@react-navigation/native";
+import PrinterIcon from '../assets/icons/Printericon.svg';
 import Video from "react-native-video";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import TulsiScreen from "../assets/images/LoginScreen.png"
 // Tab button supporting SVG or raster icon
 function TabButton({ label, iconUri, active, onPress, activeColor, inactiveColor = "#444" }) {
@@ -48,13 +51,18 @@ export default function HomeScreen() {
 
   // Loader state
   const [showScreen, setShowScreen] = useState(false);
-
+  const [showdefaulttopbanner, setShowDefaultTopBanner] = useState('');
+    const [showdefaultbottombanner, setShowDefaultBottomBanner] = useState('');
   const insets = useSafeAreaInsets();
   const { cart } = useContext(CartContext);
+  const { print } = useContext(PrintContext);
+  
   const [address, setAdress] = useState("123 mg road");
 
   const [tabs, setTabs] = useState([]);
   const [activeTab, setActiveTab] = useState("");
+ const [activeTabID, setActiveTabID] = useState("");
+  
   const activeIconColor = "#F57200";
 
   // Home pull-to-refresh state
@@ -69,13 +77,19 @@ export default function HomeScreen() {
       try {
         setShowScreen(true);
         const all = await getTopCategories();
-
-        const allCat = all.find((c) => (c.category || "").toLowerCase() === "all");
-        const others = all.filter((c) => c.toplist && (c.category || "").toLowerCase() !== "all");
-
+        const bottomurl = await AsyncStorage.getItem('bottombanner');
+        const topurl = await AsyncStorage.getItem('topabanner');
+      setShowDefaultBottomBanner(bottomurl);
+      setShowDefaultTopBanner(topurl);
+        const allCat = all.find((c) => (c.category || "").toLowerCase() === "latest");
+        const others = all.filter((c) => c.toplist && (c.category || "").toLowerCase() !== "latest");
+console.log("allCat:",allCat)
+console.log("others",others);
         const ordered = [];
         if (allCat) ordered.push(allCat);
-        ordered.push(...others);
+        if (others) ordered.push(...others);
+        
+        // your getTopCategories() alias
 
         const normalized = ordered.map((c) => ({
           _id: c._id,
@@ -83,17 +97,19 @@ export default function HomeScreen() {
           label: capitalizeWords(String(c.category || "")),
           topicon: c.topicon || null,
           topbanner: c.topbanner || null,
-          topbannerbottom: c.topbannerbottom || null,
+          topbannerbottom: c.topBannerBottom || null,
         }));
 
         setTabs(normalized);
         if (normalized.length > 0) {
           setActiveTab((prev) => (prev && normalized.some((t) => t.value === prev) ? prev : normalized[0].value));
+          setActiveTabID((prev) => (prev && normalized.some((t) => t._id === prev) ? prev : normalized[0]._id));
+          
         } else {
           setActiveTab("");
         }
       } catch (e) {
-        console.error("Failed to load categories:", e?.message);
+        console.log("Failed to load categories:", e?.message);
         setTabs([]);
         setActiveTab("");
       } finally {
@@ -108,9 +124,9 @@ export default function HomeScreen() {
   // Header background: use topbanner image if present, else color
   const currentBackground = useMemo(() => {
     if (currentTab?.topbanner) {
-      return { type: "image", value: currentTab.topbanner };
+      return { type: "image", value: `data:image/png;base64,${currentTab.topbanner}` };
     }
-    return { type: "color", value: "#2CA32C" };
+    return { type: "image", value: showdefaulttopbanner };
   }, [currentTab]);
 
   // Home pull-to-refresh handler:
@@ -142,11 +158,7 @@ export default function HomeScreen() {
           playWhenInactive
           playInBackground={false}
         />
-            {/* <Image 
-                source={TulsiScreen}  // if TulsiScreen is a require/import image
-                style={{ width: "100%", height: "100%" }} // add style to make it visible
-                resizeMode="cover" // or 'cover' based on your need
-              /> */}
+
       </View>
     );
   }
@@ -173,9 +185,9 @@ export default function HomeScreen() {
               <TabButton
                 key={t._id || t.value}
                 label={t.label}
-                iconUri={t.topicon}
+                iconUri={`data:image/svg+xml;base64,${t.topicon}`}
                 active={activeTab === t.value}
-                onPress={() => setActiveTab(t.value)}
+                onPress={() => {setActiveTab(t.value), setActiveTabID(t._id)}}
                 activeColor={activeIconColor}
               />
             ))}
@@ -192,19 +204,22 @@ export default function HomeScreen() {
             paddingBottom: 16 + insets.bottom,
           }}
         >
-          {activeTab ? (
-            // Remount on refresh using listReloadKey; pass bottom banner as background
+          {activeTabID ? (
+            <>
             <ProductList
               key={`${activeTab}-${listReloadKey}`}
+              id={activeTabID}
               category={activeTab}
-              backgroundUri={currentTab?.topbannerbottom || null}
+              backgroundUri={currentTab.topbannerbottom? `data:image/jpeg;base64,${currentTab.topbannerbottom}` : showdefaultbottombanner}
             />
+                 
+            </>
+
           ) : (
             <View style={{ padding: 16 }}>
               <Text style={{ color: "#444" }}>No categories available.</Text>
             </View>
           )}
-
           <MoreCategoriesGrid />
         </ScrollView>
 
@@ -238,6 +253,43 @@ export default function HomeScreen() {
               }}
             >
               <Text style={{ color: "#fff", fontWeight: "700" }}>🛒 {cart.length}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+            {/* ✅ Global floating Print overlay */}
+        {print.length > 0 && (
+          <View
+            pointerEvents="box-none"
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+            }}
+          >
+                  
+            <TouchableOpacity
+              onPress={() => navigation.navigate("PrintScreen")}
+              style={{
+                alignSelf: "flex-end",
+                marginRight: 16,
+                marginBottom: 12 + insets.bottom,
+                backgroundColor: "#2c1e70",
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                borderRadius: 30,
+                elevation: 6,
+                shadowColor: "#000",
+                shadowOpacity: 0.25,
+                shadowRadius: 8,
+                shadowOffset: { width: 0, height: 4 },
+                zIndex: 9999,
+                flexDirection:'row'
+              }}
+            >
+            <PrinterIcon width={20} height={20} fill={"#fff"}/>
+             <Text style={{ color: "#fff", fontWeight: "700" }}> {print.length}</Text>
             </TouchableOpacity>
           </View>
         )}

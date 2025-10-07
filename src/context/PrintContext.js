@@ -22,7 +22,7 @@ export const PrintProvider = ({ children }) => {
 
   const addToPrint = (product) => {
     let newprint = [...print];
-    const index = newprint.findIndex((item) => item._id === product._id);
+    const index = newprint.findIndex((item) => item.product_id === product.product_id);
 
     if (index >= 0) {
       newprint[index].qty += 1;
@@ -34,7 +34,7 @@ export const PrintProvider = ({ children }) => {
 
   const increasePrintQty = (productId) => {
     let newprint = [...print];
-    const index = newprint.findIndex((item) => item._id === productId);
+    const index = newprint.findIndex((item) => item.product_id === productId);
 
     if (index >= 0) {
       newprint[index].qty += 1;
@@ -44,7 +44,7 @@ export const PrintProvider = ({ children }) => {
 
   const decreasePrintQty = (productId) => {
     let newprint = [...print];
-    const index = newprint.findIndex((item) => item._id === productId);
+    const index = newprint.findIndex((item) => item.product_id === productId);
 
     if (index >= 0) {
       if (newprint[index].qty > 1) {
@@ -57,7 +57,7 @@ export const PrintProvider = ({ children }) => {
   };
 
   const removeFromprint = (productId) => {
-    let newprint = print.filter((item) => item._id !== productId);
+    let newprint = print.filter((item) => item.product_id !== productId);
     saveprint(newprint);
   };
 

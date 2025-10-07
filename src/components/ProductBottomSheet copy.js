@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useRef, useState, useMemo, useEffect } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useState, useMemo, useEffect,useContext } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, Platform, Modal } from 'react-native';
 import RBSheet from 'react-native-raw-bottom-sheet';
 import { API_URL } from '@env';
@@ -6,8 +6,9 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { Camera, CameraType } from 'react-native-camera-kit';
-import { getTopCategories } from '../functions/function';
-
+import { getTopCategories } from '../functions/product-function';
+import { CartContext } from '../context/CartContext';
+import { PrintContext } from '../context/PrintContext';
 import { Picker } from '@react-native-picker/picker';
 const THEME = {
   primary: '#2C1E70',
@@ -18,13 +19,16 @@ const THEME = {
 const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
 
   const sheetRef = useRef(null);
+  const { cart, addToCart, increaseQty, decreaseQty } = useContext(CartContext);
+  const { print, addToPrint, increasePrintQty, decreasePrintQty } = useContext(PrintContext);
   const [product, setProduct] = useState(null);
   // Editable fields
   const [name, setName] = useState('');
+    const [id, setID] = useState('');
   const [size, setSize] = useState('');
   const [category, setCategory] = useState('');
   const [price, setPrice] = useState('');  // keep as string, convert on submit
-  const [sale, setSale] = useState('');    // keep as string, convert on submit
+  const [cost, setCost] = useState('');    // keep as string, convert on submit
   const [newBarcode, setNewBarcode] = useState(''); // new scanned/typed barcode
   // Image (base64)
   const [imgBase64, setImgBase64] = useState('');
@@ -35,6 +39,7 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
   // UI
   const [submitting, setSubmitting] = useState(false);
+
   useEffect(() => {
     (async () => {
       try {
@@ -61,15 +66,16 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   }, []);
 
   useImperativeHandle(ref, () => ({
+    
     open: (p) => {
       setProduct(p || null);
-      // seed edit fields from product
       if (p) {
-        setName(p.name || '');
-        setSize(p.size || '');
-        setCategory(p.category || '');
-        setPrice(String(p.price ?? ''));
-        setSale(p.sale != null ? String(p.sale) : '');
+        setName(p.productName || '');
+        setID(p.product_id || '');
+        setSize(p.productSize || '');
+        setCategory(p.categoryName || '');
+        setPrice(String(p.salePrice ?? ''));
+        setCost(p.costPrice != null ? String(p.costPrice) : '');
         setNewBarcode(''); // blank until user scans/types a replacement
         setImgBase64('');
         setImgMime('image/jpeg');
@@ -147,7 +153,7 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
       size: size?.trim() || undefined,
       image: imageDataUri || undefined, // base64 data URI if user picked/took a new one
       price: price?.trim() !== '' ? Number(price) : undefined,
-      sale: sale?.trim() !== '' ? Number(sale) : undefined,
+      cost: cost?.trim() !== '' ? Number(cost) : undefined,
       category: category?.trim() || undefined,
     };
 
@@ -156,8 +162,8 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
       Alert.alert('Validation', 'Price must be a valid number.');
       return;
     }
-    if (payload.sale != null && !Number.isFinite(payload.sale)) {
-      Alert.alert('Validation', 'Sale must be a valid number.');
+    if (payload.cost != null && !Number.isFinite(payload.cost)) {
+      Alert.alert('Validation', 'Cost must be a valid number.');
       return;
     }
 
@@ -183,13 +189,13 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
       const updated = {
         ...product,
         ...data?.product, // if backend returns updated product
-        name: payload.name ?? product.name,
+        name: payload.name ?? product.productName,
         size: payload.size ?? product.size,
         category: payload.category ?? product.category,
         price: payload.price ?? product.price,
-        sale: payload.sale ?? product.sale,
+        cost: payload.cost ?? product.cost,
         barcode: payload.newBarcode ?? product.barcode,
-        image: imageDataUri || product.image,
+        image: imageDataUri || product.productImage,
       };
       setProduct(updated);
       // reset transient image state (keep fields editable)
@@ -201,6 +207,8 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
       setSubmitting(false);
     }
   };
+      const inCart = cart.find((p) => p.product_id === id);
+    const inPrint = print.find((p) => p.product_id === id);
 
   return (
     <>
@@ -223,8 +231,8 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
             {/* Image / Preview */}
             {imageDataUri ? (
               <Image source={{ uri: imageDataUri }} style={styles.image} />
-            ) : product.image ? (
-              <Image source={{ uri: product.image }} style={styles.image} />
+            ) : product.productImage ? (
+              <Image source={{ uri: `data:image/webp;base64,${product.productImage}`}} style={styles.image} />
             ) : (
               <View style={[styles.image, styles.imagePlaceholder]}>
                 <Text style={{ color: '#aaa' }}>No Image</Text>
@@ -285,9 +293,9 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
               />
               <TextInput
                 style={styles.input}
-                placeholder="Sale (optional, e.g., 0.2)"
-                value={sale}
-                onChangeText={setSale}
+                placeholder="Cost (optional, e.g., 0.2)"
+                value={cost}
+                onChangeText={setCost}
                 keyboardType="decimal-pad"
                 autoCapitalize="none"
               />
@@ -321,19 +329,42 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
             </View>
 
             <View style={[styles.row, { marginTop: 16 }]}>
+                {inCart ? (
+                            <View style={styles.qtyRow}>
+                              <TouchableOpacity style={styles.qtyBtn} onPress={() => decreaseQty(product.product_id)}>
+                                <Text style={styles.qtyText}>-</Text>
+                              </TouchableOpacity>
+                              <Text style={styles.qtyValue}>{inCart.qty}</Text>
+                              <TouchableOpacity style={styles.qtyBtn} onPress={() => increaseQty(product.product_id)}>
+                                <Text style={styles.qtyText}>+</Text>
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
               <TouchableOpacity
                 style={[styles.btn, { backgroundColor: THEME.secondary }]}
-                onPress={() => onAddToCart?.(product)}
+                onPress={() => addToCart(product)}
               >
                 <Text style={styles.btnText}>Add to Cart</Text>
               </TouchableOpacity>
-
+                          )}
+                          {inPrint ? (
+                                        <View style={[styles.qtyRow, { marginTop: 8 }]}>
+                                          <TouchableOpacity style={styles.qtyBtn} onPress={() => decreasePrintQty(product.product_id)}>
+                                            <Text style={styles.qtyText}>-</Text>
+                                          </TouchableOpacity>
+                                          <Text style={styles.qtyValue}>{inPrint.qty}</Text>
+                                          <TouchableOpacity style={styles.qtyBtn} onPress={() => increasePrintQty(product.product_id)}>
+                                            <Text style={styles.qtyText}>+</Text>
+                                          </TouchableOpacity>
+                                        </View>
+                                      ) : (
               <TouchableOpacity
                 style={[styles.btn, { backgroundColor: THEME.primary }]}
-                onPress={() => onAddToPrint?.(product)}
+                onPress={() => addToPrint(product)}
               >
                 <Text style={styles.btnText}>Add to Print</Text>
               </TouchableOpacity>
+                )}
             </View>
            
             <TouchableOpacity
@@ -405,6 +436,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1, borderColor: '#ddd', borderRadius: 8,
     paddingVertical: 10, paddingHorizontal: 12, color: '#333',
+    textTransform: "capitalize"
   },
   inputWrapper: { position: 'relative', marginTop: 0 },
   inputWithRightIcon: {
@@ -432,5 +464,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 10,
     overflow: 'hidden',
-  }
+  },
+    cartBtnText: { color: '#fff', fontWeight: 'bold' },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  qtyBtn: { backgroundColor: '#2c1e70', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 },
+  qtyText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  qtyValue: { marginHorizontal: 10, fontSize: 16, fontWeight: 'bold', color: '#000' },
+
 });

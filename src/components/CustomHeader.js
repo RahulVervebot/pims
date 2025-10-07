@@ -2,6 +2,7 @@
 import React,{useEffect,useState} from 'react';
 import { View, StyleSheet, ImageBackground, TouchableOpacity,Image,Text  } from 'react-native';
 import Profile from "../assets/icons/Profile.svg";
+import Setting from "../assets/icons/Profile.svg";
 import TulsiLogo from '../assets/images/Tulsi.svg';
 import TulsiWhiteLogo from '../assets/icons/Icon_Tulsi.png'
 import { useNavigation } from '@react-navigation/native';
@@ -19,15 +20,10 @@ const CustomHeader = ({
     const [user_name, setUserName] = useState('');
   const [user_email, setUserEmail] = useState('');
   const [user_role, setUserRole] = useState('');
-  const toTitleCase = (s = '') =>
-  s
-    .trim()
-    .toLowerCase()
-    .replace(/(^|[\s\-’'])([a-z])/g, (_, p1, p2) => p1 + p2.toUpperCase());
+
   useEffect(() => {
     const checkLogin = async () => {
       try {
-        const userId = await AsyncStorage.getItem('userId');
         const userName = await AsyncStorage.getItem('userName');
         const userEmail = await AsyncStorage.getItem('userEmail');
         const userRole = await AsyncStorage.getItem('userRole');
@@ -71,7 +67,7 @@ const renderContent = () => (
       <Image source={TulsiWhiteLogo} style={styles.rowIcon} />
       <View>
         <Text style={styles.headerUser}>Hello,</Text>
-        <Text style={styles.headerName}>{toTitleCase(user_name)}</Text>
+        <Text style={styles.headerName}>{user_name}</Text>
       </View>
     </View>
 
@@ -87,9 +83,10 @@ const renderContent = () => (
     </View>
 
     {/* Right */}
-    <TouchableOpacity style={styles.profileBtn} onPress={() => navigation.navigate('Profile')}>
+      <TouchableOpacity style={styles.profileBtn} onPress={() => navigation.navigate('Profile')}>
       <Profile width={36} height={36} />
     </TouchableOpacity>
+
   </View>
 );
 
@@ -108,7 +105,8 @@ const styles = StyleSheet.create({
     minHeight: 48,                 // give the row some height to center against
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+       paddingTop: 30
   },
   rowIcon: { width: 36, height: 36 },
 
@@ -118,6 +116,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
+    paddingTop: 30
   },
   headerTitle: {
     fontSize: 20,
@@ -128,8 +127,7 @@ const styles = StyleSheet.create({
   },
 
   headerUser: { fontSize: 12, fontWeight: '400', color: '#000', paddingHorizontal: 10 },
-  headerName: { fontSize: 16, fontWeight: '700', color: '#000', paddingHorizontal: 10 },
-  profileBtn: { },
+  headerName: { fontSize: 16, fontWeight: '700', color: '#000', paddingHorizontal: 10,textTransform:"capitalize" },
 });
 
 

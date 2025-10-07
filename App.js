@@ -25,6 +25,7 @@ import ReportScreen from './src/screens/ReportScreen';
 import UserScreen from './src/screens/UserScreen';
 import CartScreen from './src/screens/CartScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
+import CategoryListScreen from './src/components/CategoryListScreen';
 import SaleSummaryReport from './src/screens/SalesSummaryReport';
 import PrintScreen from './src/screens/PrintScreen';
 import AppProviders from './src/context/AppProviders';
@@ -32,11 +33,15 @@ import OcrScreen from './src/components/icms/OcrCameraScreen';
 import SettingScreen from './src/screens/SettingScreen';
 import POSScreen from './src/screens/POSScreen';
 import ICMSScreen from './src/screens/ICMSScreen';
+import ICMS_invoice from './src/screens/icms/ICMS_invoice.js';
+import ICMS_VendorList from './src/screens/icms/ICMS_VendorList.js';
+import InvoiceDetails from './src/screens/icms/InvoiceDetails.js';
 //icons 
 import HomeIcon from './src/assets/icons/HomeIcon.svg';
-import CartIcon from './src/assets/icons/Carticon.svg';
-import PrinterIcon from './src/assets/icons/Printericon.svg';
-import ReportIcon from './src/assets/icons/Reportsicon.svg';
+import CartIconold from './src/assets/icons/Carticon.svg';
+import CartIcon from './src/assets/icons/inventory_1.svg';
+import POSIcon from './src/assets/icons/payment_2.svg';
+import ReportIcon from './src/assets/icons/Reportsicon.svg'; 
 const Stack = createNativeStackNavigator();
 const Drawer = createDrawerNavigator();
 const Tab = createBottomTabNavigator();
@@ -107,7 +112,7 @@ function BottomTabs() {
             case 'Home':   IconComp = HomeIcon; break;
             case 'Report': IconComp = ReportIcon; break;
             case 'ICMSScreen':   IconComp = CartIcon; break;
-            case 'POSScreen':  IconComp = PrinterIcon; break;
+            case 'POSScreen':  IconComp = POSIcon; break;
             default: return null;
           }
 
@@ -171,8 +176,8 @@ export default function App() {
   useEffect(() => {
     const checkLogin = async () => {
       try {
-        const userId = await AsyncStorage.getItem('userId');
-        setInitialRoute(userId ? 'MainDrawer' : 'Login');
+        const access_token = await AsyncStorage.getItem('access_token');
+        setInitialRoute(access_token ? 'MainDrawer' : 'Login');
       } catch (e) {
         setInitialRoute('Login');
       }
@@ -198,8 +203,12 @@ export default function App() {
       <Stack.Screen name="SaleSummaryReport" component={SaleSummaryReport} />     
       <Stack.Screen name="OcrScreen" component={OcrScreen} />     
        <Stack.Screen name="SettingScreen" component={SettingScreen} />    
+            <Stack.Screen name="CategoryListScreen" component={CategoryListScreen} />  
      <Stack.Screen name="PrintScreen" component={PrintScreen} />    
       <Stack.Screen name="SignupScreen" component={SignupScreen} />
+
+
+      
           <Stack.Screen name="MainDrawer" component={MainDrawer} />
       <Stack.Screen
         name="CategoryProducts"
@@ -208,7 +217,30 @@ export default function App() {
           title: route?.params?.category || "Category",
         })}
       />
-    
+     <Stack.Screen
+            name="InvoiceDetails"
+            component={InvoiceDetails}
+            options={{ title: 'InvoiceDetails' }}
+          />
+          <Stack.Screen
+            name="VendorList"
+            component={ICMS_VendorList}
+            options={{ title: 'Vendorlist' }}
+          />
+          <Stack.Screen
+            name="InvoiceList"
+            component={ICMS_invoice}
+            options={{
+              title: 'Product Information',
+              headerStyle: {
+                backgroundColor: '#3478F5',
+              },
+              headerTintColor: '#fff',
+              headerTitleStyle: {
+                fontWeight: 'bold',
+              },
+            }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </AppProviders>

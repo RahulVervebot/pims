@@ -21,7 +21,7 @@ import { request, PERMISSIONS, RESULTS } from "react-native-permissions";
 import { CartContext } from "../context/CartContext";
 import { PrintContext } from "../context/PrintContext";
 import ProductBottomSheet from "./ProductBottomSheet"; // ✅ ADD
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
 const THEME = {
   primary: "#2C1E70",
   accent: "#F57200",
@@ -43,7 +43,8 @@ export default function ProductSearch() {
   const cameraRef = useRef(null);
   const isHandlingScanRef = useRef(false);
   const [torchOn, setTorchOn] = useState(false);
-
+  const [access_token, setAccessToken] = useState('');
+  const [storeURL, setStoreurl] = useState('');
   // floating results position
   const [searchRowH, setSearchRowH] = useState(0);
 
@@ -57,6 +58,10 @@ export default function ProductSearch() {
   useEffect(() => {
     (async () => {
       let result;
+     const storeulr =    await AsyncStorage.getItem('storeurl');
+     const access_token =    await AsyncStorage.getItem('access_token');
+setAccessToken(access_token);
+setStoreurl(storeulr)
       if (Platform.OS === "ios") {
         result = await request(PERMISSIONS.IOS.CAMERA);
       } else {
@@ -79,10 +84,21 @@ export default function ProductSearch() {
     typingTimeout.current = setTimeout(async () => {
       if (text.length >= 3) {
         try {
-          const res = await axios.get(
-            `${API_URL}/api/products/search?query=${encodeURIComponent(text)}`
-          );
-          setResults(res.data || []);
+   const res = await fetch(`${storeURL}/pos/app/product/search?query=${encodeURIComponent(text)}`, {
+    method: 'GET',
+    headers: {
+      accept: 'application/json',
+      access_token: access_token,
+    },
+  });
+   if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch categories (${res.status}): ${text || 'No details'}`);
+  }
+
+  const json = await res.json();
+  const list = Array.isArray(json?.products) ? json.products : [];
+          setResults(list || []);
         } catch (err) {
           console.error("❌ Search error:", err?.message);
           setResults([]);
@@ -99,10 +115,20 @@ export default function ProductSearch() {
 
     setScannerVisible(false);
     try {
-      const res = await axios.get(
-        `${API_URL}/api/products/search?query=${encodeURIComponent(barcode)}`
-      );
-      const list = Array.isArray(res.data) ? res.data : [];
+  const res = await fetch(`${storeURL}/pos/app/product/search?query=${encodeURIComponent(barcode)}`, {
+    method: 'GET',
+    headers: {
+      accept: 'application/json',
+      access_token: access_token,
+    },
+  });
+   if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch categories (${res.status}): ${text || 'No details'}`);
+  }
+
+  const json = await res.json();
+  const list = Array.isArray(json?.products) ? json.products : [];
 
       if (list.length >= 1) {
         setScannedProduct(list[0]);
@@ -203,7 +229,7 @@ export default function ProductSearch() {
                 <TouchableOpacity onPress={() => openSheetFor(item)}>
                   <View style={styles.resultItem}>
                     <Text style={styles.resultTitle} numberOfLines={1}>
-                      {item?.name}
+                      {item?.productName}
                     </Text>
                     <Text style={styles.resultMeta} numberOfLines={1}>
                       {item?.category} {item?.barcode ? `• ${item.barcode}` : ""}
@@ -281,17 +307,17 @@ export default function ProductSearch() {
       >
         <View style={styles.modalBackdrop}>
           <View style={styles.resultCard}>
-            {scannedProduct?.image ? (
-              <Image source={{ uri: scannedProduct.image }} style={styles.resultImage} />
+            {scannedProduct?.productImage ? (
+              <Image source={{ uri: `data:image/webp;base64,${scannedProduct.productImage}`}} style={styles.resultImage} />
             ) : (
               <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
                 <Icon name="image" size={32} color="#bbb" />
               </View>
             )}
 
-            <Text style={styles.title}>{scannedProduct?.name || "Product"}</Text>
+            <Text style={styles.title}>{scannedProduct?.productName || "Product"}</Text>
             <Text style={styles.metaText}>
-              {scannedProduct?.category || "Category"} {scannedProduct?.size ? `• ${scannedProduct.size}` : ""}
+              {scannedProduct?.categoryName || "Category"} {scannedProduct?.productSize ? `• ${scannedProduct.productSize}` : ""}
             </Text>
             <Text style={styles.priceText}>
               ₹{Number(scannedProduct?.price || 0).toFixed(2)}

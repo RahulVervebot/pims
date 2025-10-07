@@ -14,7 +14,7 @@ import {
 import CustomHeader from "../components/CustomHeader";
 import ProductSearch from "../components/ProductSearch";
 import ProductList from "../components/ProductList";
-import { getTopCategories, looksLikeSvg, capitalizeWords } from "../functions/function";
+import { getTopCategories, looksLikeSvg, capitalizeWords } from "../functions/product-function";
 import MoreCategoriesGrid from "../components/MoreCategoriesGrid";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CartContext } from "../context/CartContext";
@@ -24,6 +24,7 @@ import CreateProductModal from "../components/CreateProductModal";
 import { useNavigation } from "@react-navigation/native";
 import PrinterIcon from '../assets/icons/Printericon.svg';
 import Video from "react-native-video";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import TulsiScreen from "../assets/images/LoginScreen.png"
 // Tab button supporting SVG or raster icon
 function TabButton({ label, iconUri, active, onPress, activeColor, inactiveColor = "#444" }) {
@@ -50,7 +51,8 @@ export default function HomeScreen() {
 
   // Loader state
   const [showScreen, setShowScreen] = useState(false);
-
+  const [showdefaulttopbanner, setShowDefaultTopBanner] = useState('');
+    const [showdefaultbottombanner, setShowDefaultBottomBanner] = useState('');
   const insets = useSafeAreaInsets();
   const { cart } = useContext(CartContext);
   const { print } = useContext(PrintContext);
@@ -59,6 +61,8 @@ export default function HomeScreen() {
 
   const [tabs, setTabs] = useState([]);
   const [activeTab, setActiveTab] = useState("");
+ const [activeTabID, setActiveTabID] = useState("");
+  
   const activeIconColor = "#F57200";
 
   // Home pull-to-refresh state
@@ -68,54 +72,76 @@ export default function HomeScreen() {
   const [listReloadKey, setListReloadKey] = useState(0);
 
   // Initial categories load (and hiding the loader video when done)
-  useEffect(() => {
-    (async () => {
-      try {
-        setShowScreen(true);
-        const all = await getTopCategories();
+// replace your current useEffect body with this safer version
+useEffect(() => {
+  (async () => {
+    try {
+      setShowScreen(true);
 
-        const allCat = all.find((c) => (c.category || "").toLowerCase() === "all");
-        const others = all.filter((c) => c.toplist && (c.category || "").toLowerCase() !== "all");
+      const [allRaw, bottomurl, topurl] = await Promise.all([
+        getTopCategories().catch(() => null),
+        AsyncStorage.getItem('bottombanner').catch(() => ''),
+        AsyncStorage.getItem('topabanner').catch(() => ''),
+      ]);
+      setShowDefaultBottomBanner(bottomurl || '');
+      setShowDefaultTopBanner(topurl || '');
+      // Ensure we always work with an array
+      const all = Array.isArray(allRaw) ? allRaw : [];
+      const allCat = all.find(
+        (c) => ((c?.category ?? '') + '').toLowerCase() === 'latest'
+      );
 
-        const ordered = [];
-        if (allCat) ordered.push(allCat);
-        ordered.push(...others);
+      const others = all.filter(
+        (c) => c?.toplist && ((c?.category ?? '') + '').toLowerCase() !== 'latest'
+      );
 
-        const normalized = ordered.map((c) => ({
-          _id: c._id,
-          value: c.category,
-          label: capitalizeWords(String(c.category || "")),
-          topicon: c.topicon || null,
-          topbanner: c.topbanner || null,
-          topbannerbottom: c.topbannerbottom || null,
-        }));
+      // Avoid .push and concat safely
+      const ordered = (allCat ? [allCat] : []).concat(others || []);
 
-        setTabs(normalized);
-        if (normalized.length > 0) {
-          setActiveTab((prev) => (prev && normalized.some((t) => t.value === prev) ? prev : normalized[0].value));
-        } else {
-          setActiveTab("");
-        }
-      } catch (e) {
-        console.error("Failed to load categories:", e?.message);
-        setTabs([]);
-        setActiveTab("");
-      } finally {
-        // hide loader in all cases
-        setShowScreen(false);
+      const normalized = ordered.map((c) => ({
+        _id: c?._id ?? String(Math.random()),
+        value: c?.category ?? '',
+        label: capitalizeWords(String(c?.category ?? '')),
+        // keep null if missing so we can guard at render
+        topicon: c?.topicon ?? null,
+        topbanner: c?.topbanner ?? null,
+        topbannerbottom: c?.topBannerBottom ?? null,
+      }));
+
+      setTabs(normalized);
+
+      if (normalized.length > 0) {
+        // make sure previously active still exists, else pick first
+        setActiveTab((prev) =>
+          prev && normalized.some((t) => t.value === prev) ? prev : normalized[0].value
+        );
+        setActiveTabID((prev) =>
+          prev && normalized.some((t) => t._id === prev) ? prev : normalized[0]._id
+        );
+      } else {
+        setActiveTab('');
+        setActiveTabID('');
       }
-    })();
-  }, []);
+    } catch (e) {
+      console.log('Failed to load categories:', e?.message);
+      setTabs([]);
+      setActiveTab('');
+      setActiveTabID('');
+    } finally {
+      setShowScreen(false);
+    }
+  })();
+}, []);
 
   const currentTab = useMemo(() => tabs.find((t) => t.value === activeTab), [tabs, activeTab]);
 
   // Header background: use topbanner image if present, else color
-  const currentBackground = useMemo(() => {
-    if (currentTab?.topbanner) {
-      return { type: "image", value: currentTab.topbanner };
-    }
-    return { type: "color", value: "#2CA32C" };
-  }, [currentTab]);
+const currentBackground = useMemo(() => {
+  if (currentTab?.topbanner) {
+    return { type: 'image', value: `data:image/png;base64,${currentTab.topbanner}` };
+  }
+  return { type: 'image', value: showdefaulttopbanner || '' };
+}, [currentTab, showdefaulttopbanner]);
 
   // Home pull-to-refresh handler:
   // 1) Show top spinner
@@ -146,11 +172,7 @@ export default function HomeScreen() {
           playWhenInactive
           playInBackground={false}
         />
-            {/* <Image 
-                source={TulsiScreen}  // if TulsiScreen is a require/import image
-                style={{ width: "100%", height: "100%" }} // add style to make it visible
-                resizeMode="cover" // or 'cover' based on your need
-              /> */}
+
       </View>
     );
   }
@@ -174,14 +196,16 @@ export default function HomeScreen() {
         <View style={[styles.tabRow, { backgroundColor: "transparent" }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
             {tabs.map((t) => (
-              <TabButton
-                key={t._id || t.value}
-                label={t.label}
-                iconUri={t.topicon}
-                active={activeTab === t.value}
-                onPress={() => setActiveTab(t.value)}
-                activeColor={activeIconColor}
-              />
+          <TabButton
+  key={t._id || t.value}
+  label={t.label}
+  iconUri={t.topicon ? `data:image/svg+xml;base64,${t.topicon}` : undefined}
+  active={activeTab === t.value}
+  onPress={() => { setActiveTab(t.value); setActiveTabID(t._id); }}
+  activeColor={activeIconColor}
+/>
+
+
             ))}
           </ScrollView>
         </View>
@@ -196,12 +220,13 @@ export default function HomeScreen() {
             paddingBottom: 16 + insets.bottom,
           }}
         >
-          {activeTab ? (
+          {activeTabID ? (
             <>
             <ProductList
               key={`${activeTab}-${listReloadKey}`}
+              id={activeTabID}
               category={activeTab}
-              backgroundUri={currentTab?.topbannerbottom || null}
+              backgroundUri={currentTab.topbannerbottom? `data:image/jpeg;base64,${currentTab.topbannerbottom}` : showdefaultbottombanner}
             />
                  
             </>

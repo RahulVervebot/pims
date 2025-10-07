@@ -10,7 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-
+import { assertEasingIsWorklet } from 'react-native-reanimated/lib/typescript/animation/util';
 const PRESETS = [
   { key: 'today', label: 'Today' },
   { key: 'this_week', label: 'This Week' },
@@ -137,7 +137,7 @@ export default function DateRangePickerModal({
     return presetToRange(preset);
   }, [preset, customStartDate, customEndDate, customStartTime, customEndTime]);
 
-  function handleApply() {
+  async function handleApply () {
     // Guard: ensure end >= start
     if (selectedRange.end < selectedRange.start) {
       // Swap if user picked reversed order
@@ -145,7 +145,6 @@ export default function DateRangePickerModal({
     }
     onApply(selectedRange);
   }
-
   // Android picker handlers
   function onChangeFactory(kind) {
     return (_e, date) => {

@@ -13,7 +13,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { CartContext } from '../context/CartContext';
 import { PrintContext } from '../context/PrintContext';
-import { getCategoryProducts, getLatestProducts } from '../functions/function';
+import { getCategoryProducts, getLatestProducts } from '../functions/product-function';
 import fallbackBg from '../assets/images/green-bg.jpg';
 import ProductBottomSheet from './ProductBottomSheet';
 import AsyncStorage from '@react-native-async-storage/async-storage';

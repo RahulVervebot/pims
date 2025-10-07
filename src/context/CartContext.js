@@ -23,7 +23,7 @@ export const CartProvider = ({ children }) => {
 
   const addToCart = (product) => {
     let newCart = [...cart];
-    const index = newCart.findIndex((item) => item._id === product._id);
+    const index = newCart.findIndex((item) => item.product_id === product.product_id);
 
     if (index >= 0) {
       newCart[index].qty += 1;
@@ -35,7 +35,7 @@ export const CartProvider = ({ children }) => {
 
   const increaseQty = (productId) => {
     let newCart = [...cart];
-    const index = newCart.findIndex((item) => item._id === productId);
+    const index = newCart.findIndex((item) => item.product_id === productId);
 
     if (index >= 0) {
       newCart[index].qty += 1;
@@ -45,7 +45,7 @@ export const CartProvider = ({ children }) => {
 
   const decreaseQty = (productId) => {
     let newCart = [...cart];
-    const index = newCart.findIndex((item) => item._id === productId);
+    const index = newCart.findIndex((item) => item.product_id === productId);
 
     if (index >= 0) {
       if (newCart[index].qty > 1) {
@@ -58,7 +58,7 @@ export const CartProvider = ({ children }) => {
   };
 
   const removeFromCart = (productId) => {
-    let newCart = cart.filter((item) => item._id !== productId);
+    let newCart = cart.filter((item) => item.product_id !== productId);
     saveCart(newCart);
   };
 

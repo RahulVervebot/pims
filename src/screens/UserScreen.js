@@ -1,146 +1,289 @@
-import { View, Text, StyleSheet, TouchableOpacity,ImageBackground } from 'react-native';
-import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import AppHeader from "../components/AppHeader"; 
+import AppHeader from "../components/AppHeader";
 import reportbg from '../assets/images/report-bg.png';
+
 export default function UserScreen({ navigation }) {
-  const [user_id, setUserID] = useState('');
+  const [access_token, setAccessToken] = useState('');
   const [user_name, setUserName] = useState('');
   const [user_email, setUserEmail] = useState('');
   const [user_role, setUserRole] = useState('');
 
   const handleLogout = async () => {
-    try {
-      await GoogleSignin.signOut(); // Google logout
-    } catch (e) {
-      console.log('Google signout error:', e);
-    }
-    await AsyncStorage.multiRemove(['userId', 'userRole', 'userEmail', 'userName']);
-
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
+    try { await GoogleSignin.signOut(); } catch (e) { console.log('Google signout error:', e); }
+    await AsyncStorage.multiRemove(['access_token', 'userRole', 'userEmail', 'userName']);
+    navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
   };
+
   const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
+
   useEffect(() => {
     const checkLogin = async () => {
       try {
-        const userId = await AsyncStorage.getItem('userId');
+        const accesstoken = await AsyncStorage.getItem('access_token');
         const userName = await AsyncStorage.getItem('userName');
         const userEmail = await AsyncStorage.getItem('userEmail');
         const userRole = await AsyncStorage.getItem('userRole');
 
-        setUserID(userId);
-        setUserEmail(userEmail);
-        setUserName(userName);
-        setUserRole(userRole);
+        setAccessToken(accesstoken);
+        setUserEmail(userEmail || '');
+        setUserName(userName || '');
+        setUserRole(userRole || '');
+        console.log('accesstoken:', accesstoken);
       } catch (e) {
         navigation.replace('Login');
       }
     };
     checkLogin();
-  }, []);
+  }, [navigation]);
+
+  const initials = useMemo(() => {
+    if (!user_name) return 'U';
+    const parts = user_name.trim().split(/\s+/);
+    return (parts[0]?.[0] || '') + (parts[1]?.[0] || '');
+  }, [user_name]);
+
+  const prettyRole = useMemo(() => (user_role ? user_role.replace(/_/g, ' ') : 'user'), [user_role]);
+
+  const isAdmin = useMemo(() => {
+  const raw = (user_role || '').toLowerCase();
+  const pretty = (prettyRole || '').toLowerCase();
+  return raw === 'administrator' || pretty === 'administrator';
+}, [user_role, prettyRole]);
+
 
   return (
-        <ImageBackground
-              source={getImageSource(reportbg)}
-              style={styles.screen}
-              resizeMode="cover"
-            >
-      <AppHeader Title="PROFILE"
-      backgroundType="image" backgroundValue={reportbg}>
+    <ImageBackground source={getImageSource(reportbg)} style={styles.screen} resizeMode="cover">
+      <View style={styles.backdrop} />
 
-      </AppHeader>
+      <AppHeader Title="PROFILE" backgroundType="image" backgroundValue={reportbg} />
+
       <View style={styles.container}>
-        {user_id ? (
-          <View style={styles.profileBox}>
-            <Text style={styles.name}>{user_name}</Text>
-            <Text style={styles.email}>{user_email}</Text>
+        {access_token ? (
+          <View style={styles.card}>
+            {/* Avatar + Name */}
+            <View style={styles.topRow}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initials.toUpperCase()}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.name} numberOfLines={1}>{user_name || 'User'}</Text>
+                <Text style={styles.email} numberOfLines={1}>{user_email || '—'}</Text>
+                {!!prettyRole && (
+                  <View style={styles.roleBadge}>
+                    <Text style={styles.roleText}>{prettyRole}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
 
-            {/* 🔹 Settings Button */}
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => navigation.navigate('Settings')}
-            >
-              <Text style={styles.btnText}>Go to Settings</Text>
-            </TouchableOpacity>
+            {/* Divider */}
+            <View style={styles.divider} />
 
-            {/* 🔹 Show Signup only if not customer */}
-            {user_role !== 'customer' && (
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={() => navigation.navigate('SignupScreen')}
-              >
-                <Text style={styles.btnText}>Go to Signup</Text>
-              </TouchableOpacity>
-            )}
+            {/* Info rows */}
+            <View style={styles.infoBlock}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Name</Text>
+                <Text style={styles.infoValue} numberOfLines={1}>{user_name || '—'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Email</Text>
+                <Text style={styles.infoValue} numberOfLines={1}>{user_email || '—'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Role</Text>
+                <Text style={styles.infoValue} numberOfLines={1}>{prettyRole}</Text>
+              </View>
+            </View>
 
-            {/* 🔹 Logout Button */}
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-              <Text style={styles.logoutText}>Logout</Text>
-            </TouchableOpacity>
+            {/* Actions */}
+           <View style={styles.actions}>
+  {isAdmin && (
+    <TouchableOpacity
+      style={[styles.button, styles.secondary]}
+      onPress={() => navigation.navigate('SettingScreen')}
+      activeOpacity={0.85}
+    >
+      <Text style={styles.buttonText}>Settings</Text>
+    </TouchableOpacity>
+  )}
+
+  {user_role !== 'customer' && (
+    <TouchableOpacity
+      style={[styles.button, styles.primary]}
+      onPress={() => navigation.navigate('SignupScreen')}
+      activeOpacity={0.85}
+    >
+      <Text style={styles.buttonText}>Go to Signup</Text>
+    </TouchableOpacity>
+  )}
+
+  <TouchableOpacity
+    style={[styles.button, styles.danger]}
+    onPress={handleLogout}
+    activeOpacity={0.85}
+  >
+    <Text style={styles.buttonText}>Logout</Text>
+  </TouchableOpacity>
+</View>
+
           </View>
         ) : (
-          <Text style={{ marginTop: 20 }}>No user data available.</Text>
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyText}>No user data available.</Text>
+            <TouchableOpacity
+              style={[styles.button, styles.primary, { marginTop: 12 }]}
+              onPress={() => navigation.replace('Login')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.buttonText}>Go to Login</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     </ImageBackground>
   );
 }
 
+const COLORS = {
+  baseBG: 'rgba(255,255,255,0.85)',
+  text: '#1E1E1E',
+  sub: '#6B7280',
+  primary: '#2C1E70',
+  primaryDark: '#211759',
+  danger: '#E53935',
+  roleBG: '#FAD569',
+  roleText: '#5B4500',
+  stroke: 'rgba(0,0,0,0.08)',
+};
+
 const styles = StyleSheet.create({
-   screen: {
-    flex: 1,
+  screen: { flex: 1 },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.25)', // improves contrast over bg image
   },
   container: {
     flex: 1,
-    paddingTop: 40,
-    backgroundColor: '#fff',
+    padding: 16,
+    paddingTop: 24,
   },
-  profileBox: {
+  card: {
+    backgroundColor: COLORS.baseBG,
+    borderRadius: 20,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  topRow: {
+    flexDirection: 'row',
+    gap: 14,
     alignItems: 'center',
-    marginTop: 30,
-    padding: 20,
+  },
+  avatar: {
+    width: 66,
+    height: 66,
+    borderRadius: 40,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: COLORS.roleBG,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.primary,
+    letterSpacing: 1,
   },
   name: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 6,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 2,
   },
   email: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 4,
-  },
-  userId: {
     fontSize: 14,
-    color: '#999',
-    marginBottom: 20,
+    color: COLORS.sub,
+    marginBottom: 6,
   },
-  actionBtn: {
-    width: '80%',
-    paddingVertical: 12,
-    marginVertical: 8,
-    backgroundColor: '#007bff',
-    borderRadius: 8,
+  roleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.roleBG,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  roleText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.roleText,
+    textTransform: 'capitalize',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.stroke,
+    marginVertical: 16,
+  },
+  infoBlock: {
+    gap: 12,
+  },
+  infoRow: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  btnText: {
-    color: '#fff',
-    fontWeight: '600',
+  infoLabel: {
+    width: 80,
+    color: COLORS.sub,
+    fontSize: 14,
   },
-  logoutBtn: {
-    marginTop: 30,
-    width: '80%',
+  infoValue: {
+    flex: 1,
+    textAlign: 'right',
+    color: COLORS.text,
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  actions: {
+    marginTop: 18,
+    gap: 10,
+  },
+  button: {
+    width: '100%',
     paddingVertical: 12,
-    backgroundColor: 'red',
-    borderRadius: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primary: {
+    backgroundColor: COLORS.primary,
+  },
+  danger: {
+    backgroundColor: COLORS.danger,
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+    letterSpacing: 0.2,
+  },
+  emptyWrap: {
+    marginTop: 24,
     alignItems: 'center',
   },
-  logoutText: {
+  emptyText: {
     color: '#fff',
-    fontWeight: '600',
+    fontSize: 16,
+    opacity: 0.95,
   },
+  secondary: {
+  backgroundColor: COLORS.primaryDark, // subtle variation from primary
+},
 });

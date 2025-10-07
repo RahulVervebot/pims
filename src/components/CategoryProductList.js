@@ -13,15 +13,19 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { CartContext } from '../context/CartContext';
 import { PrintContext } from '../context/PrintContext';
-import { getCategoryProducts, getLatestProducts } from '../functions/function';
+import { getCategoryProducts, getLatestProducts } from '../functions/product-function';
 import fallbackBg from '../assets/images/green-bg.jpg';
 import ProductBottomSheet from './ProductBottomSheet';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-export default function CategoryProductList({ category, backgroundUri, showFloatingCart = false }) {
+import PrinterIcon from '../assets/icons/Printericon.svg'; 
+import CartIcon from "../assets/icons/Carticon.svg"
+import FastImage from 'react-native-fast-image';
+export default function CategoryProductList({ id, category, backgroundUri, showFloatingCart = false }) {
   const navigation = useNavigation();
   const [products, setProducts] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
     const [userrole, setUserRole] = useState('');
+   
   const { cart, addToCart, increaseQty, decreaseQty } = useContext(CartContext);
   const { print, addToPrint, increasePrintQty, decreasePrintQty } = useContext(PrintContext);
   const sheetRef = useRef(null);
@@ -46,105 +50,125 @@ export default function CategoryProductList({ category, backgroundUri, showFloat
   useEffect(() => {
     fetchProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category]);
+  }, [id]);
 
   const fetchProducts = async () => {
     try {
   const userRole =    await AsyncStorage.getItem('userRole');
+ console.log("category id: ",id);
   setUserRole(userRole);
       setRefreshing(true);
-      const data = category === 'all' ? await getLatestProducts() : await getCategoryProducts(category);
+      const data = category === 'latest' ? await getLatestProducts() : await getCategoryProducts(id);
       setProducts(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error(`Failed to fetch products for ${category}:`, err?.message);
+      console.log(`Failed to fetch products for ${category}:`, err?.message);
       setProducts([]);
     } finally {
       setRefreshing(false);
     }
   };
 
-  const openDetails = (item) => sheetRef.current?.open(item);
-  const goToCategory = (cat) => {
-    console.log("cat:",cat);
-    navigation.navigate("CategoryProducts", {
-      category: category,
-      backgroundUri: backgroundUri || null,
-    });
-  };
-  const renderProduct = ({ item }) => {
-    const inCart = cart.find((p) => p._id === item._id);
-    const inPrint = print.find((p) => p._id === item._id);
+const openDetails = (item) => sheetRef.current?.open(item);
 
-    return (
-      <TouchableOpacity activeOpacity={0.9} onPress={() => openDetails(item)} style={{ width: CARD_WIDTH }}>
-        <View style={styles.productCard}>
-          {/* Top info */}
-          <View>
-            <Image source={{ uri: item.image }} style={[styles.productImage, { height: IMAGE_HEIGHT }]} />
-            <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-            {!!item.size && <Text style={styles.metaText}>{item.size}</Text>}
-            <Text style={styles.price}>₹{Number(item.price || 0).toFixed(2)}</Text>
-            {!!item.category && <Text style={styles.metaText} numberOfLines={1}>{item.category}</Text>}
-          </View>
-          {/* Bottom actions pinned */}
-          <View>
-            {inCart ? (
-              <View style={styles.qtyRow}>
-                <TouchableOpacity style={styles.qtyBtn} onPress={() => decreaseQty(item._id)}>
-                  <Text style={styles.qtyText}>-</Text>
-                </TouchableOpacity>
-                <Text style={styles.qtyValue}>{inCart.qty}</Text>
-                <TouchableOpacity style={styles.qtyBtn} onPress={() => increaseQty(item._id)}>
-                  <Text style={styles.qtyText}>+</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.cartBtn} onPress={() => addToCart(item)}>
-                <Text style={styles.cartBtnText}>Add to Cart</Text>
-              </TouchableOpacity>
-            )}
+const renderProduct = ({ item }) => {
+  const inCart = cart.find((p) => p.product_id === item.product_id);
+  const inPrint = print.find((p) => p.product_id === item.product_id);
 
-            {inPrint ? (
-              <View style={[styles.qtyRow, { marginTop: 8 }]}>
-                <TouchableOpacity style={styles.qtyBtn} onPress={() => decreasePrintQty(item._id)}>
-                  <Text style={styles.qtyText}>-</Text>
-                </TouchableOpacity>
-                <Text style={styles.qtyValue}>{inPrint.qty}</Text>
-                <TouchableOpacity style={styles.qtyBtn} onPress={() => increasePrintQty(item._id)}>
-                  <Text style={styles.qtyText}>+</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={[styles.cartBtn, { marginTop: 8, backgroundColor: '#2c1e70' }]}
-                onPress={() => addToPrint(item)}
-              >
-                <Text style={styles.cartBtnText}>Add to Print</Text>
-              </TouchableOpacity>
-            )}
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={() => openDetails(item)}
+      style={{ width: CARD_WIDTH }}
+    >
+      <View style={styles.productCard}>
+        <View>
+          {!!item.productImage && (
+            <Image
+              source={{ uri: `data:image/webp;base64,${item.productImage}` }}
+              style={[styles.productImage, { height: IMAGE_HEIGHT }]}
+            />
+          )}
+          <Text style={styles.productName} numberOfLines={1}>{item.productName}</Text>
+          <View style={{ flexDirection: 'row' }}>
+            <Text style={styles.price}>₹{Number(item.salePrice || 0).toFixed(2)}</Text>
+            {!!item.productSize && <Text style={styles.metaText}> / {item.productSize}</Text>}
           </View>
+          {!!item.category && <Text style={styles.metaText} numberOfLines={1}>{item.category}</Text>}
         </View>
-      </TouchableOpacity>
-    );
-  };
+
+        <View>
+          {userrole === 'customer'
+            ? (inCart ? (
+                <View style={styles.qtyRow}>
+                  <TouchableOpacity style={styles.qtyBtn} onPress={() => decreaseQty(item.product_id)}>
+                    <Text style={styles.qtyText}>-</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.qtyValue}>{inCart.qty}</Text>
+                  <TouchableOpacity style={styles.qtyBtn} onPress={() => increaseQty(item.product_id)}>
+                    <Text style={styles.qtyText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={() => addToCart(item)}>
+                  <CartIcon width={30} height={30} fill="rgba(245, 114, 0, 1)" />
+                </TouchableOpacity>
+              ))
+            : (inPrint ? (
+                <View style={[styles.qtyRow, { marginTop: 8 }]}>
+                  <TouchableOpacity style={styles.qtyBtn} onPress={() => decreasePrintQty(item.product_id)}>
+                    <Text style={styles.qtyText}>-</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.qtyValue}>{inPrint.qty}</Text>
+                  <TouchableOpacity style={styles.qtyBtn} onPress={() => increasePrintQty(item.product_id)}>
+                    <Text style={styles.qtyText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={() => addToPrint(item)}>
+                  <PrinterIcon width={30} height={30} fill="rgba(245, 114, 0, 1)" />
+                </TouchableOpacity>
+              ))}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
 
   const bgSource = backgroundUri ? { uri: backgroundUri } : fallbackBg;
-
+const isGifBanner = useMemo(() => {
+  if (!backgroundUri) return false;
+  if (typeof backgroundUri === 'string') {
+    const s = backgroundUri.trim();
+    console.log("backgroundUri:",backgroundUri);
+    // .gif in path or query, or base64 gif
+    return /\.gif(\?|$)/i.test(s) || /^data:image\/gif;base64,/i.test(s);
+  }
+    console.log("not backgroundUri:",backgroundUri);
+  return false;
+}, [backgroundUri]);
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
       {/* Banner BEFORE list */}
-        <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => goToCategory(category)}
-             
-            >
-      <Image source={bgSource} style={styles.banner(bannerHeight)} resizeMode="cover" />
-</TouchableOpacity>
+      
+                {isGifBanner ? (
+    <FastImage
+      source={{ uri: backgroundUri }}
+      style={styles.banner(bannerHeight)}
+      resizeMode={FastImage.resizeMode.cover}
+      priority={FastImage.priority.high}
+    />
+  ) : 
+   <Image source={bgSource} style={styles.banner(bannerHeight)} resizeMode="cover" />
+}
+
+{/* <Image source={bgSource} style={styles.banner(bannerHeight)} resizeMode="cover" /> */}
+
       {/* Grid list */}
   <FlatList
   key={COLS} // re-render if column count changes
   data={products}
-  keyExtractor={(item) => String(item._id)}
+  keyExtractor={(item) => String(item.product_id)}
   renderItem={renderProduct}
   numColumns={COLS} // ✅ 3 on mobile, 4 on tablet
   columnWrapperStyle={{ gap: GAP }} // ✅ horizontal gap
@@ -172,12 +196,14 @@ export default function CategoryProductList({ category, backgroundUri, showFloat
       )}
 
       {/* Bottom Sheet */}
-      <ProductBottomSheet
+        <ProductBottomSheet
         ref={sheetRef}
         onAddToCart={(p) => addToCart(p)}
         onAddToPrint={(p) => addToPrint(p)}
       />
     </View>
+  
+ 
   );
 
 }
@@ -211,7 +237,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   productName: { fontWeight: 'bold', fontSize: 14, marginTop: 2, color: '#000' },
-  metaText: { color: '#555', marginTop: 2, fontSize: 12 },
+  metaText: { color: '#555', marginTop: 4, fontSize: 14 },
   price: { color: 'green', fontSize: 14, fontWeight: '600', marginTop: 4 },
 
   cartBtn: {

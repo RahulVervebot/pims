@@ -13,11 +13,14 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { CartContext } from '../context/CartContext';
 import { PrintContext } from '../context/PrintContext';
-import { getCategoryProducts, getLatestProducts } from '../functions/function';
+import { getCategoryProducts, getLatestProducts } from '../functions/product-function';
 import fallbackBg from '../assets/images/green-bg.jpg';
 import ProductBottomSheet from './ProductBottomSheet';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-export default function ProductList({ category, backgroundUri, showFloatingCart = false }) {
+import PrinterIcon from '../assets/icons/Printericon.svg'; 
+import CartIcon from "../assets/icons/Carticon.svg"
+import FastImage from 'react-native-fast-image';
+export default function ProductList({id, category, backgroundUri, showFloatingCart = false }) {
   const navigation = useNavigation();
   const [products, setProducts] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -43,20 +46,35 @@ export default function ProductList({ category, backgroundUri, showFloatingCart 
   const IMAGE_HEIGHT = Math.round(CARD_WIDTH * 0.55);    // keep a nice ratio
   const FLOATING_BOTTOM = isTablet ? 28 : 20;
 
+const isGifBanner = useMemo(() => {
+  if (!backgroundUri) return false;
+  if (typeof backgroundUri === 'string') {
+    const s = backgroundUri.trim();
+    console.log("backgroundUri:",backgroundUri);
+    // .gif in path or query, or base64 gif
+    return /\.gif(\?|$)/i.test(s) || /^data:image\/gif;base64,/i.test(s);
+  }
+    console.log("not backgroundUri:",backgroundUri);
+  return false;
+}, [backgroundUri]);
+
   useEffect(() => {
     fetchProducts();
+    console.log("category:",id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category]);
+  }, [id]);
 
   const fetchProducts = async () => {
     try {
   const userRole =    await AsyncStorage.getItem('userRole');
   setUserRole(userRole);
       setRefreshing(true);
-      const data = category === 'all' ? await getLatestProducts() : await getCategoryProducts(category);
+      const data = category === 'latest' ? await getLatestProducts() : await getCategoryProducts(id);
       setProducts(Array.isArray(data) ? data : []);
+      console.log("data:",data);
     } catch (err) {
-      console.error(`Failed to fetch products for ${category}:`, err?.message);
+      console.log(`Failed to fetch products for ${category}:`, err?.message);
+      
       setProducts([]);
     } finally {
       setRefreshing(false);
@@ -65,64 +83,77 @@ export default function ProductList({ category, backgroundUri, showFloatingCart 
 
   const openDetails = (item) => sheetRef.current?.open(item);
   const goToCategory = (cat) => {
-    console.log("cat:",cat);
     navigation.navigate("CategoryProducts", {
+      id: id,
       category: category,
       backgroundUri: backgroundUri || null,
     });
   };
+
   const renderProduct = ({ item }) => {
-    const inCart = cart.find((p) => p._id === item._id);
-    const inPrint = print.find((p) => p._id === item._id);
+    const inCart = cart.find((p) => p.product_id === item.product_id);
+    const inPrint = print.find((p) => p.product_id === item.product_id);
 
     return (
       <TouchableOpacity activeOpacity={0.9} onPress={() => openDetails(item)} style={{ width: CARD_WIDTH }}>
         <View style={styles.productCard}>
           {/* Top info */}
           <View>
-            <Image source={{ uri: item.image }} style={[styles.productImage, { height: IMAGE_HEIGHT }]} />
-            <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-            {!!item.size && <Text style={styles.metaText}>{item.size}</Text>}
-            <Text style={styles.price}>₹{Number(item.price || 0).toFixed(2)}</Text>
-            {!!item.category && <Text style={styles.metaText} numberOfLines={1}>{item.category}</Text>}
-          </View>
-          {/* Bottom actions pinned */}
+        
+            {item.productImage && 
+            <Image source={{ uri: `data:image/webp;base64,${item.productImage}` }} style={[styles.productImage, { height: IMAGE_HEIGHT }]} />
+            }
+          
+             {/* Bottom actions pinned */}
           <View>
-            {inCart ? (
-              <View style={styles.qtyRow}>
-                <TouchableOpacity style={styles.qtyBtn} onPress={() => decreaseQty(item._id)}>
-                  <Text style={styles.qtyText}>-</Text>
-                </TouchableOpacity>
-                <Text style={styles.qtyValue}>{inCart.qty}</Text>
-                <TouchableOpacity style={styles.qtyBtn} onPress={() => increaseQty(item._id)}>
-                  <Text style={styles.qtyText}>+</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.cartBtn} onPress={() => addToCart(item)}>
-                <Text style={styles.cartBtnText}>Add to Cart</Text>
-              </TouchableOpacity>
-            )}
-            
-            {inPrint ? (
-              <View style={[styles.qtyRow, { marginTop: 8 }]}>
-                <TouchableOpacity style={styles.qtyBtn} onPress={() => decreasePrintQty(item._id)}>
-                  <Text style={styles.qtyText}>-</Text>
-                </TouchableOpacity>
-                <Text style={styles.qtyValue}>{inPrint.qty}</Text>
-                <TouchableOpacity style={styles.qtyBtn} onPress={() => increasePrintQty(item._id)}>
-                  <Text style={styles.qtyText}>+</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={[styles.cartBtn, { marginTop: 8, backgroundColor: '#2c1e70' }]}
-                onPress={() => addToPrint(item)}
-              >
-                <Text style={styles.cartBtnText}>Add to Print</Text>
-              </TouchableOpacity>
-            )}
+          <View style={styles.row}>
+  {!!item.productSize && <Text style={styles.metaText}>{item.productSize}</Text>}
+
+  <View style={styles.right}>
+    {userrole === 'customer'
+      ? (inCart ? (
+          <View style={styles.qtyRow}>
+            <TouchableOpacity style={styles.qtyBtn} onPress={() => decreaseQty(item.product_id)}>
+              <Text style={styles.qtyText}>-</Text>
+            </TouchableOpacity>
+            <Text style={styles.qtyValue}>{inCart.qty}</Text>
+            <TouchableOpacity style={styles.qtyBtn} onPress={() => increaseQty(item.product_id)}>
+              <Text style={styles.qtyText}>+</Text>
+            </TouchableOpacity>
           </View>
+        ) : (
+          <TouchableOpacity onPress={() => addToCart(item)}>
+            <CartIcon width={30} height={30} fill="rgba(245, 114, 0, 1)" />
+          </TouchableOpacity>
+        ))
+      : (inPrint ? (
+          <View style={styles.qtyRow}>
+            <TouchableOpacity style={styles.qtyBtn} onPress={() => decreasePrintQty(item.product_id)}>
+              <Text style={styles.qtyText}>-</Text>
+            </TouchableOpacity>
+            <Text style={styles.qtyValue}>{inPrint.qty}</Text>
+            <TouchableOpacity style={styles.qtyBtn} onPress={() => increasePrintQty(item.product_id)}>
+              <Text style={styles.qtyText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.cartprint} onPress={() => addToPrint(item)}>
+            <PrinterIcon width={30} height={30} fill="rgba(245, 114, 0, 1)" />
+          </TouchableOpacity>
+        ))
+    }
+  </View>
+</View>
+
+          </View>
+         <Text style={[styles.productName, { textTransform: 'capitalize' }]} numberOfLines={1}>{item.productName}</Text>
+        <View style={{flexDirection: "row"}}>
+            <Text style={styles.price}>₹{Number(item.salePrice || 0).toFixed(2)}</Text>
+            </View>
+            {/* {!!item.category && <Text style={styles.metaText} numberOfLines={1}>{item.category}</Text>} */}
+          </View>
+        
+
         </View>
       </TouchableOpacity>
     );
@@ -135,17 +166,25 @@ export default function ProductList({ category, backgroundUri, showFloatingCart 
       {/* Banner BEFORE list */}
         <TouchableOpacity
               activeOpacity={0.9}
-              onPress={() => goToCategory(category)}
-             
-            >
-      <Image source={bgSource} style={styles.banner(bannerHeight)} resizeMode="cover" />
+              onPress={() => goToCategory(id)}
+    >
+   {isGifBanner ? (
+    <FastImage
+      source={{ uri: backgroundUri }}
+      style={styles.banner(bannerHeight)}
+      resizeMode={FastImage.resizeMode.cover}
+      priority={FastImage.priority.high}
+    />
+  ) :
+   <Image source={bgSource} style={styles.banner(bannerHeight)} resizeMode="cover" />
+}
 </TouchableOpacity>
       {/* Grid list */}
       <FlatList
         key={COLS}                                 // force layout recalculation when COLS changes
         data={products}
          horizontal
-        keyExtractor={(item) => String(item._id)}
+        keyExtractor={(item) => String(item.product_id)}
         renderItem={renderProduct}
         // numColumns={COLS}
         // columnWrapperStyle={{ gap: GAP }}          // horizontal gap between items
@@ -200,16 +239,15 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 },
     justifyContent: 'space-between',
-    minHeight: 220,
+    // minHeight: 220,
   },
   productImage: {
     width: '100%',
     resizeMode: 'cover',
     borderRadius: 8,
-    marginBottom: 6,
   },
   productName: { fontWeight: 'bold', fontSize: 14, marginTop: 2, color: '#000' },
-  metaText: { color: '#555', marginTop: 2, fontSize: 12 },
+  metaText: { color: '#555',fontSize: 12, textAlign:"left", fontWeight:'bold' },
   price: { color: 'green', fontSize: 14, fontWeight: '600', marginTop: 4 },
 
   cartBtn: {
@@ -218,11 +256,41 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
+
   cartBtnText: { color: '#fff', fontWeight: 'bold' },
-  qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  qtyBtn: { backgroundColor: '#2c1e70', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 },
-  qtyText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  qtyValue: { marginHorizontal: 10, fontSize: 16, fontWeight: 'bold', color: '#000' },
+ row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    // either of these works; you can keep both:
+    justifyContent: 'space-between',
+  },
+  metaText: {
+    fontSize: 12,
+    color: '#666',
+    flexShrink: 1,
+    marginRight: 8,
+  },
+  right: {
+    marginLeft: 'auto',           // pushes this container to the far right
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  qtyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',                     // RN 0.71+; otherwise use margins
+  },
+  cartprint: {
+    borderRadius: 8,
+    // alignItems here affects children layout inside the button, not row placement.
+    // Keep it centered for better touch target:
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 4,
+  },
+
+  qtyBtn: { backgroundColor: '#2c1e70', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6 },
+  qtyText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+  qtyValue: { marginHorizontal: 5, fontSize: 16, fontWeight: 'bold', color: '#000' },
 
   floatingCart: {
     position: 'absolute',

@@ -110,8 +110,8 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-  implementation 'com.google.android.gms:play-services-auth:20.7.0' // latest
-
+  implementation files("libs/ZSDK_ANDROID_API.jar")
+    implementation 'com.google.android.gms:play-services-auth:20.7.0' // latest
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
         implementation project(':react-native-svg')
@@ -119,4 +119,4 @@ dependencies {
         implementation jscFlavor
     }
 }
-   
+apply plugin: 'com.google.gms.google-services'

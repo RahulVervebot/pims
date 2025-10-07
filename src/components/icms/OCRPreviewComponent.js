@@ -1,21 +1,40 @@
-import React, { useEffect,useState } from 'react';
-import { View, Text, StyleSheet, Alert, Image, Modal, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Alert,
+  Image,
+  Modal,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import API_ENDPOINTS, { initICMSBase, setICMSBase } from '../../../icms_config/api';
 
-const OCRPreviewComponent = ({ filenames, vendorName, imageURIs, tableData, ocrurl }) => {
-       const [ocruploadstore, setOcrUploadStore] = useState(null);
-       const [highlightedImages, setHighlightedImages] = useState([]);
-       const [selectedImage, setSelectedImage] = useState(null);
-       const [modalVisible, setModalVisible] = useState(false);
+
+const OCRPreviewComponent = ({
+  filenames,
+  vendorName,
+  imageURIs,
+  tableData,
+  ocrurl,
+}) => {
+  const [ocruploadstore, setOcrUploadStore] = useState(null);
+  const [highlightedImages, setHighlightedImages] = useState([]);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
   useEffect(() => {
     const generatePreview = async () => {
-    //   const imageURLs = imageURIs.map((uri) => uri);
-    const temocruploadstore = await AsyncStorage.getItem('ocruploadstore');
-    setOcrUploadStore(temocruploadstore);
+      initICMSBase();
+      //   const imageURLs = imageURIs.map((uri) => uri);
+      const temocruploadstore = await AsyncStorage.getItem('ocruploadstore');
+      setOcrUploadStore("tulsi_dev");
       // const missingDataList = tableData.map((row) => row.description);
-      const missingDataList = tableData.map(
-        (row) =>
-          `${row.itemNo || ''} ${row.description || ''} ${row.unitPrice || ''} ${row.extendedPrice || ''}`.trim()
+      const missingDataList = tableData.map(row =>
+        `${row.itemNo || ''} ${row.description || ''} ${row.unitPrice || ''} ${
+          row.extendedPrice || ''
+        }`.trim(),
       );
 
       const payload = {
@@ -26,13 +45,16 @@ const OCRPreviewComponent = ({ filenames, vendorName, imageURIs, tableData, ocru
           missingDataList: missingDataList,
         },
       };
-console.log("payload",payload);
+      console.log('payload', payload);
       try {
-        const response = await fetch(`${ocrurl}/api/ocr-preview`, {
+            const token = await AsyncStorage.getItem('access_token');
+        const response = await fetch(API_ENDPOINTS.PREVIEW_OCR, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'store': temocruploadstore,
+         'store': 'tulsi_dev',
+        'access_token': token,
+        'mode': 'MOBILE',
           },
           body: JSON.stringify(payload),
         });
@@ -47,7 +69,6 @@ console.log("payload",payload);
         const previewResult = await response.json();
         setHighlightedImages(previewResult.highlightedImages || []);
         console.log('🟢 OCR Preview Response');
-
       } catch (error) {
         console.error('OCR Preview Failed:', error);
         Alert.alert('Error', error.message);
@@ -56,7 +77,7 @@ console.log("payload",payload);
 
     generatePreview();
   }, [filenames, vendorName, imageURIs, tableData, ocrurl]);
-  const openModal = (image) => {
+  const openModal = image => {
     setSelectedImage(image);
     setModalVisible(true);
   };
@@ -70,7 +91,10 @@ console.log("payload",payload);
       {highlightedImages.length > 0 ? (
         <ScrollView horizontal>
           {highlightedImages.map((img, index) => (
-            <TouchableOpacity key={index} onPress={() => openModal(img.base64Image)}>
+            <TouchableOpacity
+              key={index}
+              onPress={() => openModal(img.base64Image)}
+            >
               <Image
                 source={{ uri: img.base64Image }}
                 style={styles.previewImage}
@@ -82,11 +106,15 @@ console.log("payload",payload);
       ) : (
         <Text style={styles.text}>Wait for Inv Preview...</Text>
       )}
-       {/* Modal to preview selected image */}
-       <Modal visible={modalVisible} transparent={true} animationType="fade">
+      {/* Modal to preview selected image */}
+      <Modal visible={modalVisible} transparent={true} animationType="fade">
         <View style={styles.modalBackground}>
           <TouchableOpacity style={styles.closeArea} onPress={closeModal} />
-          <Image source={{ uri: selectedImage }} style={styles.fullImage} resizeMode="contain" />
+          <Image
+            source={{ uri: selectedImage }}
+            style={styles.fullImage}
+            resizeMode="contain"
+          />
         </View>
       </Modal>
     </View>

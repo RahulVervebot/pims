@@ -8,6 +8,7 @@ import TopCustumerList from '../assets/icons/Top-Customers-List.png';
 import TopSellingProducts from '../assets/icons/Top-Selling-Products.png'
 import TopSellingCategories from '../assets/icons/Top-Selling-Categories.png'
 import { useNavigation } from '@react-navigation/native';
+
 const PANEL_RADIUS = 28;
 
 export default function ICMSScreen() {
@@ -44,12 +45,18 @@ resizeMode="cover"
                     >
                   <Row icon={SaleSummaryReport} label="Create New Invoice" isFirst />
                     </TouchableOpacity>
-          <Row icon={HourlyReport} label="Vendor List" />
-          <Row icon={TopCustumerList} label="Invoice List" />
+               <TouchableOpacity
+                    onPress={()=> navigation.navigate('InvoiceList')}
+                  >
+                  <Row icon={TopCustumerList} label="Invoice List" />
+                  </TouchableOpacity>
         </View>
         </ImageBackground>
   );
+  
 }
+
+
 const getStyles = (isTablet) => StyleSheet.create({
   screen: {
     flex: 1,

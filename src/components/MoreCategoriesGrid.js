@@ -1,19 +1,52 @@
 // src/components/MoreCategoriesGrid.js
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback, memo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
-  Image,
   TouchableOpacity,
   ActivityIndicator,
   useWindowDimensions,
+  Image,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { getTopCategories, capitalizeWords } from "../functions/function";
+import { getTopCategories, capitalizeWords } from "../functions/product-function";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PASTELS = ["#FFF3E0","#E8F5E9","#E3F2FD","#F3E5F5","#FFFDE7","#FCE4EC","#E0F7FA"];
+
+/** Small image wrapper that shows a spinner while loading and a fallback on error */
+const ProgressiveImage = memo(function ProgressiveImage({ uri, size, style }) {
+  const [loading, setLoading] = useState(!!uri);
+  const [error, setError] = useState(false);
+
+  if (!uri || error) {
+    return (
+      <View style={[styles.image, styles.imagePlaceholder, { width: size, height: size }, style]}>
+        <Text style={{ color: "#aaa", fontSize: 12 }}>{error ? "No Image" : "No Image"}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ width: size, height: size }}>
+      {loading && (
+        <View style={[StyleSheet.absoluteFill, styles.loaderOverlay]}>
+          <ActivityIndicator />
+        </View>
+      )}
+      <Image
+        source={{ uri }}
+        style={[styles.image, { width: size, height: size }, style]}
+        resizeMode="cover"
+        onLoadStart={() => setLoading(true)}
+        onLoadEnd={() => setLoading(false)}
+        onError={() => { setError(true); setLoading(false); }}
+      />
+    </View>
+  );
+});
 
 export default function MoreCategoriesGrid() {
   const navigation = useNavigation();
@@ -34,28 +67,33 @@ export default function MoreCategoriesGrid() {
 
   const [allCats, setAllCats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [bottomBanner, setBottomBanner] = useState('');
 
   useEffect(() => {
     (async () => {
       try {
         const cats = await getTopCategories();
-        setAllCats((cats || []).filter(c => !c.toplist));
+        const bb = await AsyncStorage.getItem('bottombanner');
+        setBottomBanner(bb || '');
+        // keep non-toplist only
+        setAllCats((cats || []).filter((c) => !c.toplist));
       } catch (e) {
-        console.error("Failed to fetch categories:", e?.message);
+        console.log("Failed to fetch categories:", e?.message);
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
-  const goToCategory = (cat) => {
+  const goToCategory = useCallback((cat) => {
     navigation.navigate("CategoryProducts", {
-      category: cat.category,
-      backgroundUri: cat.topbannerbottom || null,
+        id: String(cat._id),
+       category: cat.category,
+      backgroundUri: cat.topbannerbottom || bottomBanner,
     });
-  };
+  }, [navigation, bottomBanner]);
 
-  const renderItem = ({ item, index }) => {
+  const renderItem = useCallback(({ item, index }) => {
     const bg = PASTELS[index % PASTELS.length];
     return (
       <TouchableOpacity
@@ -63,62 +101,58 @@ export default function MoreCategoriesGrid() {
         onPress={() => goToCategory(item)}
         style={[styles.card, { backgroundColor: bg, width: cardWidth }]}
       >
-        {item.image ? (
-          <Image
-            source={{ uri: item.image }}
-            style={[styles.image, { width: imageSize, height: imageSize }]}
-          />
-        ) : (
-          <View
-            style={[
-              styles.image,
-              styles.imagePlaceholder,
-              { width: imageSize, height: imageSize },
-            ]}
-          >
-            <Text style={{ color: "#aaa", fontSize: 12 }}>No Image</Text>
-          </View>
-        )}
+        <ProgressiveImage uri={`data:image/webp;base64,${item.image}`} size={imageSize} />
         <Text style={styles.title} numberOfLines={2}>
           {capitalizeWords(item.category)}
         </Text>
       </TouchableOpacity>
     );
-  };
+  }, [cardWidth, imageSize, goToCategory]);
 
-  // if (loading) {
-  //   return (
-  //     <View style={styles.center}>
-  //       <ActivityIndicator size="large" color="#2C1E70" />
-  //     </View>
-  //   );
-  // }
+  const keyExtractor = useCallback((item) => String(item._id || item.category), []);
 
-  // if (!allCats?.length) {
-  //   return (
-  //     <View style={styles.center}>
-  //       <Text style={{ color: "#666" }}>No categories available.</Text>
-  //     </View>
-  //   );
-  // }
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator />
+        <Text style={{ color: "#666", marginTop: 6 }}>Loading categories…</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ paddingBottom: 16 }}>
       <FlatList
-        key={NUM_COLUMNS}                           // reflow on breakpoint change
+        key={NUM_COLUMNS} // reflow on breakpoint change
         data={allCats}
-        keyExtractor={(item) => item._id || item.category}
+        keyExtractor={keyExtractor}
         numColumns={NUM_COLUMNS}
-        scrollEnabled={false}                        // let parent ScrollView scroll
-        removeClippedSubviews={false}                // avoid bottom cut-off
-        showsVerticalScrollIndicator={false}
+        // IMPORTANT: keep virtualization ON
+        scrollEnabled={true}
+        nestedScrollEnabled={true} // allow nested lists inside parent scroll
         renderItem={renderItem}
         columnWrapperStyle={{ gap: COL_GAP, marginBottom: COL_GAP }}
         contentContainerStyle={{
           paddingHorizontal: H_PADDING,
           paddingTop: 6,
-          paddingBottom: 24,                         // extra space for last row
+          paddingBottom: 24,
         }}
+        // Performance knobs for big lists
+        initialNumToRender={12}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+        removeClippedSubviews={true}
+        updateCellsBatchingPeriod={50}
+        getItemLayout={(_, index) => {
+          // approximate item height to help virtualization (card has image + text + paddings)
+          const cardHeight = imageSize + 10 /*padding*/ + 18 /*title area approx*/;
+          return { length: cardHeight, offset: cardHeight * Math.floor(index / NUM_COLUMNS), index };
+        }}
+        ListEmptyComponent={
+          <View style={styles.center}>
+            <Text style={{ color: "#666" }}>No categories found.</Text>
+          </View>
+        }
       />
     </View>
   );
@@ -126,8 +160,10 @@ export default function MoreCategoriesGrid() {
 
 const styles = StyleSheet.create({
   card: { borderRadius: 12, padding: 10, alignItems: "center" },
-  image: { borderRadius: 10, resizeMode: "cover", marginBottom: 8 },
+  image: { borderRadius: 10, marginBottom: 8 },
   imagePlaceholder: { backgroundColor: "#f2f2f2", alignItems: "center", justifyContent: "center" },
+  loaderOverlay: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.4)', borderRadius: 10 },
+
   title: { textAlign: "center", color: "#222", fontWeight: "700", fontSize: 12 },
   center: { justifyContent: "center", alignItems: "center", paddingVertical: 16 },
 });
