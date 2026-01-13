@@ -3,7 +3,7 @@ import React, { useState, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 
-const GOLD = "#FAD569";
+const GOLD = "#319241";
 
 function TabCircle({ active }) {
   return (

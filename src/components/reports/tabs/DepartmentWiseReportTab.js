@@ -6,6 +6,7 @@ import {
   ScrollView,
   FlatList,
   Dimensions,
+  ActivityIndicator
 } from "react-native";
 import {
   SectionCard,
@@ -76,7 +77,15 @@ function DeptTable({ rows }) {
   );
 }
 
-export default function DepartmentWiseReportTab({ data }) {
+export default function DepartmentWiseReportTab({ data,loading }) {
+    if (loading) {
+    return (
+      <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+        <Text style={{ marginTop: 8, color: '#666' }}>Loading…</Text>
+      </View>
+    );
+  }
   const screenW = Dimensions.get("window").width;
   const screenH = Dimensions.get("window").height;
   const donutSize = Math.min(Math.max(screenW - 48, 260), screenW >= 768 ? 520 : 420);

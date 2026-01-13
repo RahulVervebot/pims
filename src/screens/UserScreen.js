@@ -33,11 +33,12 @@ export default function UserScreen({ navigation }) {
         setUserRole(userRole || '');
         console.log('accesstoken:', accesstoken);
       } catch (e) {
-        navigation.replace('Login');
+        console.log("error in user screen",e);
+        // navigation.replace('Login');
       }
     };
     checkLogin();
-  }, [navigation]);
+  }, []);
 
   const initials = useMemo(() => {
     if (!user_name) return 'U';
@@ -154,7 +155,7 @@ const COLORS = {
   primary: '#2C1E70',
   primaryDark: '#211759',
   danger: '#E53935',
-  roleBG: '#FAD569',
+  roleBG: '#319241',
   roleText: '#5B4500',
   stroke: 'rgba(0,0,0,0.08)',
 };

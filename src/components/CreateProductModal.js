@@ -345,8 +345,8 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
 
             {/* Row 1: Name | Size */}
             <View style={styles.rowGap}>
-              <TextInput style={styles.inputCol} placeholder="Name *" value={name} onChangeText={setName} />
-              <TextInput style={styles.inputCol} placeholder="Size (e.g., 500ml)" value={size} onChangeText={setSize} />
+              <TextInput style={styles.inputCol} placeholder="Name *" placeholderTextColor={PLACEHOLDER} value={name} onChangeText={setName} />
+              <TextInput style={styles.inputCol} placeholder="Size (e.g., 500ml)" placeholderTextColor={PLACEHOLDER} value={size} onChangeText={setSize} />
             </View>
 
             {/* Barcode (full width with scan) */}
@@ -354,6 +354,7 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
               <TextInput
                 style={styles.inputWithRightIcon}
                 placeholder="Barcode"
+                placeholderTextColor={PLACEHOLDER}
                 value={barcode}
                 onChangeText={setBarcode}
               />
@@ -372,6 +373,7 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
               <TextInput
                 style={styles.inputCol}
                 placeholder="Price*"
+                placeholderTextColor={PLACEHOLDER}
                 value={price}
                 onChangeText={setPrice}
                 keyboardType="decimal-pad"
@@ -379,6 +381,7 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
               <TextInput
                 style={styles.inputCol}
                 placeholder="Unit Cost"
+                placeholderTextColor={PLACEHOLDER}
                 value={cost}
                 onChangeText={setCost}
                 keyboardType="decimal-pad"
@@ -390,6 +393,7 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
               <TextInput
                 style={styles.inputCol}
                 placeholder="Case Cost"
+                placeholderTextColor={PLACEHOLDER}
                 value={casecost}
                 keyboardType="decimal-pad"
                 onChangeText={setCaseCost}
@@ -398,6 +402,7 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
                 <TextInput
                   style={[styles.inputCol, { marginTop: 0 }]}
                   placeholder="Units in Case"
+                  placeholderTextColor={PLACEHOLDER}
                   value={unitc}
                   keyboardType="number-pad"
                   onChangeText={setUnitc}
@@ -413,6 +418,7 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
             <TextInput
               style={styles.input}
               placeholder="Qty Available"
+              placeholderTextColor={PLACEHOLDER}
               value={qtyavailable}
               onChangeText={setQtyAvailable}
               keyboardType="decimal-pad"
@@ -438,6 +444,7 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
                 <TextInput
                   style={styles.inputFlex}
                   placeholder="Search vendor (min 3 chars)"
+                  placeholderTextColor={PLACEHOLDER}
                   value={searchText}
                   onChangeText={handleVendorSearch}
                   autoCapitalize="none"
@@ -562,7 +569,8 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
   );
 }
 
-const THEME = { primary: '#2C1E70', secondary: '#F57200' };
+const THEME = { primary: '#2C1E70', secondary: '#319241' };
+const PLACEHOLDER = '#9AA3AF';
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: '#00000077' },

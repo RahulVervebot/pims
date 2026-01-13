@@ -17,7 +17,7 @@ import { PrintContext } from '../context/PrintContext';
 import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const THEME = { primary: '#2C1E70', secondary: '#F57200', price: '#27ae60' };
+const THEME = { primary: '#2C1E70', secondary: '#319241', price: '#27ae60' };
 
 /** Little modal for multi-select list with checkboxes */
 const MultiSelectModal = ({ visible, title, options, selectedIds, onChange, onClose }) => {

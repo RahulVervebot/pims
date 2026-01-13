@@ -12,7 +12,7 @@ import { PrintContext } from '../context/PrintContext';
 import { Picker } from '@react-native-picker/picker';
 const THEME = {
   primary: '#2C1E70',
-  secondary: '#F57200',
+  secondary: '#319241',
   price: '#27ae60',
 };
 

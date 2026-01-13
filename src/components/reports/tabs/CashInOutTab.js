@@ -1,7 +1,7 @@
 // components/reports/tabs/CashInOutTab.jsx
 import React, { useMemo } from "react";
 import {
-  View, ScrollView, Text, StyleSheet, FlatList, Dimensions, Platform,
+  View, ScrollView, Text, StyleSheet, FlatList, Dimensions, Platform,ActivityIndicator
 } from "react-native";
 import { SectionCard, DonutPie, LegendList, SummaryRow, PALETTE, currency, safeNumber, sumBy } from "../shared/ReportUI";
 
@@ -57,7 +57,15 @@ function CashTable({ kind, rows }) {
   );
 }
 
-export default function CashInOutTab({ data }) {
+export default function CashInOutTab({ data,loading }) {
+  if (loading) {
+    return (
+      <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+        <Text style={{ marginTop: 8, color: '#666' }}>Loading…</Text>
+      </View>
+    );
+  }
   const screenW = Dimensions.get("window").width;
   const screenH = Dimensions.get("window").height;
   const donutSize = Math.min(Math.max(screenW - 48, 260), screenW >= 768 ? 520 : 420);

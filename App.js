@@ -36,6 +36,8 @@ import ICMSScreen from './src/screens/ICMSScreen';
 import ICMS_invoice from './src/screens/icms/ICMS_invoice.js';
 import ICMS_VendorList from './src/screens/icms/ICMS_VendorList.js';
 import InvoiceDetails from './src/screens/icms/InvoiceDetails.js';
+import RedProductsScreen from './src/screens/icms/RedProductsScreen';
+import ReportsByHours from './src/screens/HourlyReport.js';
 //icons 
 import HomeIcon from './src/assets/icons/HomeIcon.svg';
 import CartIconold from './src/assets/icons/Carticon.svg';
@@ -133,14 +135,14 @@ function BottomTabs() {
                 //   position: 'absolute',
                 //   top: 0, left: 0, right: 0,            // ensures consistent bar height
                 //   height: 2,
-                //   backgroundColor: focused ? '#F57200' : 'transparent',
+                //   backgroundColor: focused ? '#319241' : 'transparent',
                 // }}
               />
               {/* Icon */}
               <IconComp
                 width={size ?? 24}
                 height={size ?? 24}
-                fill={focused ? '#F57200' : 'gray'}
+                fill={focused ? '#319241' : 'gray'}
               />
             </View>
           );
@@ -201,6 +203,7 @@ export default function App() {
           <Stack.Screen name="Cart" component={CartScreen} />
        <Stack.Screen name="Checkout" component={CheckoutScreen} />    
       <Stack.Screen name="SaleSummaryReport" component={SaleSummaryReport} />     
+      <Stack.Screen name="ReportsByHours" component={ReportsByHours} />    
       <Stack.Screen name="OcrScreen" component={OcrScreen} />     
        <Stack.Screen name="SettingScreen" component={SettingScreen} />    
             <Stack.Screen name="CategoryListScreen" component={CategoryListScreen} />  
@@ -240,6 +243,11 @@ export default function App() {
                 fontWeight: 'bold',
               },
             }}
+          />
+          <Stack.Screen
+            name="RedProducts"
+            component={RedProductsScreen}
+            options={{ title: 'Red Products' }}
           />
         </Stack.Navigator>
       </NavigationContainer>

@@ -281,7 +281,7 @@ export default function CheckoutScreen() {
   );
 }
 
-const THEME = { primary: '#2C1E70', secondary: '#F57200', price: '#27ae60' };
+const THEME = { primary: '#2C1E70', secondary: '#319241', price: '#27ae60' };
 
 const styles = StyleSheet.create({
     screen:{

@@ -18,6 +18,10 @@ const PATHS = {
   SAVE_INVOICE: '/api/invoice/scaninvoicedata',
   FETCH_INVOICE: '/api/invoice/getsavedinvoices',
   CREATE_INVOICE: '/api/invoice/create_data',
+  UPDATE_INVOICE: '/api/invoice/updateinvoicedetails',
+  RED_PRODUCTS: '/api/proxy/redproducts',
+  UPDATE_RED_PRODUCTS: '/api/update-redproduct'
+ 
 };
 
 // normalize base: strip trailing slashes

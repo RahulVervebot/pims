@@ -6,6 +6,7 @@ import {
   ScrollView,
   FlatList,
   Platform,
+  ActivityIndicator
 } from "react-native";
 import {
   SectionCard,
@@ -66,7 +67,15 @@ function RefundsTable({ rows }) {
   );
 }
 
-export default function RefundReportTab({ data }) {
+export default function RefundReportTab({ data,loading }) {
+      if (loading) {
+      return (
+        <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+          <ActivityIndicator size="large" />
+          <Text style={{ marginTop: 8, color: '#666' }}>Loading…</Text>
+        </View>
+      );
+    }
   const {
     totalAmount,
     totalCount,

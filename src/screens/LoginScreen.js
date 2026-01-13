@@ -93,9 +93,9 @@ export default function LoginScreen({ navigation }) {
             .map((o) => {
               const name = o && typeof o === 'object' ? Object.keys(o)[0] : null;
               if (!name) return null;
-              const { storeurl, dbname, icms_store } = o[name] || {};
+              const { storeurl, dbname, icms_store, chat_ai_api, chat_ai_baseurl } = o[name] || {};
               if (!storeurl || !dbname) return null;
-              return { name, storeurl, dbname,icms_store };
+              return { name, storeurl, dbname, icms_store, chat_ai_api, chat_ai_baseurl };
             })
             .filter(Boolean);
         }
@@ -129,6 +129,8 @@ export default function LoginScreen({ navigation }) {
       await AsyncStorage.setItem('storeurl', store.storeurl);
       await AsyncStorage.setItem('dbname', store.dbname);
       await AsyncStorage.setItem('icms_store', store.icms_store);
+      await AsyncStorage.setItem('chat_ai_api', store.chat_ai_api);
+      await AsyncStorage.setItem('chat_ai_baseurl', store.chat_ai_baseurl);
     } catch (e) {
       console.error('AsyncStorage set error:', e);
     } finally {

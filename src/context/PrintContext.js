@@ -61,9 +61,13 @@ export const PrintProvider = ({ children }) => {
     saveprint(newprint);
   };
 
+  const clearPrint = () => {
+    saveprint([]);
+  };
+
   return (
     <PrintContext.Provider
-      value={{ print, addToPrint, increasePrintQty, decreasePrintQty, removeFromprint }}
+      value={{ print, addToPrint, increasePrintQty, decreasePrintQty, removeFromprint, clearPrint }}
     >
       {children}
     </PrintContext.Provider>

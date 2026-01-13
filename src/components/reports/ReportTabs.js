@@ -2,27 +2,20 @@ import React, { useState, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 
-const ACTIVE_ICON = "#F6C343"; // requested active color
-const INACTIVE_ICON = "#9EA0A6";
+const ACTIVE_ICON = "#2e7d32";
+const INACTIVE_ICON = "#000";
 
 function DefaultTabIcon({ active }) {
   const color = active ? ACTIVE_ICON : INACTIVE_ICON;
   return (
-    <Svg width={44} height={44}>
+    <Svg width={32} height={32}>
       {/* simple ring icon; no background highlight */}
-      <Circle cx={22} cy={22} r={18} fill="#FFFFFF" stroke={color} strokeWidth={2} />
+      <Circle cx={16} cy={16} r={13} fill="#FFFFFF" stroke={color} strokeWidth={2} />
     </Svg>
   );
 }
 
-/**
- * props:
- *  - tabs: [{ key, component, icon?: ReactComp, renderIcon?: ({active, color})=>ReactNode }]
- *  - apiData: { [key]: any }
- *  - initialTab?: string
- *  - onTabChange?: (key)=>void
- */
-export default function ReportTabs({ tabs = [], apiData = {}, initialTab, onTabChange }) {
+export default function ReportTabs({ tabs = [], apiData = {}, loadingByTab = {}, initialTab, onTabChange }) {
   const [activeKey, setActiveKey] = useState(initialTab || tabs?.[0]?.key);
   const active = useMemo(() => tabs.find((t) => t.key === activeKey), [tabs, activeKey]);
   const ActiveComp = active?.component;
@@ -45,8 +38,8 @@ export default function ReportTabs({ tabs = [], apiData = {}, initialTab, onTabC
       // Pass common props most react-native-svg icons accept
       return (
         <Icon
-          width={44}
-          height={44}
+          width={32}
+          height={32}
           color={color}
           stroke={color}
           fill={color === INACTIVE_ICON ? "none" : color}
@@ -70,7 +63,7 @@ export default function ReportTabs({ tabs = [], apiData = {}, initialTab, onTabC
         {/* Scrollable content */}
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
           {ActiveComp ? (
-            <ActiveComp data={apiData[activeKey]} />
+          <ActiveComp data={apiData[activeKey]} loading={!!loadingByTab[activeKey]} />
           ) : (
             <View style={{ padding: 16 }}>
               <Text>Tab not configured.</Text>
@@ -137,7 +130,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 6,
     fontSize: 12,
-    color: "#333",
+    color: "#111",
     fontWeight: "700",
   },
   tabLabelActive: { color: "#000" },

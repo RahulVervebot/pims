@@ -6,7 +6,9 @@ import API_ENDPOINTS from '../../icms_config/api';
 export async function searchVendors(query) {
   if (!query || query.trim().length < 2) return [];
   const token = await AsyncStorage.getItem('access_token');
-   const store = 'deepanshu_test'
+    const icms_store = await AsyncStorage.getItem('icms_store');
+  
+   const store = icms_store
   const res = await fetch(API_ENDPOINTS.SEARCHVENDOR, {
     method: 'POST',
     headers: {
@@ -24,5 +26,6 @@ export async function searchVendors(query) {
   }
 
   const data = await res.json().catch(() => ({}));
+  console.log("vender data:",data);
   return Array.isArray(data?.results) ? data.results : [];
 }

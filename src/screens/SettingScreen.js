@@ -258,7 +258,7 @@ const COLORS = {
   sub: '#6B7280',
   text: '#111827',
   primary: '#2C1E70',
-  roleBG: '#FAD569',
+  roleBG: '#319241',
   roleText: '#5B4500',
   update: '#2C1E70',
 };

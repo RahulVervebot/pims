@@ -20,6 +20,7 @@ import TopSellingProducts from '../assets/icons/Top-Selling-Products.png';
 import TopSellingCategories from '../assets/icons/Top-Selling-Categories.png';
 import CreateCategoryModal from '../components/CreateCategoryModal';
 import { useNavigation } from '@react-navigation/native';
+import CreateProductModal from '../components/CreateProductModal';
 const PANEL_RADIUS = 28;
 
 // Enable LayoutAnimation on Android
@@ -32,6 +33,7 @@ export default function POSScreen() {
   const isTablet = width >= 768;
   const styles = getStyles(isTablet);
   const navigation = useNavigation();
+  const [showProductCreate, setShowProductCreate] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
 
@@ -67,7 +69,7 @@ export default function POSScreen() {
 
   return (
     <ImageBackground source={getImageSource(reportbg)} style={styles.screen} resizeMode="cover">
-      <CustomHeader Title="POS FEATURES" backgroundType="image" backgroundValue={reportbg} />
+      <CustomHeader Title="POS" backgroundType="image" backgroundValue={reportbg} />
 
       <View style={styles.panelInner}>
         {/* PROMOTIONS (Accordion) */}
@@ -108,7 +110,7 @@ export default function POSScreen() {
             <Row
               icon={TopCustumerList}
               label="Product Print"
-              onPress={() => navigation.navigate('ProductPrintScreen')}
+              onPress={() => navigation.navigate('PrintScreen')}
               right={null}
             />
             <Row
@@ -124,13 +126,18 @@ export default function POSScreen() {
         {/* PRODUCT CATEGORIES (Accordion) */}
         <Row
           icon={TopCustumerList}
-          label="Product Categories"
+          label="Product Managment"
           onPress={() => toggle('category')}
           right={<Text style={{ fontSize: 22, opacity: 0.6 }}>{expanded.category ? '−' : '+'}</Text>}
         />
         {expanded.category && (
           <View>
-        
+          <Row
+              icon={TopSellingProducts}
+              label="Create Product"
+              right={null}
+                onPress={() => setShowProductCreate(true)}
+            />
             <Row
               icon={TopSellingProducts}
               label="Create Category"
@@ -155,6 +162,15 @@ export default function POSScreen() {
    fetchCategories();
   }}
 />
+  <CreateProductModal
+        visible={showProductCreate}
+        onClose={() => setShowProductCreate(false)}
+        onCreated={() => {
+          // If you want to refresh immediately after product creation:
+          setListReloadKey((k) => k + 1);
+          setShowProductCreate(false);
+        }}
+      />
     </ImageBackground>
   );
 }

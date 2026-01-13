@@ -2,13 +2,12 @@ import React, { useState,useCallback } from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import API_ENDPOINTS, { initICMSBase, setICMSBase } from '../../../icms_config/api';
-
+import API_ENDPOINTS, { initICMSBase } from '../../../icms_config/api';
 const SaveInvoiceModal = ({ isVisible, onClose,ImageURL, vendorName, tableData,cleardata,selectedVendor }) => {
   const [savedInvoiceNo, setSavedInvoiceNo] = useState('');
    const baseurl = "https://icmsfrontend.vervebot.io";
      const [ocrurl, setOcrUrl] = useState(null);
-     const [ocrsavestore, setOcrSaveStore] = useState('tulsi_dev');
+   
        const [user_email, setUserEmail] = useState('');
    useFocusEffect(
     useCallback(() => {
@@ -18,9 +17,9 @@ const SaveInvoiceModal = ({ isVisible, onClose,ImageURL, vendorName, tableData,c
           // Retrieve any needed tokens/urls (if used by fetchManageOrderReport)
              const userEmail = await AsyncStorage.getItem('userEmail');
           const temocrurl = await AsyncStorage.getItem('ocrurl');
-          const temocruploadstore = await AsyncStorage.getItem('ocruploadstore');
+      
           setUserEmail(userEmail || '');
-          setOcrSaveStore(temocruploadstore);
+
           setOcrUrl(temocrurl);
         } catch (error) {
           console.error('Error fetching initial data:', error);
@@ -34,18 +33,7 @@ const SaveInvoiceModal = ({ isVisible, onClose,ImageURL, vendorName, tableData,c
       Alert.alert('Missing Invoice Number', 'Please enter a valid invoice number.');
       return;
     }
-
-    const bodyPayload = {
-      InvoicesImgUrls: ImageURL,
-      InvoiceName: vendorName,
-      InvoiceDate: new Date().toISOString().split('T')[0],
-      InvoicePage: '',
-      UserDetailInfo: {
-       InvoiceUpdatedby: user_email,
-       date: new Date().toISOString().split('T')[0],
-      
-      },
-      InvoiceData: tableData.map((row) => ({
+     const invdata = tableData.map((row) => ({
         qty: row.qty || '',
         itemNo: row.itemNo || '',
         description: row.description || '',
@@ -57,7 +45,18 @@ const SaveInvoiceModal = ({ isVisible, onClose,ImageURL, vendorName, tableData,c
         posName: row.posName || '',
         department: row.department || '',
         condition: row.condition || '',
-      })),
+      }))
+    const bodyPayload = {
+      InvoicesImgUrls: ImageURL,
+      InvoiceName: vendorName,
+      InvoiceDate: new Date().toISOString().split('T')[0],
+      InvoicePage: '',
+      UserDetailInfo: {
+       InvoiceUpdatedby: user_email,
+       date: new Date().toISOString().split('T')[0],
+      
+      },
+      InvoiceData: invdata,
       SavedDate: new Date().toISOString().split('T')[0],
       SavedInvoiceNo: savedInvoiceNo,
       Exist: false,
@@ -66,16 +65,19 @@ const SaveInvoiceModal = ({ isVisible, onClose,ImageURL, vendorName, tableData,c
     try {
         console.log("bodyPayload",bodyPayload);
         const token = await   AsyncStorage.getItem('access_token');
+          const icms_store = await   AsyncStorage.getItem('icms_store');
+        
         const vendordetails = selectedVendor;
+        console.log("vendordetails",vendordetails);
         // const vendordetails = '{"value":"Chetak","slug":"chetak","jsonName":"chetak-products.json","emptyColumn":true,"databaseName":"chetakproducts"}'
         const response = await fetch(API_ENDPOINTS.SAVE_INVOICE, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'store': 'tulsi_dev',
+          'store': icms_store,
          'access_token': token,
           'mode': 'MOBILE',
-          vendordetails : vendordetails,
+          vendordetails : JSON.stringify(vendordetails),
         },
         body: JSON.stringify(bodyPayload),
         });
@@ -130,15 +132,17 @@ const handleCreateInvoice = async () => {
   try {
     console.log('Create_bodyPayload', bodyPayload);
     const token = await AsyncStorage.getItem('access_token');
-
+  const icms_store = await AsyncStorage.getItem('icms_store');
+    
+    const vendorlist =  JSON.stringify(vendordetails)
     const response = await fetch(API_ENDPOINTS.CREATE_INVOICE, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'store': 'tulsi_dev',
+        'store': icms_store,
         'access_token': token ?? '',
         'mode': 'MOBILE',
-        vendordetails,
+       vendordetails: JSON.stringify(vendordetails),
       },
       body: JSON.stringify(bodyPayload),
     });
@@ -163,14 +167,12 @@ const handleCreateInvoice = async () => {
 
     console.log('created response', data);
     Alert.alert('Success', 'Invoice created successfully.');
-    cleardata();
+    // cleardata();
   } catch (error) {
     console.log('create error', error);
     Alert.alert('Error', error.message || 'Failed to create invoice.');
   }
 };
-
-
 
     return (
     <Modal visible={isVisible} transparent animationType="fade">

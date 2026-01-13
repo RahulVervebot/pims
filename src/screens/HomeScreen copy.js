@@ -63,7 +63,7 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState("");
  const [activeTabID, setActiveTabID] = useState("");
   
-  const activeIconColor = "#F57200";
+  const activeIconColor = "#319241";
 
   // Home pull-to-refresh state
   const [homeRefreshing, setHomeRefreshing] = useState(false);

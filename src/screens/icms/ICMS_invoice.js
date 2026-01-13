@@ -1,6 +1,6 @@
 import React, {useState, useEffect, useMemo, useCallback} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {View, Text, TextInput, Platform, FlatList, TouchableOpacity, StyleSheet, ImageBackground,ActivityIndicator} from 'react-native';
+import {View, Text, TextInput, Platform, FlatList, TouchableOpacity, StyleSheet, ImageBackground,ActivityIndicator, Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import API_ENDPOINTS, { initICMSBase, setICMSBase } from '../../../icms_config/api';
 import AppHeader from '../../components/AppHeader';
@@ -30,6 +30,8 @@ function buildFetchInvoiceUrl(vendor) {
 async function fetchInvoicesForVendor(vendor) {
   try {
     const token = await AsyncStorage.getItem('access_token');
+    console.log("token:",token);
+      const icms_store = await AsyncStorage.getItem('icms_store');
     const url = buildFetchInvoiceUrl(vendor);
     console.log('FETCH_INVOICE URL =>', url);
 
@@ -37,7 +39,7 @@ async function fetchInvoicesForVendor(vendor) {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'store': 'tulsi_dev',
+        'store': icms_store,
         'access_token': token ?? '',
         'mode': 'MOBILE',
       },
@@ -126,7 +128,7 @@ const [vendorSearchError, setVendorSearchError] = useState('');
 
   // vendor search (debounced suggestions)
   const runVendorSearch = async (q) => {
-    const results = await searchVendors(q, 'tulsi_dev');
+    const results = await searchVendors(q);
     setVendorResults(results);
   };
   const debouncedVendorSearch = useMemo(() => debounce(runVendorSearch, 300), []);
@@ -136,7 +138,7 @@ const onPressSearchVendor = async () => {
   setVendorSearchError('');
   setVendorSearching(true);
   try {
-    const results = await searchVendors(vendorQuery, 'deepanshu_test');
+    const results = await searchVendors(vendorQuery);
 
     if (!Array.isArray(results) || results.length === 0) {
       // no match: clear list + show message
@@ -153,6 +155,7 @@ const onPressSearchVendor = async () => {
     }
   } catch (e) {
     setVendorSearchError('Search failed. Try again.');
+    Alert.alert("Vendor Search Failed", 'Please try again')
   } finally {
     setVendorSearching(false);
   }
@@ -231,6 +234,8 @@ const onSelectVendor = async (v) => {
               onChangeText={(t) => { setVendorQuery(t); debouncedVendorSearch(t); }}
               placeholder="Search Vendor…"
               style={styles.searchInput}
+              placeholderTextColor="#6b7280"
+              selectionColor="#1f1f1f"
               returnKeyType="search"
               onSubmitEditing={onPressSearchVendor}
             />
@@ -243,9 +248,9 @@ const onSelectVendor = async (v) => {
     ? <ActivityIndicator size="small" color="#fff" />
     : <Text style={styles.vendorSearchBtnText}>Search</Text>}
 </TouchableOpacity>
-{!!vendorSearchError && <Text style={styles.errorText}>{vendorSearchError}</Text>}
+{/* {vendorSearchError && <Text style={styles.errorText}>{vendorSearchError}</Text>} */}
 
-            {!!vendorResults.length && (
+            {vendorResults.length > 0 && (
               <View style={styles.dropdownContainer}>
                 <View style={styles.dropdown}>
                   {vendorResults.map((v, i) => (
@@ -271,12 +276,14 @@ const onSelectVendor = async (v) => {
               onChangeText={setInvoiceSearch}
               placeholder="Search Invoice No…"
               style={styles.searchInput}
+              placeholderTextColor="#6b7280"
+              selectionColor="#1f1f1f"
             />
           </View>
         </View>
 
         {loading ? (
-          <Text style={{ textAlign: 'center', color: '#888' }}>Loading invoices…</Text>
+          <Text style={styles.helperText}>Loading invoices…</Text>
         ) : (
           <FlatList
             data={visibleInvoices}
@@ -285,10 +292,10 @@ const onSelectVendor = async (v) => {
             stickyHeaderIndices={[0]}
             renderItem={({ item, index }) => (
               <View style={[styles.row, { backgroundColor: index % 2 === 0 ? '#fafafa' : '#fff' }]}>
-                <Text style={[styles.col, styles.invCol]} numberOfLines={1}>
+                <Text style={[styles.col, styles.invCol, styles.cellText]} numberOfLines={1}>
                   {normalizeInvNo(item) || '-'}
                 </Text>
-                <Text style={[styles.col, styles.dateCol]} numberOfLines={1}>
+                <Text style={[styles.col, styles.dateCol, styles.cellText]} numberOfLines={1}>
                   {item?.SavedDate ?? '-'}
                 </Text>
                 <View style={[styles.col, styles.actionCol, { flexDirection: 'row', gap: 8 }]}>
@@ -302,7 +309,7 @@ const onSelectVendor = async (v) => {
               </View>
             )}
             ListEmptyComponent={() => (
-              <Text style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>
+              <Text style={styles.emptyText}>
               {selectedVendor ? 'No invoices found' : 'Search a vendor to load invoices'}
               </Text>
             )}
@@ -356,12 +363,13 @@ const styles = StyleSheet.create({
   searchInput: {
     borderWidth: 1, borderColor: '#ccc', borderRadius: 10,
     paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#fff',
+    color: '#1f1f1f',
   },
   vendorSearchBtn: {
     position: 'absolute', right: 6, top: 6, bottom: 6,
     paddingHorizontal: 12, borderRadius: 8,
     justifyContent: 'center', alignItems: 'center',
-    backgroundColor: '#2C62FF',
+    backgroundColor: '#319241',
   },
   vendorSearchBtnText: { color: '#fff', fontWeight: '700' },
 
@@ -410,10 +418,13 @@ const styles = StyleSheet.create({
   invCol: { flex: 1.2 },
   dateCol: { flex: 1.2 },
   actionCol: { flex: 0.9, alignItems: 'flex-start' },
-  headerText: { fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
-  badge: { backgroundColor: 'blue', borderRadius: 12, paddingHorizontal: 6, paddingVertical: 2 },
+  headerText: { fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3, color: '#1f1f1f' },
+  cellText: { color: '#1f1f1f' },
+  badge: { backgroundColor: '#319241', borderRadius: 12, paddingHorizontal: 6, paddingVertical: 2 },
   badgeText: { color: 'white', fontSize: 12 },
-  link: { color: 'blue', fontWeight: '600' },
+  link: { color: '#319241', fontWeight: '600' },
   errorText: { marginTop: 6, color: '#d9534f', fontWeight: '600' },
+  helperText: { textAlign: 'center', color: '#666' },
+  emptyText: { textAlign: 'center', color: '#666', marginTop: 20 },
 
-});
+}); 

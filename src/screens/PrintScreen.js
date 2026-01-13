@@ -1,28 +1,20 @@
 // src/screens/printScreen.js
-import React, { useEffect, useContext } from 'react';
+import React, { useContext } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ImageBackground } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { PrintContext } from '../context/PrintContext';
 import AppHeader from '../components/AppHeader';
 import reportbg from '../assets/images/report-bg.png';
 import PrintOptions from '../components/PrintOptions';
 
-const THEME = { primary: '#2C1E70', secondary: '#F57200', price: '#27ae60' };
+const THEME = { primary: '#2C1E70', secondary: '#319241', price: '#27ae60' };
 
 export default function PrintScreen() {
   const navigation = useNavigation();
-  const { print, increasePrintQty, decreasePrintQty, removeFromprint, setPrint } = useContext(PrintContext);
+  const { print, removeFromprint, clearPrint } = useContext(PrintContext);
 
   const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
 
-  useEffect(() => {
-    (async () => {
-      const stored = await AsyncStorage.getItem('print');
-      setPrint(stored ? JSON.parse(stored) : []);
-    })();
-  }, [setPrint]);
-  
   const renderItem = ({ item }) => (
     <View style={styles.printItem}>
       <View>
@@ -32,7 +24,7 @@ export default function PrintScreen() {
 
       <Text style={styles.price}>${Number(item.price ?? item.salePrice ?? 0).toFixed(2)}</Text>
 
-        <TouchableOpacity style={styles.removeBtn} onPress={() => removeFromprint(item._id)}>
+        <TouchableOpacity style={styles.removeBtn} onPress={() => removeFromprint(item.product_id)}>
           <Text style={{ color: '#fff' }}>Remove</Text>
         </TouchableOpacity>
 
@@ -57,7 +49,7 @@ export default function PrintScreen() {
             {/* New: Print options (USB / Bluetooth) */}
             <PrintOptions
               items={print}
-              onClear={() => setPrint([])}
+              onClear={clearPrint}
               containerStyle={{ backgroundColor: '#fff' }}
             />
           </View>
@@ -87,7 +79,7 @@ const styles = StyleSheet.create({
   qtyBtn: { backgroundColor: '#2c1e70', padding: 6, borderRadius: 5 },
   qtyText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   qtyValue: { marginHorizontal: 10, fontSize: 16, fontWeight: 'bold' },
-  removeBtn: { backgroundColor: '#F57200', padding: 6, borderRadius: 5, marginTop: 8, alignSelf: 'flex-end' },
+  removeBtn: { backgroundColor: '#319241', padding: 6, borderRadius: 5, marginTop: 8, alignSelf: 'flex-end' },
   empty: { textAlign: 'center', marginTop: 50, fontSize: 16, color: '#888' },
   footer: { position: 'absolute', bottom: 0, left: 0, right: 0 },
 });

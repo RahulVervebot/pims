@@ -1,5 +1,5 @@
 // src/components/PrintOptions.js
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -46,18 +46,34 @@ function toExportList(items) {
   return items
     .map((it) => {
       // Map your current context item shape -> expected shape
+      const name =
+        it.name ??
+        it.productName ??
+        it.product_name ??
+        it.title ??
+        '';
       const list_price_num =
         typeof it.list_price === 'number'
           ? it.list_price
           : typeof it.price === 'number'
           ? it.price
-          : Number(it.list_price || it.price || 0);
+          : typeof it.salePrice === 'number'
+          ? it.salePrice
+          : Number(it.list_price || it.price || it.salePrice || 0);
+      const barcode =
+        it.barcode ??
+        it.product_barcode ??
+        it.upc ??
+        it.code ??
+        it.ean13 ??
+        '';
+      const size = (it.size ?? it.Size) ? String(it.size ?? it.Size) : '';
 
       return {
-        name: it.name ?? '',
+        name,
         list_price: list_price_num, // raw number; server can format
-        barcode: it.barcode ?? it.code ?? it.ean13 ?? '',
-        size: (it.size && String(it.size)) || '',
+        barcode,
+        size,
       };
     })
     .map(o => {
@@ -144,6 +160,9 @@ const [qty, setQty] = useState(1);
   const [addIpToggle, setAddIpToggle] = useState(false);
   const [ipAddress, setIpAddress] = useState('');
   const [btPrinters, setBtPrinters] = useState([]);
+  const [btScanning, setBtScanning] = useState(false);
+  const btScanActiveRef = useRef(false);
+  const btScanTimeoutRef = useRef(null);
 const incQty = () => setQty((n) => Math.min((Number(n) || 1) + 1, 9999));
 const decQty = () => setQty((n) => Math.max((Number(n) || 1) - 1, 1));
 
@@ -154,36 +173,88 @@ const decQty = () => setQty((n) => Math.max((Number(n) || 1) - 1, 1));
     else Alert.alert('Error', 'Please enter a valid integer number');
   };
 
+  const showPrinterPicker = (discoveredJson) => {
+    const json = JSON.parse(discoveredJson || '[]');
+    const list =
+      Platform.OS === 'ios'
+        ? json.map((p, i) => ({ id: i, label: `${p.friendlyName}`, mac: p.friendlyName }))
+        : json.map((p, i) => ({ id: i, label: `${p.address}, ${p.friendlyName}`, mac: p.address }));
+    setBtPrinters(list);
+    if (!list.length) {
+      Alert.alert('Printers', 'No printers found, try again.');
+      return;
+    }
+    const buttons = list.map(pr => ({
+      text: pr.label,
+      onPress: () => printViaBluetooth(pr),
+    }));
+    buttons.push({ text: 'CANCEL', onPress: () => {} });
+    Alert.alert('Printers', 'Select a Bluetooth printer', buttons, { cancelable: true });
+  };
+
+  const fetchBondedPrinters = () => {
+    if (!ZSDKModule?.zsdkGetBondedBluetoothPrinters) {
+      Alert.alert('Bluetooth', 'Paired device lookup is not available. Please rebuild the app.');
+      return;
+    }
+    ZSDKModule.zsdkGetBondedBluetoothPrinters((error, bonded) => {
+      if (error) {
+        Alert.alert('Bluetooth', `Paired device lookup failed: ${error}`);
+        return;
+      }
+      showPrinterPicker(bonded);
+    });
+  };
+
   const discoverPrinters = async () => {
     const ok = await ensureBtScanReady();
     if (!ok) return;
 
     try {
+      if (!ZSDKModule?.zsdkPrinterDiscoveryBluetooth) {
+        Alert.alert('Bluetooth', 'ZSDKModule is not available. Please rebuild the app.');
+        return;
+      }
+      btScanActiveRef.current = true;
+      setBtScanning(true);
+      if (btScanTimeoutRef.current) {
+        clearTimeout(btScanTimeoutRef.current);
+      }
+      btScanTimeoutRef.current = setTimeout(() => {
+        if (btScanActiveRef.current) {
+          btScanActiveRef.current = false;
+          setBtScanning(false);
+          fetchBondedPrinters();
+        }
+      }, 15000);
+
       ZSDKModule.zsdkPrinterDiscoveryBluetooth((error, discovered) => {
+        btScanActiveRef.current = false;
+        setBtScanning(false);
+        if (btScanTimeoutRef.current) {
+          clearTimeout(btScanTimeoutRef.current);
+          btScanTimeoutRef.current = null;
+        }
         if (error) {
           console.error('Discovery error:', error);
-          Alert.alert('Bluetooth', 'Discovery failed.');
+          Alert.alert('Bluetooth', `Discovery failed: ${error}`);
           return;
         }
-        const json = JSON.parse(discovered || '[]');
-        const list =
-          Platform.OS === 'ios'
-            ? json.map((p, i) => ({ id: i, label: `${p.friendlyName}`, mac: p.friendlyName }))
-            : json.map((p, i) => ({ id: i, label: `${p.address}, ${p.friendlyName}`, mac: p.address }));
-        setBtPrinters(list);
-        if (!list.length) Alert.alert('Printers', 'No printers found, try again.');
-        else {
-          const buttons = list.map(pr => ({
-            text: pr.label,
-            onPress: () => printViaBluetooth(pr),
-          }));
-          buttons.push({ text: 'CANCEL', onPress: () => {} });
-          Alert.alert('Printers', 'Select a Bluetooth printer', buttons, { cancelable: true });
+        if (!discovered || discovered === '[]') {
+          fetchBondedPrinters();
+          return;
         }
+        showPrinterPicker(discovered);
       });
     } catch (e) {
       console.error(e);
       Alert.alert('Bluetooth', 'Discovery threw an exception.');
+      btScanActiveRef.current = false;
+      setBtScanning(false);
+      if (btScanTimeoutRef.current) {
+        clearTimeout(btScanTimeoutRef.current);
+        btScanTimeoutRef.current = null;
+      }
     }
   };
 
@@ -302,8 +373,8 @@ const times = Math.max(Number(qty) || 1, 1);
           <Text style={styles.btnUsbText}>PRINT VIA USB</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.btnBt} onPress={discoverPrinters}>
-          <Text style={styles.btnBtText}>PRINT VIA BLUETOOTH</Text>
+        <TouchableOpacity style={styles.btnBt} onPress={discoverPrinters} disabled={btScanning}>
+          <Text style={styles.btnBtText}>{btScanning ? 'SCANNING...' : 'PRINT VIA BLUETOOTH'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -348,7 +419,7 @@ const times = Math.max(Number(qty) || 1, 1);
   );
 }
 
-const THEME = {primary: '#2C1E70', secondary: '#F57200'};
+const THEME = {primary: '#2C1E70', secondary: '#319241'};
 
 const styles = StyleSheet.create({
   wrapper: {
@@ -440,6 +511,6 @@ qtyBtn: {
   borderRadius: 5,
 },
 qtyText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-qtyValue: { marginHorizontal: 12, fontSize: 16, fontWeight: 'bold' },
+qtyValue: { marginHorizontal: 12, fontSize: 16, fontWeight: 'bold',color:"#000" },
 
 });

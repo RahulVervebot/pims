@@ -24,11 +24,12 @@ import ProductBottomSheet from "./ProductBottomSheet"; // ✅ ADD
 import AsyncStorage from '@react-native-async-storage/async-storage';
 const THEME = {
   primary: "#2C1E70",
-  accent: "#F57200",
+  accent: "#319241",
   text: "#222",
   muted: "#777",
   success: "#27ae60",
 };
+const PLACEHOLDER = "#9AA3AF";
 
 export default function ProductSearch() {
   const [searchText, setSearchText] = useState("");
@@ -195,6 +196,7 @@ setStoreurl(storeulr)
         <TextInput
           style={styles.input}
           placeholder="Search by name, barcode, or category..."
+          placeholderTextColor={PLACEHOLDER}
           value={searchText}
           onChangeText={handleSearch}
         />

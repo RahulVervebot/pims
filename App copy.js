@@ -66,7 +66,7 @@ function BottomTabs() {
       screenOptions={({ route, navigation }) => ({
         tabBarShowLabel: false,   // 👈 hides the text labels
         headerShown: false,    // optional: hides header
-        tabBarActiveTintColor: '#F57200',
+        tabBarActiveTintColor: '#319241',
         tabBarInactiveTintColor: 'gray',
         tabBarStyle: { backgroundColor: '#fff', height: 60 },
         tabBarIcon: ({ color, size }) => {

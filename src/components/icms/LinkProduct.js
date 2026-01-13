@@ -10,7 +10,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import API_ENDPOINTS from '../../../icms_config/api';
+import API_ENDPOINTS, { initICMSBase } from '../../../icms_config/api';
 
 const LinkProductModal =  ({
   visible,
@@ -19,14 +19,13 @@ const LinkProductModal =  ({
   linkingItem,
   invoice,
 }) => {
-  const baseUrl = 'http://192.168.68.111:3006';
 
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState('');
-   const [ocruploadstore, setOcrUploadStore] = useState("tulsi_dev");
+
   // const vender = await AsyncStorage.getItem('vendor');
   const day = invoice?.SavedDate;
   const InvNumber = invoice?.SavedInvoiceNo;
@@ -37,6 +36,8 @@ const LinkProductModal =  ({
     const loadVendor = async () => {
       try {
         const value = await AsyncStorage.getItem('vendor');
+
+
         if (value) {
           setStoredVendor(JSON.parse(value));
         }
@@ -56,7 +57,8 @@ const LinkProductModal =  ({
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-         const token = await   AsyncStorage.getItem('access_token');
+       const token = await   AsyncStorage.getItem('access_token');
+       const icms_store = await AsyncStorage.getItem('icms_store');
        console.log("AsyncStorage:",token);
         const res = await fetch(API_ENDPOINTS.FINDPRODUCTFROMHICKSVILL, {
           method: 'POST',
@@ -64,7 +66,7 @@ const LinkProductModal =  ({
             'Content-Type': 'application/json',
                 'access_token': token,
           'mode': 'MOBILE',
-          'store': ocruploadstore
+          'store': icms_store
           },
           body: JSON.stringify({barcodes: [searchTerm]}),
         });
@@ -85,53 +87,64 @@ const LinkProductModal =  ({
   }, [searchTerm]);
 
 const linkProduct = async (item, qty) => {
+  const safeString = (val, fallback = '') =>
+    val === undefined || val === null ? fallback : String(val);
+  const safeBoolString = (val, fallback = 'false') =>
+    val === undefined || val === null ? fallback : String(!!val);
+
   const data = {
-    invoiceName: vendorName,
+    invoiceName: safeString(vendorName),
     value: {
-      Item: linkingItem.itemNo,
-      POS: item.name,
-      Barcode: item.upc,
-      PosSKU: item.sku,
-      isReviewed: 'true',
-      Description: linkingItem.description,
-      Size: linkingItem.size,
-      Department: item.department,
-      SellerCost: item.cost,
-      SellingPrice: item.price,
-      Quantity: qty,
-      Price: item.salePrice,
-      LinkingCorrect: 'true',
-      LinkByBarcode: 'false',
-      LinkByName: 'false',
-      InvoiceName: vendorName,
-      InvoiceDate: day,
-      InvoiceNo: InvNumber,
-      ProductId: linkingItem.ProductId,
-      DefaultLinking: true,
-      StockSpliting: true,
+      Item: safeString(linkingItem?.itemNo),
+      POS: safeString(item?.name),
+      Barcode: safeString(item?.upc),
+      PosSKU: safeString(item?.sku, '0'),
+      isReviewed: safeBoolString(linkingItem?.isReviewed, 'true'),
+      Description: safeString(linkingItem?.description),
+      Size: safeString(linkingItem?.size),
+      Department: safeString(item?.department),
+      SellerCost: safeString(item?.cost),
+      SellingPrice: safeString(item?.price),
+      Quantity: safeString(qty, '0'),
+      Price: safeString(item?.salePrice),
+      LinkingCorrect: safeBoolString(linkingItem?.LinkingCorrect, 'true'),
+      LinkByBarcode: safeBoolString(linkingItem?.LinkByBarcode, 'false'),
+      LinkByName: safeBoolString(linkingItem?.LinkByName, 'false'),
+      InvoiceName: safeString(vendorName),
+      InvoiceDate: safeString(day),
+      InvoiceNo: safeString(InvNumber),
+      ProductId: safeString(linkingItem?.ProductId),
+      DefaultLinking: Boolean(linkingItem?.DefaultLinking ?? true),
+      StockSpliting: Boolean(linkingItem?.StockSpliting ?? true),
     },
   };
 
   console.log("Sending data:", data);
 
   try {
-    const res = await fetch(`${baseUrl}/api/invoice/product/update`, {
+      const icms_store = await AsyncStorage.getItem('icms_store');
+    await initICMSBase();
+    const token = await AsyncStorage.getItem('access_token');
+    const res = await fetch(API_ENDPOINTS.PRODUCTLINKING, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        store: 'deepanshu_test',
-        vendordetails: JSON.stringify(storedVendor)
+        'access_token': token ?? '',
+        'mode': 'MOBILE',
+        store: icms_store,
+        vendordetails: storedVendor ? JSON.stringify(storedVendor) : '',
       },
       body: JSON.stringify(data) // ✅ Must be stringified
     });
 
     const result = await res.json(); // ✅ Read API response
     console.log("API Response:", result);
+      console.log("res",res)
 
     if (!res.ok) {
       throw new Error(result.error || 'Failed to link product');
     }
-    console.log("res",res)
+  
     // Maybe close modal or show success
     alert('Product linked successfully!');
   } catch (err) {
@@ -152,6 +165,7 @@ const linkProduct = async (item, qty) => {
               placeholder="Type product name or barcode"
               value={searchTerm}
               onChangeText={setSearchTerm}
+              placeholderTextColor="#6b7280"
             />
             {loading && <ActivityIndicator size="small" color="#000" />}
             <FlatList
@@ -212,6 +226,7 @@ const linkProduct = async (item, qty) => {
               value={quantity}
               onChangeText={setQuantity}
               keyboardType="numeric"
+              placeholderTextColor="#6b7280"
             />
 
             <TouchableOpacity
@@ -242,30 +257,34 @@ export default LinkProductModal;
 
 const styles = StyleSheet.create({
   container: {flex: 1, padding: 16, backgroundColor: '#fff'},
-  header: {fontSize: 18, fontWeight: 'bold', marginBottom: 10},
+  header: {fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#111'},
   searchInput: {
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 8,
     padding: 10,
     marginBottom: 10,
+    backgroundColor: '#fff',
+    color: '#1f1f1f',
   },
   detailCard: {
-  backgroundColor: '#f8f9fa',
-  padding: 12,
-  borderRadius: 8,
-  borderWidth: 1,
-  borderColor: '#ddd',
-  marginBottom: 10,
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginBottom: 10,
 },
 detailLabel: {
   fontWeight: 'bold',
   fontSize: 14,
   marginTop: 6,
+  color: '#1f1f1f',
 },
 detailValue: {
   fontSize: 14,
   marginBottom: 4,
+  color: '#1f1f1f',
 },
 
   resultItem: {
@@ -273,8 +292,8 @@ detailValue: {
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  productName: {fontSize: 16},
-  productBarcode: {fontSize: 12, color: '#888'},
+  productName: {fontSize: 16, color: '#1f1f1f'},
+  productBarcode: {fontSize: 12, color: '#666'},
   noResult: {textAlign: 'center', color: '#666', marginTop: 20},
   confirmBtn: {
     backgroundColor: '#5cb85c',

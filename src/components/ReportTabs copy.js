@@ -20,7 +20,7 @@ const TABS = [
 ];
 
 const PALETTE = [
-  "#F6C343",
+  "#2e7d32",
   "#00D97E",
   "#22B8CF",
   "#8C54FF",
@@ -31,7 +31,7 @@ const PALETTE = [
   "#11CDEF",
   "#2DCE89",
 ];
-const GOLD = "#FAD569";
+const GOLD = "#319241";
 
 // ------------ utils ------------
 const currency = (n) => {

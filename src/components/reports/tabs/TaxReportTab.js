@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ScrollView,
   FlatList,
+  ActivityIndicator
 } from "react-native";
 import {
   SectionCard,
@@ -67,7 +68,15 @@ function TaxTable({ rows }) {
   );
 }
 
-export default function TaxReportTab({ data }) {
+export default function TaxReportTab({ data,loading }) {
+      if (loading) {
+        return (
+          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+            <ActivityIndicator size="large" />
+            <Text style={{ marginTop: 8, color: '#666' }}>Loading…</Text>
+          </View>
+        );
+      }
   const { rows, totalTax, totalBase, hasData } = useMemo(() => {
     // Accept either the raw object { result:[...] } or an array
     const rows = Array.isArray(data?.result)

@@ -1,9 +1,18 @@
 // components/reports/tabs/PosPaymentCollectionTab.jsx
 import React, { useMemo } from "react";
-import { View, Dimensions, Text } from "react-native";
+import { View, Dimensions, Text, ActivityIndicator } from "react-native";
 import { DonutPie, LegendList, SectionCard, PALETTE, safeNumber } from "../shared/ReportUI";
 
-export default function PosPaymentCollectionTab({ data }) {
+export default function PosPaymentCollectionTab({ data,loading }) {
+  console.log("pos loading",loading);
+    if (loading) {
+    return (
+      <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+        <Text style={{ marginTop: 8, color: '#666' }}>Loading…</Text>
+      </View>
+    );
+  }
   const screenW = Dimensions.get("window").width;
   const screenH = Dimensions.get("window").height;
   const donutSize = Math.min(Math.max(screenW - 48, 260), screenW >= 768 ? 520 : 420);

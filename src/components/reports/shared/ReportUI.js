@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, Platform } from "react-native";
 import Svg, { Path, Text as SvgText } from "react-native-svg";
 
 export const PALETTE = [
-  "#F6C343","#00D97E","#22B8CF","#8C54FF","#2C7BE5",
+  "#2e7d32","#00D97E","#22B8CF","#8C54FF","#2C7BE5",
   "#E63757","#FF7A59","#5E72E4","#11CDEF","#2DCE89",
 ];
 

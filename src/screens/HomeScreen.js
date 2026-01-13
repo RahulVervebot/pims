@@ -21,13 +21,14 @@ import { CartContext } from "../context/CartContext";
 import { PrintContext } from "../context/PrintContext";
 import { SvgUri } from "react-native-svg";
 import CreateProductModal from "../components/CreateProductModal";
+import ChatAI from "../components/ChatAI";
 import { useNavigation } from "@react-navigation/native";
 import PrinterIcon from '../assets/icons/Printericon.svg';
 import Video from "react-native-video";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TulsiScreen from "../assets/images/LoginScreen.png"
 // Tab button supporting SVG or raster icon
-function TabButton({ label, iconUri, active, onPress, activeColor, inactiveColor = "#444" }) {
+function TabButton({ label, iconUri, active, onPress, activeColor, inactiveColor = "#fff" }) {
   const iconSize = 20;
   const tint = active ? activeColor : inactiveColor;
   const isSvg = looksLikeSvg(iconUri || "");
@@ -63,7 +64,7 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState("");
  const [activeTabID, setActiveTabID] = useState("");
   
-  const activeIconColor = "#F57200";
+  const activeIconColor = "#fff";
 
   // Home pull-to-refresh state
   const [homeRefreshing, setHomeRefreshing] = useState(false);
@@ -310,7 +311,7 @@ const currentBackground = useMemo(() => {
           </View>
         )}
 
-        <View
+        {/* <View
           pointerEvents="box-none"
           style={{
             position: "absolute",
@@ -339,10 +340,12 @@ const currentBackground = useMemo(() => {
           >
             <Text style={{ color: "#fff", fontWeight: "700" }}>Create products +</Text>
           </TouchableOpacity>
-        </View>
+        </View> */}
+
+        <ChatAI style={{ bottom: 70 + insets.bottom, right: 16 }} />
       </View>
 
-      <CreateProductModal
+      {/* <CreateProductModal
         visible={showCreate}
         onClose={() => setShowCreate(false)}
         onCreated={() => {
@@ -350,7 +353,7 @@ const currentBackground = useMemo(() => {
           setListReloadKey((k) => k + 1);
           setShowCreate(false);
         }}
-      />
+      /> */}
     </SafeAreaView>
   );
 }
@@ -387,8 +390,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff33",
   },
   tabText: {
-    fontWeight: "700",
+    fontWeight: "800",
     fontSize: 14,
+    color: "#fff"
   },
   content: { flex: 1 },
 });

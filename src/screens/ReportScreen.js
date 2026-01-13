@@ -44,7 +44,12 @@ export default function ReportScreen() {
                     >
                   <Row icon={SaleSummaryReport} label="Sales Summary Reports" isFirst />
                     </TouchableOpacity>
-          <Row icon={HourlyReport} label="Hourly Reports" />
+                      <TouchableOpacity
+                      style={styles.checkoutBtn}
+                      onPress={() => navigation.navigate('ReportsByHours')}
+                    >
+          <Row icon={HourlyReport}  label="Hourly Reports" />
+          </TouchableOpacity>
           <Row icon={TopCustumerList} label="Top Customer List" />
           <Row icon={TopSellingProducts} label="Top Selling Products" />
           <Row icon={TopSellingCategories} label="Top Selling Categories" isLast />

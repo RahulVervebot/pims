@@ -218,3 +218,40 @@ export async function SaleSummaryDepartmentAllianceReport(startdate, enddate) {
   console.log('[Department Report][normalized array length]:', arr.length);
   return arr;
 }
+
+export async function HourlyReport(startDate, endDate, option = 'pos_hourly_sales', companyId = 1) {
+  // Accept both 'storeUrl' and 'storeurl' just in case
+  const [storeUrl, token] = await Promise.all([
+    AsyncStorage.getItem('storeurl'),
+    AsyncStorage.getItem('access_token'),
+    
+  ]);
+  console.log("storeUrl:",storeUrl);
+console.log("start:",startDate,"end:",endDate);
+  if (!storeUrl || !token) {
+    throw new Error('Missing storeUrl or access_token in AsyncStorage.');
+  }
+console.log("token:",token);
+  const qs = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate,
+    option,
+    company_id: String(companyId),
+  }).toString();
+
+const fetchurl = `${storeUrl}/pos/app/hourly-sales-report?startDate=${startDate}&endDate=${endDate}&companyId=${companyId}&option=pos_hourly_sales`
+console.log("fetchurl:",fetchurl);
+  const res = await fetch(fetchurl, {
+    method: 'GET',
+    headers: { accept: 'application/json', access_token: token},
+    // redirect: 'follow',
+    // credentials: 'omit',
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Hourly report failed (${res.status}): ${text || 'No details'}`);
+  }
+
+  return res.json(); // return raw JSON so the screen can keep its current shape handling
+}

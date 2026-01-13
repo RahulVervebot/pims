@@ -6,7 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import { CartContext } from '../context/CartContext';
 import AppHeader from '../components/AppHeader';
 import reportbg from '../assets/images/report-bg.png';
-const THEME = { primary: '#2C1E70', secondary: '#F57200', price: '#27ae60' };
+const THEME = { primary: '#2C1E70', secondary: '#319241', price: '#27ae60' };
 
 export default function CartScreen() {
   const navigation = useNavigation();
@@ -95,6 +95,6 @@ const styles = StyleSheet.create({
   qtyBtn: { backgroundColor: '#2c1e70', padding: 6, borderRadius: 5 },
   qtyText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   qtyValue: { marginHorizontal: 10, fontSize: 16, fontWeight: 'bold' },
-  removeBtn: { backgroundColor: '#F57200', padding: 6, borderRadius: 5, marginTop: 5, alignSelf: 'flex-start' },
+  removeBtn: { backgroundColor: '#319241', padding: 6, borderRadius: 5, marginTop: 5, alignSelf: 'flex-start' },
   checkoutText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

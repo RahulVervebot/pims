@@ -1,6 +1,7 @@
 // src/screens/OcrScreen.js
 import React, { useRef, useState, useEffect } from 'react';
-import API_ENDPOINTS from '../../../icms_config/api';
+// import API_ENDPOINTS from '../../../icms_config/api';
+import API_ENDPOINTS, { initICMSBase, setICMSBase } from '../../../icms_config/api';
 import {
   View,
   TouchableOpacity,
@@ -34,7 +35,7 @@ const COLORS = {
   primary: '#2C62FF',
   success: '#2e8b57',
   danger: '#D9534F',
-  accent: '#F57200',
+  accent: '#319241',
   text: '#111',
   sub: '#777',
 };
@@ -42,6 +43,7 @@ const COLORS = {
 const OcrScreen = () => {
   const insets = useSafeAreaInsets();
   const getImageSource = val => (typeof val === 'number' ? val : { uri: val });
+  const wasCameraOpenRef = React.useRef(false);
   const cameraRef = useRef(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -51,27 +53,22 @@ const OcrScreen = () => {
   const [isGenerate, setIsGenerate] = useState(false);
   const [isResponseImg, setIsResponseImg] = useState(false);
   const [vendorModalVisible, setVendorModalVisible] = useState(false);
-
   // Vendor dropdown related
   const [selectedValue, setSelectedValue] = useState('');
   const [selectedDatabaseName, setSelectedDatabaseName] = useState('');
   const [selectedVendorSlug, setSelectedVendorSlug] = useState('');
-
+  const [selectedVendor, setSelectedVendor] = useState('');
   // Captured/selected images
   const [snappedImages, setSnappedImages] = useState([]); // [{uri, base64}]
   const [uploadedFilenames, setUploadedFilenames] = useState([]);
   const [uploadedImageURLs, setUploadedImageURLs] = useState([]);
-
   // OCR + table
   const [allocrJsons, setOcrJsons] = useState([]);
   const [tableData, setTableData] = useState([]);
-
   // Camera visibility
   const [showCamera, setShowCamera] = useState(false);
-
   // URLs
   const [ocrurl, setOcrUrl] = useState(null);
-  const [ocruploadstore, setOcrUploadStore] = useState("tulsi_dev");
   // Dedup vendors by "value" and keep first occuitemrrence
   const uniqueVendors = React.useMemo(() => {
     const map = new Map();
@@ -85,13 +82,14 @@ const OcrScreen = () => {
       a.value.localeCompare(b.value),
     );
   }, [invoiceList]);
-  
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [access_token, setAccessToken] = useState('');
+
   useEffect(() => {
     (async () => {
     const getAllAsynce = async () => {
+      initICMSBase();
  const token = await   AsyncStorage.getItem('access_token');
   setAccessToken(token);
     }
@@ -111,6 +109,8 @@ const OcrScreen = () => {
       console.log("API_ENDPOINTS.SEARCHVENDOR",API_ENDPOINTS.SEARCHVENDOR);
 
        const token = await   AsyncStorage.getItem('access_token');
+        const icms_store = await   AsyncStorage.getItem('icms_store');
+       
        console.log("AsyncStorage:",token);
       const body = {
         "q" : query
@@ -121,7 +121,7 @@ const OcrScreen = () => {
           'Content-Type': 'application/json',
           'access_token': token,
           'mode': 'MOBILE',
-          'store': ocruploadstore
+          'store': icms_store
         },
         body: JSON.stringify(body),
       });
@@ -151,11 +151,12 @@ const OcrScreen = () => {
     setSelectedValue(vendor.value);
     setSelectedDatabaseName(vendor.databaseName);
     setSelectedVendorSlug(vendor.slug);
+    setSelectedVendor(vendor);
+    console.log("vendor details: ",vendor);
     setSearchQuery(vendor.value);
     setSearchResults([]);
   };
 
-  // ====== Vendor picker change (simple, themed) ======
   const handleValueChange = itemValue => {
     setSelectedValue(itemValue);
     const found = invoiceList.find(i => i.value === itemValue);
@@ -237,9 +238,10 @@ const OcrScreen = () => {
       }));
       setSnappedImages(prev => [...prev, ...add]);
       setIsResponseImg(true);
-  
+       setShowCamera(false);
     }
   };
+
   // vendor sarrch
   function debounce(fn, delay) {
     let timeoutId;
@@ -480,43 +482,33 @@ const OcrScreen = () => {
       onPress={handleOpenCamera}
     >
 
-      <Text style={styles.btnText}>Scan Invoice</Text>
+      <Text style={styles.btnText}>Select Invoice</Text>
     </TouchableOpacity>
 
-    <TouchableOpacity
-      style={[styles.btn, styles.btnAccent]}
-      onPress={pickFromGallery}
-    >
 
-      <Text style={styles.btnText}>Pick Images</Text>
-    </TouchableOpacity>
-
-    {isGenerate ? (
-      <ActivityIndicator
-        size="small"
-        color={COLORS.primary}
-        style={{ marginHorizontal: 6 }}
-      />
-    ) : (
       <TouchableOpacity
         style={[styles.btn, styles.btnSuccess]}
         onPress={handleSave}
       >
         <Text style={styles.btnText}>Generate</Text>
       </TouchableOpacity>
-    )}
-<TouchableOpacity
+    {tableData.length > 0 && (
+    <TouchableOpacity
         style={[styles.btn, styles.btnSuccess]}
         onPress={()=> setSaveInvoiceVisible((s)=>!s)}
       >
+       
         <Text style={styles.btnText}>Save</Text>
       </TouchableOpacity>
-    <TouchableOpacity
+        )}
+          <TouchableOpacity
       style={[styles.btn, styles.btnDanger]}
       onPress={clearAll}
     >
       <Text style={styles.btnText}>Clear</Text>
     </TouchableOpacity>
+
+  
   </View>
 </View>
 
@@ -631,6 +623,7 @@ const OcrScreen = () => {
           vendorName={selectedVendorSlug}
           tableData={tableData}
           cleardata={clearAll}
+         selectedVendor={selectedVendor}
         />
       )}
     </ImageBackground>

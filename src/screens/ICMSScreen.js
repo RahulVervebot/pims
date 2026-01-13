@@ -35,7 +35,7 @@ export default function ICMSScreen() {
  style={styles.screen}
 resizeMode="cover"
 >
-      <CustomHeader Title="ICMS FEATURES"
+      <CustomHeader Title="TULSI AI"
       backgroundType="image" backgroundValue={reportbg}>
       </CustomHeader>  
         <View style={styles.panelInner}>
@@ -49,6 +49,9 @@ resizeMode="cover"
                     onPress={()=> navigation.navigate('InvoiceList')}
                   >
                   <Row icon={TopCustumerList} label="Invoice List" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => navigation.navigate('RedProducts')}>
+                    <Row icon={TopSellingProducts} label="Red Products" isLast />
                   </TouchableOpacity>
         </View>
         </ImageBackground>

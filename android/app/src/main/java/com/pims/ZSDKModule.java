@@ -1,4 +1,4 @@
-package com.odoo;
+package com.pims;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
@@ -19,8 +19,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Set;
 
 import android.util.Log;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -104,9 +107,35 @@ public void zsdkWriteBluetooth(String macAddress, String zpl) {
         try {
             BluetoothDiscoverer.findPrinters(getReactApplicationContext(), new DiscoveryResult(callback));
         } catch (ConnectionException e) {
-            // Do something
+            callback.invoke(e.getMessage(), "[]");
         } finally {
             // Do something
+        }
+    }
+
+    @ReactMethod
+    public void zsdkGetBondedBluetoothPrinters(Callback callback) {
+        try {
+            BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+            if (adapter == null) {
+                callback.invoke("Bluetooth not supported on this device", "[]");
+                return;
+            }
+            if (!adapter.isEnabled()) {
+                callback.invoke("Bluetooth is off", "[]");
+                return;
+            }
+            Set<BluetoothDevice> devices = adapter.getBondedDevices();
+            JSONArray bondedJson = new JSONArray();
+            for (BluetoothDevice device : devices) {
+                JSONObject obj = new JSONObject();
+                obj.put("address", device.getAddress());
+                obj.put("friendlyName", device.getName());
+                bondedJson.put(obj);
+            }
+            callback.invoke(null, bondedJson.toString());
+        } catch (Exception e) {
+            callback.invoke(e.getMessage(), "[]");
         }
     }
 
@@ -151,7 +180,7 @@ public void zsdkWriteBluetooth(String macAddress, String zpl) {
 
         @Override
         public void discoveryError(String message) {
-            // To do
+            callback.invoke(message, "[]");
         }
     }
 }

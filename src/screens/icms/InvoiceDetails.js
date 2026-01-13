@@ -10,6 +10,7 @@ import {
   UIManager,
   Button,
   StyleSheet,
+  TextInput,
   
   ImageBackground
 } from 'react-native';
@@ -18,9 +19,11 @@ import EditProduct from '../../components/icms/EditProduct.js';
 import reportbg from '../../assets/images/report-bg.png';
 import InvoiceRow from '../../components/icms/InvoiceRow.js';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import LinkProductModal from '../../components/icms/LinkProduct.js'; // adjust path if needed
+import LinkProductModal from '../../components/icms/LinkProduct.js';
+import { transparent } from 'react-native-paper/lib/typescript/styles/themes/v2/colors.js';
 
 // Enable Layout Animation for Android
+
 if (
   Platform.OS === 'android' &&
   UIManager.setLayoutAnimationEnabledExperimental
@@ -28,8 +31,7 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
  const getImageSource = val => (typeof val === 'number' ? val : { uri: val });
-
-
+ 
 export default function InvoiceDetails() {
   const itemsRef = useRef([]);
 
@@ -41,32 +43,50 @@ export default function InvoiceDetails() {
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [InvoiceDetails, setInvoiceDetails] = useState(null);
+  const [query, setQuery] = useState('');
   const navigation = useNavigation();
   const route = useRoute();
   const { Invoice } = route.params;
 
   useEffect(() => {
     setInvoiceDetails(Invoice);
+    itemsRef.current = Array.isArray(Invoice?.InvoiceData)
+      ? Invoice.InvoiceData
+      : [];
   }, [Invoice]);
   const day = Invoice?.SavedDate;
   const InvNumber = Invoice?.SavedInvoiceNo;
   const vendorName = Invoice?.InvoiceName;
-  itemsRef.current = Invoice?.InvoiceData;
-  const totalExtendedPrice = itemsRef.current.reduce(
+  const items = itemsRef.current;
+  const totalExtendedPrice = items.reduce(
     (sum, item) => sum + Number(item.extendedPrice),
     0,
   );
-  const totalUnitPrice = itemsRef.current.reduce(
+  const totalUnitPrice = items.reduce(
     (sum, item) => sum + Number(item.unitPrice),
     0,
   );
-  const totalPieces = itemsRef.current.reduce(
+  const totalPieces = items.reduce(
     (sum, item) => sum + Number(item.pieces),
     0,
   );
+  const filteredItems = items.filter(item => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    const haystack = [
+      item?.description,
+      item?.barcode,
+      item?.itemNo,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return haystack.includes(q);
+  });
   // console.log('Invoice Details:', Invoice);
   const openModal = useCallback(item => {
     setSelectedItem(item);
+    console.log("check all item fileds:",item);
     setModalVisible(true);
   }, []);
   const openLinkProduct = item => {
@@ -130,9 +150,15 @@ export default function InvoiceDetails() {
   const handleSave = useCallback(
     (updatedItem, commit = true) => {
       if (commit) {
-        itemsRef.current = itemsRef.current.map(it =>
-          it.id === updatedItem.id ? updatedItem : it,
-        );
+        itemsRef.current = itemsRef.current.map(it => {
+          if (it.ProductId && updatedItem.ProductId) {
+            return it.ProductId === updatedItem.ProductId ? updatedItem : it;
+          }
+          if (it.itemNo && updatedItem.itemNo) {
+            return it.itemNo === updatedItem.itemNo ? updatedItem : it;
+          }
+          return it;
+        });
         closeModal();
       } else {
         setSelectedItem(updatedItem);
@@ -149,7 +175,7 @@ export default function InvoiceDetails() {
   const renderHeader = useCallback(
     () => (
       <View style={styles.headerRow}>
-        {['Barcode', 'P. Info', 'U.C', 'Case Cost', 'Ext. Price'].map(
+        {['Barcode', 'P. Info', 'QTY', 'Case Cost', 'Ext. Price'].map(
           (title, idx) => (
             <Text
               key={idx}
@@ -191,11 +217,11 @@ export default function InvoiceDetails() {
     [expandedId, toggleExpand, handleLongPress, selectedIds],
   );
 
-  const FloatingButton = ({ onPress, title }) => (
-    <TouchableOpacity style={styles.fab} onPress={onPress}>
-      <Text style={styles.fabText}>{title}</Text>
-    </TouchableOpacity>
-  );
+  // const FloatingButton = ({ onPress, title }) => (
+  //   <TouchableOpacity style={styles.fab} onPress={onPress}>
+  //     <Text style={styles.fabText}>{title}</Text>
+  //   </TouchableOpacity>
+  // );
 
   return (
     <ImageBackground
@@ -208,54 +234,77 @@ export default function InvoiceDetails() {
         backgroundType="image"
         backgroundValue={reportbg}
       ></AppHeader> 
-    <View style={{ flex: 1, backgroundColor: '#F5F6FA' }}>
+    <View style={{ flex: 1, backgroundColor: '#F5F6FA'}}>
       {/* Summary Bar */}
       <View style={styles.summaryBar}>
-        <View style={{ flexDirection: 'column', gap: 4 }}>
+        <View style={styles.summaryCol}>
           <Text style={styles.summaryText}>
-            INV No: <Text style={styles.summaryValue}>{InvNumber}</Text>
+            INV No
+          </Text>
+          <Text style={styles.summaryValue} numberOfLines={1}>
+            {InvNumber}
           </Text>
           <Text style={styles.summaryText}>
-            V. Name: <Text style={styles.summaryValue}>{vendorName}</Text>
+            V. Name
+          </Text>
+          <Text style={styles.summaryValue} numberOfLines={1}>
+            {vendorName}
           </Text>
           <Text style={styles.summaryText}>
-            S. Date: <Text style={styles.summaryValue}>{day}</Text>
+            S. Date
+          </Text>
+          <Text style={styles.summaryValue} numberOfLines={1}>
+            {day}
           </Text>
         </View>
         <View
-          style={{ flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}
+          style={[styles.summaryCol, styles.summaryColRight]}
         >
           <Text style={styles.summaryText}>
-            No. Units: <Text style={styles.summaryValue}>{totalPieces}</Text>
+            No. Units
+          </Text>
+          <Text style={styles.summaryValue}>{totalPieces}</Text>
+          <Text style={styles.summaryText}>
+            E. Price
+          </Text>
+          <Text style={styles.summaryValue}>
+            ${totalExtendedPrice.toFixed(2)}
           </Text>
           <Text style={styles.summaryText}>
-            E. Price:{' '}
-            <Text style={styles.summaryValue}>
-              ${totalExtendedPrice.toFixed(2)}
-            </Text>
+            C. Cost
           </Text>
-          <Text style={styles.summaryText}>
-            C. Cost:{' '}
-            <Text style={styles.summaryValue}>
-              ${totalUnitPrice.toFixed(2)}
-            </Text>
+          <Text style={styles.summaryValue}>
+            ${totalUnitPrice.toFixed(2)}
           </Text>
         </View>
       </View>
 
+      <View style={styles.searchWrap}>
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search by description, barcode, item no"
+          style={styles.searchInput}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholderTextColor="#6b7280"
+          selectionColor="#1f1f1f"
+        />
+      </View>
+
       {/* List */}
-      {itemsRef.current.length === 0 ? (
+      {filteredItems.length === 0 ? (
         <View
           style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
         >
-          <Text style={{ fontSize: 16, color: '#888' }}>
-            No items found in this invoice.
+          <Text style={styles.emptyText}>
+            {query ? 'No matching items.' : 'No items found in this invoice.'}
           </Text>
         </View>
       ) : (
         <View style={{ flex: 1, paddingHorizontal: 12, paddingTop: 8 }}>
           <FlatList
-            data={itemsRef.current}
+            data={filteredItems}
             keyExtractor={item => item.ProductId.toString()}
             ListHeaderComponent={renderHeader}
             stickyHeaderIndices={[0]}
@@ -266,9 +315,13 @@ export default function InvoiceDetails() {
             windowSize={5}
             removeClippedSubviews
           />
+
           <EditProduct
             visible={isModalVisible}
             item={selectedItem}
+            InvoiceDate={day}
+            InvNumber={InvNumber}
+            vendorName={vendorName}
             onClose={closeModal}
             onSave={handleSave}
           />
@@ -284,10 +337,10 @@ export default function InvoiceDetails() {
             />
           )}
 
-          <FloatingButton
+          {/* <FloatingButton
             onPress={() => alert('Floating button pressed!')}
             title="+"
-          />
+          /> */}
         </View>
       )}
     </View>
@@ -308,6 +361,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 12.6,
     textAlign: 'center',
+    color: '#1f1f1f',
   },
   card: {
     marginVertical: 3,
@@ -391,25 +445,54 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   summaryBar: {
-    height: 90,
     margin: 8,
-    padding: 12,
+    padding: 14,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#8FD9FB',
-    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e4e7ef',
     shadowColor: '#000',
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.06,
     shadowRadius: 6,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  summaryCol: {
+    flex: 1,
+    gap: 4,
+  },
+  summaryColRight: {
+    alignItems: 'flex-end',
   },
   summaryText: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '600',
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   summaryValue: {
-    fontWeight: '400',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
   },
+  searchWrap: {
+    marginHorizontal: 8,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#cfd6ea',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    fontSize: 13,
+    color: '#1f1f1f',
+  },
+  emptyText: { fontSize: 16, color: '#666' },
 });

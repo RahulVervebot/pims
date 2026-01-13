@@ -1,6 +1,6 @@
 // components/CustomHeader.js
 import React,{useEffect,useState} from 'react';
-import { View, StyleSheet, ImageBackground, TouchableOpacity,Image,Text  } from 'react-native';
+import { View, StyleSheet, ImageBackground, TouchableOpacity, Image, Text, useWindowDimensions } from 'react-native';
 import Profile from "../assets/icons/Profile.svg";
 import Setting from "../assets/icons/Profile.svg";
 import TulsiLogo from '../assets/images/Tulsi.svg';
@@ -17,7 +17,11 @@ const CustomHeader = ({
   children
 }) => {
   const navigation = useNavigation();
-    const [user_name, setUserName] = useState('');
+  const { width } = useWindowDimensions();
+  const isCompact = width < 420;
+  const isTablet = width >= 768;
+  const styles = getStyles({ isCompact, isTablet });
+  const [user_name, setUserName] = useState('');
   const [user_email, setUserEmail] = useState('');
   const [user_role, setUserRole] = useState('');
 
@@ -44,7 +48,7 @@ const CustomHeader = ({
       return (
         <ImageBackground
           source={getImageSource(backgroundValue)}
-          style={styles.headerContainer}
+          style={[styles.headerContainer, isCompact && styles.headerContainerCompact]}
           resizeMode="cover"
         >
           {renderContent()}
@@ -53,82 +57,138 @@ const CustomHeader = ({
       );
     } 
     return (
-      <View style={[styles.headerContainer, { backgroundColor: backgroundValue }]}>
+      <View style={[styles.headerContainer, { backgroundColor: backgroundValue }, isCompact && styles.headerContainerCompact]}>
         {renderContent()}
         {children}
       </View>
     );
   };
 
-const renderContent = () => (
-  <View style={styles.content}>
-    {/* Left */}
-    <View style={styles.logo}>
-      <Image source={TulsiWhiteLogo} style={styles.rowIcon} />
-      <View>
-        <Text style={styles.headerUser}>Hello,</Text>
-        <Text style={styles.headerName}>{user_name}</Text>
+const renderContent = () => {
+  return (
+    <View style={[styles.content, isCompact && styles.contentCompact]}>
+      {/* Left */}
+      <View style={[styles.logo, isCompact && styles.logoCompact]}>
+        <Image source={TulsiWhiteLogo} style={styles.rowIcon} />
+        <View style={styles.logoTextWrap}>
+          <Text style={styles.headerUser}>Hello,</Text>
+          <Text style={styles.headerName} numberOfLines={1} ellipsizeMode="tail">
+            {user_name}
+          </Text>
+        </View>
       </View>
-    </View>
 
-    {/* Center (absolute) */}
-    <View style={styles.titleOverlay} pointerEvents="none">
-      <Text
-        style={styles.headerTitle}
-        numberOfLines={1}
-        ellipsizeMode="tail"
-      >
-        {Title}
-      </Text>
-    </View>
+      {/* Center (absolute) */}
+      <View style={styles.titleOverlay} pointerEvents="none">
+        <Text
+          style={styles.headerTitle}
+          numberOfLines={isCompact ? 2 : 1}
+          ellipsizeMode="tail"
+        >
+          {Title}
+        </Text>
+      </View>
 
-    {/* Right */}
+      {/* Right */}
       <TouchableOpacity style={styles.profileBtn} onPress={() => navigation.navigate('Profile')}>
-      <Profile width={36} height={36} />
-    </TouchableOpacity>
-
-  </View>
-);
+        <Profile width={36} height={36} />
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 
   return <View>{renderBackground()}</View>;
 };
 
-const styles = StyleSheet.create({
-  logo: { flexDirection: 'row' },
-  headerContainer: {
-    paddingHorizontal: 25,
-    paddingVertical: 20,
-  },
-  content: {
-    position: 'relative',
-    minHeight: 48,                 // give the row some height to center against
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-       paddingTop: 30
-  },
-  rowIcon: { width: 36, height: 36 },
+const getStyles = ({ isCompact, isTablet }) => {
+  const horizontalPadding = isTablet ? 28 : isCompact ? 16 : 22;
+  const verticalPadding = isTablet ? 24 : isCompact ? 14 : 20;
+  const iconSize = isTablet ? 42 : isCompact ? 30 : 36;
+  const titleSize = isTablet ? 22 : isCompact ? 16 : 18;
+  const nameSize = isTablet ? 18 : isCompact ? 14 : 16;
+  const userSize = isTablet ? 13 : isCompact ? 11 : 12;
+  const titleTopPad = isTablet ? 36 : 28;
 
-  // ⬇️ Absolute centered title
-  titleOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    paddingTop: 30
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#000',
-    paddingHorizontal: 80,         // reserves space so it won’t overlap icons
-    textAlign: 'center',
-  },
+  return StyleSheet.create({
+    logo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexShrink: 1,
+    },
+    logoCompact: {
+      flex: 1,
+      marginRight: 12,
+    },
+    logoTextWrap: {
+      flexShrink: 1,
+      maxWidth: '85%',
+    },
+    headerContainer: {
+      paddingHorizontal: horizontalPadding,
+      paddingVertical: verticalPadding,
+      paddingTop: isTablet ? 10 : isCompact ? 14 : 16,
+    },
+    headerContainerCompact: {
+      paddingHorizontal: horizontalPadding,
+      paddingVertical: verticalPadding,
+      marginTop: isTablet ? 18 : isCompact ? 14 : 16,
+    },
+    content: {
+      position: 'relative',
+      minHeight: isTablet ? 56 : 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingTop: titleTopPad,
+    },
+    contentCompact: {
+      paddingTop: 4,
+      minHeight: 0,
+    },
+    topRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    rowIcon: { width: iconSize, height: iconSize },
+    profileBtn: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: iconSize,
+      minHeight: iconSize,
+    },
 
-  headerUser: { fontSize: 12, fontWeight: '400', color: '#000', paddingHorizontal: 10 },
-  headerName: { fontSize: 16, fontWeight: '700', color: '#000', paddingHorizontal: 10,textTransform:"capitalize" },
-});
+    // ⬇️ Absolute centered title
+    titleOverlay: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+      paddingTop: titleTopPad,
+    },
+    headerTitle: {
+      fontSize: titleSize,
+      fontWeight: '700',
+      color: '#000',
+      paddingHorizontal: isTablet ? 140 : 90,
+      textAlign: 'center',
+    },
+    headerUser: {
+      fontSize: userSize,
+      fontWeight: '400',
+      color: '#000',
+      paddingHorizontal: 10,
+    },
+    headerName: {
+      fontSize: nameSize,
+      fontWeight: '700',
+      color: '#000',
+      paddingHorizontal: 10,
+      textTransform: 'capitalize',
+    },
+  });
+};
 
 
 export default CustomHeader;

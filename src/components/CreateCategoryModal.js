@@ -18,7 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 
-const THEME = { primary: '#2C1E70', secondary: '#F57200' };
+const THEME = { primary: '#2C1E70', secondary: '#319241' };
 const STORE_URL_KEY = 'storeurl';
 const ACCESS_TOKEN_KEY = 'access_token';
 
