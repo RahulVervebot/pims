@@ -255,3 +255,102 @@ console.log("fetchurl:",fetchurl);
 
   return res.json(); // return raw JSON so the screen can keep its current shape handling
 }
+
+
+// top selling categories report
+
+export async function TopSellingCatgegoriesReport(startdate, enddate, numberOfCategories) {
+  const [storeUrl, token] = await Promise.all([
+    AsyncStorage.getItem('storeurl'),
+    AsyncStorage.getItem('access_token'),
+  ]);
+  if (!storeUrl || !token) {
+    throw new Error('Missing store_url or access_token in AsyncStorage.');
+  }
+
+  const params = { startDate: startdate, endDate: enddate };
+  if (numberOfCategories !== undefined && numberOfCategories !== null && numberOfCategories !== '') {
+    params.numberOfCategories = String(numberOfCategories);
+  }
+  const qs = new URLSearchParams(params).toString();
+
+  const res = await fetch(
+    `${storeUrl}/pos/app/top-selling/category-wise-sales?${qs}`,
+    {
+      method: 'GET',
+      headers: { accept: 'application/json', access_token: token },
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch Categories Report (${res.status}): ${text || 'No details'}`);
+  }
+
+  const json = await res.json();
+  console.log('[Categories Report][raw json]:', json);
+
+  // ✅ Normalize shapes
+  let arr = [];
+  if (Array.isArray(json)) {
+    arr = json;
+  } else if (Array.isArray(json?.result)) {
+    // <-- Your real payload
+    arr = json.result;
+  } else {
+    // Last-resort: pick the first array value in the object
+    const firstArray = Object.values(json).find((v) => Array.isArray(v));
+    if (firstArray) arr = firstArray;
+  }
+
+  console.log('[Categories Report][normalized array length]:', arr.length);
+  return arr;
+}
+
+// top selling products report
+export async function TopSellingProductsReport(startdate, enddate, numberOfProducts) {
+  const [storeUrl, token] = await Promise.all([
+    AsyncStorage.getItem('storeurl'),
+    AsyncStorage.getItem('access_token'),
+  ]);
+  if (!storeUrl || !token) {
+    throw new Error('Missing store_url or access_token in AsyncStorage.');
+  }
+
+  const params = { startDate: startdate, endDate: enddate };
+  if (numberOfProducts !== undefined && numberOfProducts !== null && numberOfProducts !== '') {
+    params.numberOfProducts = String(numberOfProducts);
+  }
+  const qs = new URLSearchParams(params).toString();
+
+  const res = await fetch(
+    `${storeUrl}/pos/app/top-selling/product-wise-sales?${qs}`,
+    {
+      method: 'GET',
+      headers: { accept: 'application/json', access_token: token },
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch Products Report (${res.status}): ${text || 'No details'}`);
+  }
+
+  const json = await res.json();
+  console.log('[Products Report][raw json]:', json);
+
+  let arr = [];
+  if (Array.isArray(json)) {
+    arr = json;
+  } else if (Array.isArray(json?.data)) {
+    arr = json.data;
+  } else if (Array.isArray(json?.result)) {
+    arr = json.result;
+  } else {
+    const firstArray = Object.values(json).find((v) => Array.isArray(v));
+    if (firstArray) arr = firstArray;
+  }
+
+  console.log('[Products Report][normalized array length]:', arr.length);
+  return arr;
+}

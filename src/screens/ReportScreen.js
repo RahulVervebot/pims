@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ImageBackground, Image, useWindowDimensions, Platform,TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground, Image, useWindowDimensions, Platform, TouchableOpacity } from 'react-native';
 import CustomHeader from '../components/CustomHeader';
 import reportbg from '../assets/images/report-bg.png';
 import HourlyReport from '../assets/icons/Hourly-Reports.png';
@@ -14,7 +14,7 @@ export default function ReportScreen() {
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const styles = getStyles(isTablet);
- const navigation = useNavigation();
+  const navigation = useNavigation();
   const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
 
   const Row = ({ icon, label, isFirst, isLast }) => (
@@ -29,33 +29,43 @@ export default function ReportScreen() {
   );
 
   return (
-      <ImageBackground
-              source={getImageSource(reportbg)}
-              style={styles.screen}
-              resizeMode="cover"
-            >
+    <ImageBackground
+      source={getImageSource(reportbg)}
+      style={styles.screen}
+      resizeMode="cover"
+    >
       <CustomHeader Title="REPORTS"
-      backgroundType="image" backgroundValue={reportbg}>
-      </CustomHeader>  
-        <View style={styles.panelInner}>
-           <TouchableOpacity
-                      style={styles.checkoutBtn}
-                      onPress={() => navigation.navigate('SaleSummaryReport')}
-                    >
-                  <Row icon={SaleSummaryReport} label="Sales Summary Reports" isFirst />
-                    </TouchableOpacity>
-                      <TouchableOpacity
-                      style={styles.checkoutBtn}
-                      onPress={() => navigation.navigate('ReportsByHours')}
-                    >
-          <Row icon={HourlyReport}  label="Hourly Reports" />
-          </TouchableOpacity>
-          <Row icon={TopCustumerList} label="Top Customer List" />
+        backgroundType="image" backgroundValue={reportbg}>
+      </CustomHeader>
+      <View style={styles.panelInner}>
+        <TouchableOpacity
+          style={styles.checkoutBtn}
+          onPress={() => navigation.navigate('SaleSummaryReport')}
+        >
+          <Row icon={SaleSummaryReport} label="Sales Summary Reports" isFirst />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.checkoutBtn}
+          onPress={() => navigation.navigate('ReportsByHours')}
+        >
+          <Row icon={HourlyReport} label="Hourly Reports" />
+        </TouchableOpacity>
+        <Row icon={TopCustumerList} label="Top Customer List" />
+        <TouchableOpacity
+          style={styles.checkoutBtn}
+          onPress={() => navigation.navigate('TopSellingProductsReportScreen')}
+        >
           <Row icon={TopSellingProducts} label="Top Selling Products" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.checkoutBtn}
+          onPress={() => navigation.navigate('TopSellingCategoriesReport')}
+        >
           <Row icon={TopSellingCategories} label="Top Selling Categories" isLast />
-        </View>
-           
-        </ImageBackground>
+        </TouchableOpacity>
+      </View>
+
+    </ImageBackground>
   );
 }
 
@@ -68,7 +78,7 @@ const getStyles = (isTablet) => StyleSheet.create({
     fontSize: isTablet ? 24 : 20,
     fontWeight: '700',
     color: '#000',
-    paddingBottom:10
+    paddingBottom: 10
   },
   headerUnderline: {
     alignSelf: 'center',
@@ -104,10 +114,10 @@ const getStyles = (isTablet) => StyleSheet.create({
     borderTopRightRadius: PANEL_RADIUS,
   },
   panelInner: {
-    flex :1,
+    flex: 1,
     backgroundColor: 'rgba(255,255,255,0.85)', // helps separate items from bg image
     borderTopLeftRadius: 16,
-      borderTopRightRadius: 16,
+    borderTopRightRadius: 16,
     paddingVertical: isTablet ? 14 : 10,
     paddingHorizontal: isTablet ? 16 : 12,
 

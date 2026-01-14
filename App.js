@@ -38,6 +38,8 @@ import ICMS_VendorList from './src/screens/icms/ICMS_VendorList.js';
 import InvoiceDetails from './src/screens/icms/InvoiceDetails.js';
 import RedProductsScreen from './src/screens/icms/RedProductsScreen';
 import ReportsByHours from './src/screens/HourlyReport.js';
+import TopSellingCategoriesReport from './src/screens/TopSellingCategoriesReport.js';
+import TopSellingProductsReportScreen from './src/screens/TopSellingProductsReport.js';
 //icons 
 import HomeIcon from './src/assets/icons/HomeIcon.svg';
 import CartIconold from './src/assets/icons/Carticon.svg';
@@ -203,7 +205,9 @@ export default function App() {
           <Stack.Screen name="Cart" component={CartScreen} />
        <Stack.Screen name="Checkout" component={CheckoutScreen} />    
       <Stack.Screen name="SaleSummaryReport" component={SaleSummaryReport} />     
-      <Stack.Screen name="ReportsByHours" component={ReportsByHours} />    
+      <Stack.Screen name="ReportsByHours" component={ReportsByHours} />   
+   <Stack.Screen name="TopSellingCategoriesReport" component={TopSellingCategoriesReport} /> 
+<Stack.Screen name="TopSellingProductsReportScreen" component={TopSellingProductsReportScreen} /> 
       <Stack.Screen name="OcrScreen" component={OcrScreen} />     
        <Stack.Screen name="SettingScreen" component={SettingScreen} />    
             <Stack.Screen name="CategoryListScreen" component={CategoryListScreen} />  
