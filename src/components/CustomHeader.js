@@ -9,7 +9,6 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
 
-  
 const CustomHeader = ({ 
   Title, 
   backgroundType = "color", 
@@ -132,7 +131,7 @@ const getStyles = ({ isCompact, isTablet }) => {
     headerContainerCompact: {
       paddingHorizontal: horizontalPadding,
       paddingVertical: verticalPadding,
-      marginTop: isTablet ? 18 : isCompact ? 14 : 16,
+      paddingTop: isTablet ? 18 : isCompact ? 14 : 16,
     },
     content: {
       position: 'relative',

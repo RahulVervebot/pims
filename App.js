@@ -40,6 +40,8 @@ import RedProductsScreen from './src/screens/icms/RedProductsScreen';
 import ReportsByHours from './src/screens/HourlyReport.js';
 import TopSellingCategoriesReport from './src/screens/TopSellingCategoriesReport.js';
 import TopSellingProductsReportScreen from './src/screens/TopSellingProductsReport.js';
+import TopSellingCustomerReport from './src/screens/TopSellingCustomerReport.js';
+import MixMatchScreen from './src/screens/promotions/mixmatch.js';
 //icons 
 import HomeIcon from './src/assets/icons/HomeIcon.svg';
 import CartIconold from './src/assets/icons/Carticon.svg';
@@ -208,10 +210,14 @@ export default function App() {
       <Stack.Screen name="ReportsByHours" component={ReportsByHours} />   
    <Stack.Screen name="TopSellingCategoriesReport" component={TopSellingCategoriesReport} /> 
 <Stack.Screen name="TopSellingProductsReportScreen" component={TopSellingProductsReportScreen} /> 
+<Stack.Screen name="TopSellingCustomerReport" component={TopSellingCustomerReport} /> 
       <Stack.Screen name="OcrScreen" component={OcrScreen} />     
        <Stack.Screen name="SettingScreen" component={SettingScreen} />    
             <Stack.Screen name="CategoryListScreen" component={CategoryListScreen} />  
-     <Stack.Screen name="PrintScreen" component={PrintScreen} />    
+     <Stack.Screen name="PrintScreen" component={PrintScreen} /> 
+    <Stack.Screen name="MixMatchScreen" component={MixMatchScreen} /> 
+
+     
       <Stack.Screen name="SignupScreen" component={SignupScreen} />
 
 

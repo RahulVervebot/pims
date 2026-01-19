@@ -17,9 +17,9 @@ import AppHeader from '../components/AppHeader';
 import reportbg from '../assets/images/report-bg.png';
 import DateRangePickerModal from '../components/DateRangePickerModal';
 import { SectionCard, currency, safeNumber, sumBy } from '../components/reports/shared/ReportUI';
-import { TopSellingCatgegoriesReport } from '../functions/reports/pos_reports';
+import { TopSellingCustomersReport } from '../functions/reports/pos_reports';
 
-export default function TopSellingCategoriesReport() {
+export default function TopSellingCustomerReport() {
   const pad = (n) => String(n).padStart(2, '0');
   const fmtLocal = (d) => {
     const y = d.getFullYear();
@@ -44,7 +44,7 @@ export default function TopSellingCategoriesReport() {
   const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [numCategories, setNumCategories] = useState('10');
+  const [numCustomers, setNumCustomers] = useState('10');
   const [hasSearched, setHasSearched] = useState(false);
 
   const [range, setRange] = useState(() => {
@@ -60,20 +60,47 @@ export default function TopSellingCategoriesReport() {
 
   const reqIdRef = useRef(0);
 
-  const handleTopSellingReport = useCallback(async (startDate, endDate, numberOfCategories) => {
+  const getSalesAmount = (item) =>
+    safeNumber(
+      item?.amount ??
+      item?.sales_amount ??
+      item?.sale_amount ??
+      item?.total_sales ??
+      item?.total_amount
+    );
+  const getCustomerName = (item) =>
+    item?.customer_name ??
+    item?.customerName ??
+    item?.name ??
+    item?.customer ??
+    '-';
+  const getPhone = (item) =>
+    item?.phone ??
+    item?.mobile ??
+    item?.contact ??
+    item?.customer_phone ??
+    item?.customer_mobile ??
+    '-';
+  const getEmail = (item) =>
+    item?.email ??
+    item?.customer_email ??
+    item?.customerEmail ??
+    '-';
+
+  const handleTopSellingReport = useCallback(async (startDate, endDate, numberOfCustomers) => {
     const id = ++reqIdRef.current;
     setLoading(true);
     setErrorMsg('');
     try {
-      const report = await TopSellingCatgegoriesReport(
+      const report = await TopSellingCustomersReport(
         fmtLocal(startDate),
         fmtLocal(endDate),
-        numberOfCategories
+        numberOfCustomers
       );
       if (id !== reqIdRef.current) return;
       const list = Array.isArray(report) ? report : [];
       const sorted = [...list].sort(
-        (a, b) => safeNumber(b?.sale_amount) - safeNumber(a?.sale_amount)
+        (a, b) => getSalesAmount(b) - getSalesAmount(a)
       );
       setRows(sorted);
       setLoading(false);
@@ -86,24 +113,19 @@ export default function TopSellingCategoriesReport() {
     }
   }, []);
 
-  const { totalSale, totalCost, totalQty, totalTax, totalPartners, avgGmp } = useMemo(() => {
-    const totalSale = sumBy(rows, (x) => safeNumber(x?.sale_amount));
-    const totalCost = sumBy(rows, (x) => safeNumber(x?.cost));
-    const totalQty = sumBy(rows, (x) => safeNumber(x?.qty));
-    const totalTax = sumBy(rows, (x) => safeNumber(x?.tax_amount));
-    const totalPartners = sumBy(rows, (x) => safeNumber(x?.partner_count));
-    const gmpSum = sumBy(rows, (x) => safeNumber(x?.gmp));
-    const avgGmp = rows.length ? gmpSum / rows.length : 0;
-    return { totalSale, totalCost, totalQty, totalTax, totalPartners, avgGmp };
+  const { totalSales, avgSales } = useMemo(() => {
+    const totalSales = sumBy(rows, (x) => getSalesAmount(x));
+    const avgSales = rows.length ? totalSales / rows.length : 0;
+    return { totalSales, avgSales };
   }, [rows]);
 
   const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
 
   const renderHeader = () => (
     <View style={styles.tableHeaderRow}>
-      <Text style={[styles.th, styles.colName]}>NAME</Text>
-      <Text style={[styles.th, styles.colSale]}>SALE AMOUNT</Text>
-      <Text style={[styles.th, styles.colQty]}>QTY</Text>
+      <Text style={[styles.th, styles.colName]}>CUSTOMER</Text>
+      <Text style={[styles.th, styles.colPhone]}>PHONE</Text>
+      <Text style={[styles.th, styles.colSales]}>SALES AMOUNT</Text>
     </View>
   );
 
@@ -112,7 +134,7 @@ export default function TopSellingCategoriesReport() {
   };
 
   const renderItem = ({ item, index }) => {
-    const rowId = `${item?.name || 'cat'}-${index}`;
+    const rowId = `${getCustomerName(item)}-${index}`;
     const isExpanded = expandedId === rowId;
     return (
       <TouchableOpacity
@@ -122,23 +144,27 @@ export default function TopSellingCategoriesReport() {
       >
         <View style={styles.rowMain}>
           <Text style={[styles.td, styles.colName]} numberOfLines={1}>
-            {item?.name || '-'}
+            {getCustomerName(item)}
           </Text>
-          <Text style={[styles.td, styles.colSale]} numberOfLines={1}>
-            $ {currency(safeNumber(item?.sale_amount))}
+          <Text style={[styles.td, styles.colPhone]} numberOfLines={1}>
+            {getPhone(item)}
           </Text>
-          <Text style={[styles.td, styles.colQty]} numberOfLines={1}>
-            {formatNumber(item?.qty)}
+          <Text style={[styles.td, styles.colSales]} numberOfLines={1}>
+            $ {currency(getSalesAmount(item))}
           </Text>
         </View>
 
         {isExpanded && (
           <View style={styles.expanded}>
             {[
-              ['Cost', `$ ${currency(safeNumber(item?.cost))}`],
-              ['Tax Amount', `$ ${currency(safeNumber(item?.tax_amount))}`],
-              ['Partner Count', formatNumber(item?.partner_count, 0)],
-              ['GMP %', `${formatNumber(item?.gmp)}%`],
+              ['Partner ID', item?.partner_id],
+              ['Customer Name', getCustomerName(item)],
+              ['Phone', getPhone(item)],
+              ['Email', getEmail(item)],
+              ['Order Count', item?.order_count ?? item?.orders ?? item?.total_orders ?? '-'],
+              ['Total Amount', `$ ${currency(getSalesAmount(item))}`],
+              ['Average Order', `$ ${currency(safeNumber(item?.average_order))}`],
+              ['Last Purchase', item?.last_purchase_date ?? item?.last_order_date ?? item?.last_sold_date ?? '-'],
             ].map(([label, value], idx) => (
               <View key={`${label}-${idx}`} style={styles.expandedRow}>
                 <Text style={styles.expandedLabel}>{label}:</Text>
@@ -153,7 +179,7 @@ export default function TopSellingCategoriesReport() {
 
   return (
     <ImageBackground source={getImageSource(reportbg)} style={styles.screen} resizeMode="cover">
-      <AppHeader Title="TOP SELLING CATEGORIES" backgroundType="image" backgroundValue={reportbg} />
+      <AppHeader Title="TOP SELLING CUSTOMERS" backgroundType="image" backgroundValue={reportbg} />
 
       <ScrollView
         style={styles.scrollArea}
@@ -193,10 +219,10 @@ export default function TopSellingCategoriesReport() {
         </View>
 
         <View style={styles.filterCard}>
-          <Text style={styles.filterLabel}>Number of Categories</Text>
+          <Text style={styles.filterLabel}>Number of Customers</Text>
           <TextInput
-            value={numCategories}
-            onChangeText={setNumCategories}
+            value={numCustomers}
+            onChangeText={setNumCustomers}
             placeholder="10"
             keyboardType="numeric"
             style={styles.filterInput}
@@ -207,7 +233,7 @@ export default function TopSellingCategoriesReport() {
             onPress={() => {
               setHasSearched(true);
               setExpandedId(null);
-              handleTopSellingReport(range.start, range.end, numCategories);
+              handleTopSellingReport(range.start, range.end, numCustomers);
             }}
           >
             <Text style={styles.getResultText}>Get Result</Text>
@@ -223,7 +249,7 @@ export default function TopSellingCategoriesReport() {
           ) : rows.length === 0 ? (
             <View style={styles.centerState}>
               <Text style={styles.centerText}>
-                {hasSearched ? (errorMsg || 'No category data for this range.') : 'Select filters and tap Get Result.'}
+                {hasSearched ? (errorMsg || 'No customer data for this range.') : 'Select filters and tap Get Result.'}
               </Text>
             </View>
           ) : (
@@ -231,46 +257,38 @@ export default function TopSellingCategoriesReport() {
               <SectionCard title="Overview">
                 <View style={styles.statsRow}>
                   <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>Total Sales</Text>
-                    <Text style={styles.statValue}>$ {currency(totalSale)}</Text>
+                    <Text style={styles.statLabel}>Total Amount</Text>
+                    <Text style={styles.statValue}>$ {currency(totalSales)}</Text>
                   </View>
                   <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>Total Cost</Text>
-                    <Text style={styles.statValue}>$ {currency(totalCost)}</Text>
-                  </View>
-                </View>
-                <View style={styles.statsRow}>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>Total Qty</Text>
-                    <Text style={styles.statValue}>{formatNumber(totalQty)}</Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>Avg GMP %</Text>
-                    <Text style={styles.statValue}>{formatNumber(avgGmp)}%</Text>
+                    <Text style={styles.statLabel}>Total Customers</Text>
+                    <Text style={styles.statValue}>{rows.length}</Text>
                   </View>
                 </View>
                 <View style={styles.statsRow}>
                   <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>Total Tax</Text>
-                    <Text style={styles.statValue}>$ {currency(totalTax)}</Text>
+                    <Text style={styles.statLabel}>Avg Amount / Customer</Text>
+                    <Text style={styles.statValue}>$ {currency(avgSales)}</Text>
                   </View>
                   <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>Total Partners</Text>
-                    <Text style={styles.statValue}>{formatNumber(totalPartners, 0)}</Text>
+                    <Text style={styles.statLabel}>Total Orders</Text>
+                    <Text style={styles.statValue}>
+                      {formatNumber(sumBy(rows, (x) => safeNumber(x?.order_count ?? x?.orders ?? x?.total_orders)))}
+                    </Text>
                   </View>
                 </View>
               </SectionCard>
 
-              <SectionCard title="Category Details">
+              <SectionCard title="Customer Details">
                 <View style={styles.tableWrap}>
                   <View style={styles.tableTitleRow}>
-                    <Text style={styles.tableTitle}>Top Selling Categories</Text>
+                    <Text style={styles.tableTitle}>Top Selling Customers</Text>
                     <Text style={styles.tableCount}>({rows.length})</Text>
                   </View>
                   {renderHeader()}
                   <FlatList
                     data={rows}
-                    keyExtractor={(item, idx) => `${item?.name || 'cat'}-${idx}`}
+                    keyExtractor={(item, idx) => `${getCustomerName(item)}-${idx}`}
                     renderItem={renderItem}
                     ItemSeparatorComponent={() => <View style={styles.sep} />}
                     scrollEnabled={false}
@@ -423,10 +441,10 @@ const getStyles = (isTablet) =>
       paddingHorizontal: 10,
     },
     expandedRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-    expandedLabel: { fontSize: 12, fontWeight: '700', color: '#333', width: 120 },
+    expandedLabel: { fontSize: 12, fontWeight: '700', color: '#333', width: 130 },
     expandedValue: { fontSize: 12, color: '#222', flex: 1 },
 
     colName: { flex: 2, paddingRight: 8 },
-    colSale: { flex: 1, textAlign: 'right', paddingRight: 8 },
-    colQty: { flex: 1, textAlign: 'right' },
+    colPhone: { flex: 1, textAlign: 'right', paddingRight: 8 },
+    colSales: { flex: 1, textAlign: 'right' },
   });

@@ -172,62 +172,66 @@ export default function TopSellingProductsReportScreen() {
     <ImageBackground source={getImageSource(reportbg)} style={styles.screen} resizeMode="cover">
       <AppHeader Title="TOP SELLING PRODUCTS" backgroundType="image" backgroundValue={reportbg} />
 
-      <View style={styles.dateCard}>
-        <TouchableOpacity
-          onPress={() => setPickerVisible(true)}
-          style={styles.dateCardHeader}
-        >
-          <Text style={styles.dateCardHeaderText}>Select Date & Time</Text>
-        </TouchableOpacity>
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.dateCard}>
+          <TouchableOpacity
+            onPress={() => setPickerVisible(true)}
+            style={styles.dateCardHeader}
+          >
+            <Text style={styles.dateCardHeaderText}>Select Date & Time</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => setPickerVisible(true)}>
-          <View style={styles.datetimeselector}>
-            <View style={styles.dateshow}>
-              <Text style={styles.dateLabel}>From</Text>
-              <Text style={styles.dateBadge}>{fmtDateOnly(range.start)}</Text>
+          <TouchableOpacity onPress={() => setPickerVisible(true)}>
+            <View style={styles.datetimeselector}>
+              <View style={styles.dateshow}>
+                <Text style={styles.dateLabel}>From</Text>
+                <Text style={styles.dateBadge}>{fmtDateOnly(range.start)}</Text>
+              </View>
+              <View style={styles.dateshow}>
+                <Text style={styles.dateLabel}>To</Text>
+                <Text style={styles.dateBadge}>{fmtDateOnly(range.end)}</Text>
+              </View>
             </View>
-            <View style={styles.dateshow}>
-              <Text style={styles.dateLabel}>To</Text>
-              <Text style={styles.dateBadge}>{fmtDateOnly(range.end)}</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
 
-        <DateRangePickerModal
-          visible={pickerVisible}
-          onClose={() => setPickerVisible(false)}
-          onApply={({ start, end }) => {
-            setRange({ start, end });
-            setPickerVisible(false);
-          }}
-          initialPreset="today"
-        />
-      </View>
+          <DateRangePickerModal
+            visible={pickerVisible}
+            onClose={() => setPickerVisible(false)}
+            onApply={({ start, end }) => {
+              setRange({ start, end });
+              setPickerVisible(false);
+            }}
+            initialPreset="today"
+          />
+        </View>
 
-      <View style={styles.filterCard}>
-        <Text style={styles.filterLabel}>Number of Products</Text>
-        <TextInput
-          value={numProducts}
-          onChangeText={setNumProducts}
-          placeholder="10"
-          keyboardType="numeric"
-          style={styles.filterInput}
-          placeholderTextColor="#6b7280"
-        />
-        <TouchableOpacity
-          style={styles.getResultBtn}
-          onPress={() => {
-            setHasSearched(true);
-            setExpandedId(null);
-            handleTopSellingReport(range.start, range.end, numProducts);
-          }}
-        >
-          <Text style={styles.getResultText}>Get Result</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.filterCard}>
+          <Text style={styles.filterLabel}>Number of Products</Text>
+          <TextInput
+            value={numProducts}
+            onChangeText={setNumProducts}
+            placeholder="10"
+            keyboardType="numeric"
+            style={styles.filterInput}
+            placeholderTextColor="#6b7280"
+          />
+          <TouchableOpacity
+            style={styles.getResultBtn}
+            onPress={() => {
+              setHasSearched(true);
+              setExpandedId(null);
+              handleTopSellingReport(range.start, range.end, numProducts);
+            }}
+          >
+            <Text style={styles.getResultText}>Get Result</Text>
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.panelInner}>
-        <ScrollView contentContainerStyle={{ paddingBottom: 16 }} showsVerticalScrollIndicator={false}>
+        <View style={styles.panelInner}>
           {loading ? (
             <View style={styles.centerState}>
               <ActivityIndicator size="large" />
@@ -292,8 +296,8 @@ export default function TopSellingProductsReportScreen() {
               </SectionCard>
             </View>
           )}
-        </ScrollView>
-      </View>
+        </View>
+      </ScrollView>
     </ImageBackground>
   );
 }
@@ -316,8 +320,8 @@ const getStyles = (isTablet) =>
       borderBottomWidth: 2,
     },
     dateCardHeaderText: { color: '#2e7d32', fontWeight: '700' },
-    datetimeselector: { flexDirection: 'row', marginTop: 12, alignSelf: 'center' },
-    dateshow: { marginHorizontal: 6 },
+    datetimeselector: { flexDirection: 'row', marginTop: 12, alignSelf: 'center', gap: 16 },
+    dateshow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     dateLabel: { color: '#1f1f1f', fontWeight: '600' },
     dateBadge: {
       padding: 10,
@@ -359,21 +363,18 @@ const getStyles = (isTablet) =>
     getResultText: { color: '#fff', fontWeight: '700' },
 
     panelInner: {
-      flex: 1,
+      flexGrow: 1,
+      paddingVertical: isTablet ? 14 : 10,
+      paddingHorizontal: isTablet ? 16 : 12,
+      backgroundColor: 'transparent',
+    },
+    scrollArea: { flex: 1 },
+    scrollContent: {
+      flexGrow: 1,
+      paddingBottom: 24,
       backgroundColor: 'rgba(255,255,255,0.85)',
       borderTopLeftRadius: 16,
       borderTopRightRadius: 16,
-      paddingVertical: isTablet ? 14 : 10,
-      paddingHorizontal: isTablet ? 16 : 12,
-      ...Platform.select({
-        android: { elevation: 1 },
-        ios: {
-          shadowColor: '#000',
-          shadowOpacity: 0.06,
-          shadowRadius: 4,
-          shadowOffset: { width: 0, height: 2 },
-        },
-      }),
     },
 
     centerState: { paddingVertical: 40, alignItems: 'center' },

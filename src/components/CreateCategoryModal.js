@@ -190,6 +190,7 @@ export default function CreateCategoryModal({ visible, onClose, onCreated }) {
             <TextInput
               style={styles.input}
               placeholder="Category Name *"
+              placeholderTextColor="#6B7280"
               value={name}
               onChangeText={setName}
             />
@@ -293,7 +294,7 @@ const styles = StyleSheet.create({
 
   input: {
     borderWidth: 1, borderColor: '#ddd', borderRadius: 8,
-    paddingVertical: 10, paddingHorizontal: 12, color: '#333', marginTop: 10, backgroundColor: '#fff',
+    paddingVertical: 10, paddingHorizontal: 12, color: '#111', marginTop: 10, backgroundColor: '#fff',
   },
 
   row: { flexDirection: 'row', gap: 10, marginTop: 6, alignItems: 'center' },

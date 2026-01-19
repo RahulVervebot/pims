@@ -27,6 +27,7 @@ export default function LoginScreen({ navigation }) {
   // fetched from Firestore: public Storage URL to JSON (e.g., https://.../storelist.json?...token=...)
   const [firebaseeurl, setFirebaseUrl] = useState('');
   const inFlightRef = useRef(false);
+  const chatAuthInFlightRef = useRef(false);
 
   // store picker state
   const [storeMap, setStoreMap] = useState(null); // { [domain]: [{ name, storeurl, dbname }] }
@@ -49,10 +50,14 @@ export default function LoginScreen({ navigation }) {
         // expects { url: 'https://firebasestorage.googleapis.com/.../storelist.json?...' }
         if (data?.url) {
           setFirebaseUrl(String(data.url));
-        await AsyncStorage.setItem('bottombanner', data.bottombanner);
-        await AsyncStorage.setItem('topabanner', data.topabanner);
-        await AsyncStorage.setItem('icms_url', data.icmsurl);
-          }
+          await AsyncStorage.setItem('bottombanner', data.bottombanner);
+          await AsyncStorage.setItem('topabanner', data.topabanner);
+          await AsyncStorage.setItem('icms_url', data.icmsurl);
+          await AsyncStorage.setItem('tulsi_websocket', data.tulsi_websocket);
+          await AsyncStorage.setItem('tulsi_ai_backend', data.tulsi_ai_backend);
+
+
+        }
       } else {
         console.warn('Firestore: tulsi/storelist does not exist');
       }
@@ -63,10 +68,51 @@ export default function LoginScreen({ navigation }) {
     }
   }, []);
 
+  const chatailogin = useCallback(async (baseUrl) => {
+    if (chatAuthInFlightRef.current) return;
+    if (!email || !password || !baseUrl) return;
+    chatAuthInFlightRef.current = true;
+    try {
+      console.log("chat ai base url",baseUrl);
+      const url = baseUrl.endsWith('/')
+        ? `${baseUrl}auth/widget/login/`
+        : `${baseUrl}/auth/widget/login/`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.warn('Chat AI login failed:', json?.message || json?.error || res.status);
+        return;
+      }
+      console.log('Chat AI login success');
+      console.log("chat ai response:",res);
+      const user = json?.user || {};
+      const tokens = json?.tokens || {};
+      const entries = [];
+      Object.keys(user).forEach((key) => {
+        if (key === 'last_login' || key === 'date_joined') return;
+        entries.push([`chatai_${key}`, String(user[key] ?? '')]);
+      });
+      Object.keys(tokens).forEach((key) => {
+        entries.push([`chatai_${key}`, String(tokens[key] ?? '')]);
+      });
+      if (entries.length) {
+        await AsyncStorage.multiSet(entries);
+      }
+    } catch (error) {
+      console.warn('Chat AI login error:', error);
+    } finally {
+      chatAuthInFlightRef.current = false;
+    }
+  }, [email, password]);
+
   useFocusEffect(
     useCallback(() => {
       fetchFirebaseDataLogin();
-      return () => {};
+      return () => { };
     }, [fetchFirebaseDataLogin])
   );
 
@@ -177,24 +223,28 @@ export default function LoginScreen({ navigation }) {
         body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
-      console.log("login response:",data);
+      console.log("login response:", data);
       if (!res.ok || !data?.result) {
         const msg = (data && data.error && (data.error.data?.message || data.error.message)) || 'Invalid credentials or server error';
         Alert.alert('Login Failed', msg);
         return;
       }
-      const { pos_role, access_token, expiry,user_full_name,user_context } = data.result || {};
+      const { pos_role, access_token, expiry, user_full_name, user_context } = data.result || {};
       await AsyncStorage.multiSet([
         ['userRole', String(pos_role || '')],
         ['access_token', String(access_token || '')],
         ['expiry', String(expiry || '')],
-         ['userName', String(user_full_name || '')],
-         ['userEmail',String(email || '')],
-        ['userTimeZone',String(user_context.tz || '')],
-        ['userLang',String(user_context.lang || '')],
+        ['userName', String(user_full_name || '')],
+        ['userEmail', String(email || '')],
+        ['userTimeZone', String(user_context.tz || '')],
+        ['userLang', String(user_context.lang || '')],
 
 
       ]);
+      const chatBaseUrl = await AsyncStorage.getItem('tulsi_ai_backend');
+      if (chatBaseUrl) {
+        await chatailogin(chatBaseUrl);
+      }
       // navigate forward
       navigation.navigate('MainDrawer');
     } catch (error) {

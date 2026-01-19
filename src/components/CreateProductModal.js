@@ -427,7 +427,12 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
             {/* Row 5: Category | Vendor Search | UoM */}
             <View style={styles.rowGap}>
               <View style={styles.pickerCol}>
-                <Picker selectedValue={category} onValueChange={setCategory}>
+                <Picker
+                  selectedValue={category}
+                  onValueChange={setCategory}
+                  style={{ color: '#111' }}
+                  dropdownIconColor="#333"
+                >
                   <Picker.Item label="Select Category" value="" />
                   {allCats.map((cat) => (
                     <Picker.Item
@@ -472,7 +477,12 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
             {/* Row 6: Tax */}
             <View style={styles.rowGap}>
               <View style={styles.pickerCol}>
-                <Picker selectedValue={selectedTaxId} onValueChange={setSelectedTaxId}>
+                <Picker
+                  selectedValue={selectedTaxId}
+                  onValueChange={setSelectedTaxId}
+                  style={{ color: '#111' }}
+                  dropdownIconColor="#333"
+                >
                   <Picker.Item label="Select Tax" value="" />
                   {taxList.map((tax) => (
                     <Picker.Item key={String(tax.id)} label={String(tax.name)} value={String(tax.id)} />
@@ -480,7 +490,12 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
                 </Picker>
               </View>
                            <View style={styles.pickerCol}>
-                <Picker selectedValue={selectedUomId} onValueChange={setSelectedUomId}>
+                <Picker
+                  selectedValue={selectedUomId}
+                  onValueChange={setSelectedUomId}
+                  style={{ color: '#111' }}
+                  dropdownIconColor="#333"
+                >
                   <Picker.Item label="Select UoM" value="" />
                   {uomList.map((u) => (
                     <Picker.Item key={String(u.id)} label={String(u.name)} value={String(u.id)} />
@@ -584,7 +599,7 @@ const styles = StyleSheet.create({
     padding: 16
   },
   title: { fontSize: 18, fontWeight: '700', color: THEME.primary, marginBottom: 10 },
-  subTitle: { marginTop: 12, marginBottom: 6, fontWeight: '700', color: '#333' },
+  subTitle: { marginTop: 12, marginBottom: 6, fontWeight: '700', color: '#111' },
 
   input: {
     borderWidth: 1, borderColor: '#ddd', borderRadius: 8,
@@ -686,6 +701,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
   },
+  switchLabel: { color: '#111', fontWeight: '600' },
 
   // Vendor search UI
   vendorBox: { flex: 1, position: 'relative' },

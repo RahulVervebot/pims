@@ -78,7 +78,7 @@ export default function POSScreen() {
           label="Promotions"
           isFirst
           onPress={() => toggle('promo')}
-          right={<Text style={{ fontSize: 22, opacity: 0.6 }}>{expanded.promo ? '−' : '+'}</Text>}
+          right={<Text style={{ fontSize: 22,color:"#000" }}>{expanded.promo ? '−' : '+'}</Text>}
         />
         {expanded.promo && (
           <View>
@@ -103,7 +103,7 @@ export default function POSScreen() {
           icon={HourlyReport}
           label="Print"
           onPress={() => toggle('print')}
-          right={<Text style={{ fontSize: 22, opacity: 0.6 }}>{expanded.print ? '−' : '+'}</Text>}
+          right={<Text style={{fontSize: 22,color:"#000"  }}>{expanded.print ? '−' : '+'}</Text>}
         />
         {expanded.print && (
           <View>
@@ -128,7 +128,7 @@ export default function POSScreen() {
           icon={TopCustumerList}
           label="Product Managment"
           onPress={() => toggle('category')}
-          right={<Text style={{ fontSize: 22, opacity: 0.6 }}>{expanded.category ? '−' : '+'}</Text>}
+          right={<Text style={{ fontSize: 22,color:"#000" }}>{expanded.category ? '−' : '+'}</Text>}
         />
         {expanded.category && (
           <View>

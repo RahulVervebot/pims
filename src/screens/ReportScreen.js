@@ -50,7 +50,14 @@ export default function ReportScreen() {
         >
           <Row icon={HourlyReport} label="Hourly Reports" />
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.checkoutBtn}
+          onPress={() => navigation.navigate('TopSellingCustomerReport')}
+        >
         <Row icon={TopCustumerList} label="Top Customer List" />
+</TouchableOpacity>
+
+        
         <TouchableOpacity
           style={styles.checkoutBtn}
           onPress={() => navigation.navigate('TopSellingProductsReportScreen')}

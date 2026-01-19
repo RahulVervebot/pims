@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     minHeight: 48,
   },
-  input: { flex: 1, paddingVertical: 10 },
+  input: { flex: 1, paddingVertical: 10, color: "#111" },
 
   // Floating dropdown
   resultsOverlay: {

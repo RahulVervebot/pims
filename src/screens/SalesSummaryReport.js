@@ -243,7 +243,7 @@ const getStyles = (isTablet) =>
     },
     dateCardHeaderText: { color: '#2e7d32', fontWeight: '700' },
     datetimeselector: { flexDirection: 'row', marginTop: 12, alignSelf: 'center' },
-    dateshow: { marginHorizontal: 6 },
+   dateshow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     dateLabel: { color: '#1f1f1f', fontWeight: '600' },
     dateBadge: {
       padding: 10,

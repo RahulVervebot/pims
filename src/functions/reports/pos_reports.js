@@ -342,6 +342,8 @@ export async function TopSellingProductsReport(startdate, enddate, numberOfProdu
   let arr = [];
   if (Array.isArray(json)) {
     arr = json;
+  } else if (Array.isArray(json?.customers)) {
+    arr = json.customers;
   } else if (Array.isArray(json?.data)) {
     arr = json.data;
   } else if (Array.isArray(json?.result)) {
@@ -352,5 +354,54 @@ export async function TopSellingProductsReport(startdate, enddate, numberOfProdu
   }
 
   console.log('[Products Report][normalized array length]:', arr.length);
+  return arr;
+}
+
+// top selling customers report
+export async function TopSellingCustomersReport(startdate, enddate, numberOfCustomers) {
+  const [storeUrl, token] = await Promise.all([
+    AsyncStorage.getItem('storeurl'),
+    AsyncStorage.getItem('access_token'),
+  ]);
+  console.log("access_token",token);
+  if (!storeUrl || !token) {
+    throw new Error('Missing store_url or access_token in AsyncStorage.');
+  }
+
+  const params = { startDate: startdate, endDate: enddate };
+  if (numberOfCustomers !== undefined && numberOfCustomers !== null && numberOfCustomers !== '') {
+    params.number_of_customers = String(numberOfCustomers);
+  }
+  const qs = new URLSearchParams(params).toString();
+
+  const res = await fetch(
+    `${storeUrl}/pos/app/top-selling/customers?${qs}`,
+    {
+      method: 'GET',
+      headers: { accept: 'application/json', access_token: token },
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch Customers Report (${res.status}): ${text || 'No details'}`);
+  }
+
+  const json = await res.json();
+  console.log('[Customers Report][raw json]:', json);
+
+  let arr = [];
+  if (Array.isArray(json)) {
+    arr = json;
+  } else if (Array.isArray(json?.data)) {
+    arr = json.data;
+  } else if (Array.isArray(json?.result)) {
+    arr = json.result;
+  } else {
+    const firstArray = Object.values(json).find((v) => Array.isArray(v));
+    if (firstArray) arr = firstArray;
+  }
+
+  console.log('[Customers Report][normalized array length]:', arr.length);
   return arr;
 }

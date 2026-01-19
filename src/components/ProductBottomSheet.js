@@ -4,7 +4,7 @@ import React, {
 } from 'react';
 import {
   View, Text, Image, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Alert, Platform, Modal, Switch
+  TextInput, Alert, Platform, Modal, Switch, useColorScheme
 } from 'react-native';
 import RBSheet from 'react-native-raw-bottom-sheet';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -34,6 +34,9 @@ const MultiSelectModal = ({ visible, title, options, selectedIds, onChange, onCl
       <View style={msStyles.container}>
         <Text style={msStyles.title}>{title}</Text>
         <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+          {options.length === 0 && (
+            <Text style={msStyles.emptyText}>No items available.</Text>
+          )}
           {options.map(opt => {
             const idStr = String(opt.id);
             const checked = selectedIds.includes(idStr);
@@ -62,6 +65,12 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   const sheetRef = useRef(null);
   const { cart, addToCart, increaseQty, decreaseQty } = useContext(CartContext);
   const { print, addToPrint, increasePrintQty, decreasePrintQty } = useContext(PrintContext);
+  const _isDark = useColorScheme() === 'dark';
+  const inputTextColor = '#111';
+  const placeholderColor = '#6B7280';
+  const inputBg = '#fff';
+  const inputBorder = '#ddd';
+  const iconColor = '#333';
 
   const [storeUrl, setStoreUrl] = useState('');
   const [token, setToken] = useState('');
@@ -82,7 +91,10 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   const [casecost, setCaseCost] = useState('');           // case_cost
 
   const [categoryId, setCategoryId] = useState('');       // categ_id
-  const [selectedVendorIds, setSelectedVendorIds] = useState([]); // vendorcode[]
+  const [selectedVendorId, setSelectedVendorId] = useState('');
+  const [searchText, setSearchText] = useState('');
+  const [showVendorDropdown, setShowVendorDropdown] = useState(false);
+  const searchDebounceRef = useRef(null);
   const [selectedTaxIds, setSelectedTaxIds] = useState([]);       // taxes_id[]
 
   const [availablePOS, setAvailablePOS] = useState(false);
@@ -105,7 +117,6 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
 
   // Multi-select modals
-  const [vendorModal, setVendorModal] = useState(false);
   const [taxModal, setTaxModal] = useState(false);
 
   // UI
@@ -148,25 +159,20 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   useEffect(() => {
     (async () => {
       try {
-        const [cats, vendors, taxes] = await Promise.all([
+        const [cats, taxes] = await Promise.all([
           getTopCategories(),
-          VendorList(),
           TaxList(),
         ]);
         const normCats = Array.isArray(cats) ? cats.map(c => ({
           id: String(c.id ?? c._id ?? ''),
           name: String(c.name ?? c.category ?? ''),
         })) : [];
-        const normVendors = Array.isArray(vendors) ? vendors.map(v => ({
-          id: String(v.id ?? v.vendorId ?? v._id ?? ''),
-          name: String(v.name ?? v.vendorName ?? ''),
-        })) : [];
         const normTaxes = Array.isArray(taxes) ? taxes.map(t => ({
           id: String(t.id ?? t.taxId ?? t._id ?? ''),
           name: String(t.name ?? t.taxName ?? ''),
         })) : [];
         setAllCats(normCats);
-        setVendorList(normVendors);
+        setVendorList([]);
         setTaxList(normTaxes);
       } catch (e) {
         console.log('Failed to fetch lists:', e?.message);
@@ -198,9 +204,10 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
         const tIds = Array.isArray(p.productTaxes) ? p.productTaxes.map(t => String(t.taxId)) : [];
         setSelectedTaxIds(tIds);
 
-        // vendors not in payload example; keep what product may carry
-        const vIds = Array.isArray(p.vendorcode) ? p.vendorcode.map(v => String(v)) : [];
-        setSelectedVendorIds(vIds);
+        const vendorId = Array.isArray(p.vendorcode) ? p.vendorcode[0] : p.vendorcode;
+        setSelectedVendorId(vendorId != null ? String(vendorId) : '');
+        setSearchText('');
+        setShowVendorDropdown(false);
 
         setAvailablePOS(!!p.availableInPos);
         setIsEBT(!!p.isEbtProduct);
@@ -286,6 +293,41 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
     return names.length > 2 ? `${names.slice(0,2).join(', ')} +${names.length-2}` : names.join(', ');
   };
 
+  const handleVendorSearch = (text) => {
+    setSearchText(text);
+    setSelectedVendorId('');
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+
+    if (text.trim().length < 3) {
+      setVendorList([]);
+      setShowVendorDropdown(false);
+      return;
+    }
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const vendors = await VendorList(text);
+        const normalized = Array.isArray(vendors)
+          ? vendors.map(v => ({
+              id: String(v.id ?? v.vendorId ?? v._id ?? ''),
+              name: String(v.name ?? v.vendorName ?? ''),
+            }))
+          : [];
+        setVendorList(normalized);
+        setShowVendorDropdown(true);
+      } catch (err) {
+        console.log('Vendor search failed:', err?.message);
+        setVendorList([]);
+        setShowVendorDropdown(false);
+      }
+    }, 300);
+  };
+
+  const pickVendor = (vendor) => {
+    setSelectedVendorId(String(vendor.id));
+    setSearchText(vendor.name);
+    setShowVendorDropdown(false);
+  };
+
   const handleUpdate = async () => {
     if (!id) {
       Alert.alert('Error', 'Missing product id.');
@@ -293,15 +335,15 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
     }
     const body = {
       id: Number(id),
-      new_price: (cost ?? '').trim(),          // strings to mirror your API
-      new_std_price: (price ?? '').trim(),
+      new_price: (price ?? '').trim(),          // strings to mirror your API
+      new_std_price: (cost ?? '').trim(),
       new_qty: (qtyavailable ?? '').trim(),
       new_name: (name ?? '').trim(),
       size: (size ?? '').trim(),
       unit_in_case: (unitc ?? '').trim(),
       case_cost: (casecost ?? '').trim(),
       categ_id: categoryId ? Number(categoryId) : undefined,
-      vendorcode: selectedVendorIds.map(v => Number(v)),
+      vendorcode: selectedVendorId ? Number(selectedVendorId) : undefined,
       available_in_pos: String(!!availablePOS),
       taxes_id: selectedTaxIds.map(t => Number(t)),
       image: imgBase64 || '',
@@ -317,11 +359,12 @@ console.log("access_token",token,"body",body);
       setSubmitting(true);
       const res = await fetch(`${storeUrl}/pos/app/product/update`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'access_token': token },
+        headers: {'access_token': token },
         body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
-      console.log("data:",res);
+      console.log("update res:",res);
+        console.log("update data:",data);
       if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to update product');
 
       Alert.alert('Success', 'Product updated successfully.');
@@ -348,7 +391,7 @@ console.log("access_token",token,"body",body);
         case_cost: body.case_cost !== '' ? Number(body.case_cost) : product.case_cost,
         qty_available: body.new_qty !== '' ? Number(body.new_qty) : product.qty_available,
         productImage: imgBase64 ? imgBase64 : product.productImage,
-        vendorcode: body.vendorcode?.length ? body.vendorcode : product.vendorcode,
+        vendorcode: body.vendorcode ?? product.vendorcode,
       };
       setProduct(updated);
       setImgBase64('');
@@ -401,36 +444,70 @@ console.log("access_token",token,"body",body);
             <View style={{ marginTop: 12 }}>
               {/* Row 1: Name | Size */}
               <View style={styles.rowGap}>
-                <TextInput style={styles.inputCol} placeholder={`Name: ${name}`}  onChangeText={setName} />
-                <TextInput style={styles.inputCol} placeholder={`Size: ${size}`}  onChangeText={setSize} />
+                <TextInput
+                  style={[styles.inputCol, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
+                  placeholder="Name"
+                  placeholderTextColor={placeholderColor}
+                  value={name}
+                  onChangeText={setName}
+                />
+                <TextInput
+                  style={[styles.inputCol, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
+                  placeholder="Size"
+                  placeholderTextColor={placeholderColor}
+                  value={size}
+                  onChangeText={setSize}
+                />
               </View>
 
-              {/* Barcode full width + scan */}
+              {/* Barcode display (read-only) */}
               <View style={[styles.inputWrapper, { marginTop: 10 }]}>
-                <TextInput
-                  style={styles.inputWithRightIcon}
-                  placeholder={`Barcode: ${barcodeOriginal}`}
-                  onChangeText={setNewBarcode}
-                />
-                <TouchableOpacity
-                  style={styles.inputRightIcon}
-                  onPress={() => hasCameraPermission ? setScannerVisible(true) : Alert.alert('Camera Permission', 'Enable camera access in settings.')}
-                  hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-                >
-                  <Icon name="camera-alt" size={22} color="#333" />
-                </TouchableOpacity>
+                <Text style={[styles.inlineHint, { color: inputTextColor }]}>Barcode</Text>
+                <View style={[styles.readonlyField, { borderColor: inputBorder, backgroundColor: inputBg }]}>
+                  <Text style={[styles.readonlyText, { color: inputTextColor }]}>
+                    {barcodeOriginal || '-'}
+                  </Text>
+                </View>
               </View>
 
               {/* Row 2: Price | Unit Cost */}
               <View style={[styles.rowGap, { marginTop: 10 }]}>
-                <TextInput style={styles.inputCol} placeholder={`Price: ${price}`} onChangeText={setPrice} keyboardType="decimal-pad" />
-                <TextInput style={styles.inputCol} placeholder={`Cost: ${cost}`} onChangeText={setCost} keyboardType="decimal-pad" />
+                <TextInput
+                  style={[styles.inputCol, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
+                  placeholder="Price"
+                  placeholderTextColor={placeholderColor}
+                  value={price}
+                  onChangeText={setPrice}
+                  keyboardType="decimal-pad"
+                />
+                <TextInput
+                  style={[styles.inputCol, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
+                  placeholder="Cost"
+                  placeholderTextColor={placeholderColor}
+                  value={cost}
+                  onChangeText={setCost}
+                  keyboardType="decimal-pad"
+                />
               </View>
 
               {/* Row 3: Case Cost | Units in Case + Calculate */}
             <View style={[styles.rowGap, { marginTop: 10 }]}>
-                <TextInput style={styles.inputCol} placeholder={`Case Cost: ${casecost}`} onChangeText={setCaseCost} keyboardType="decimal-pad" />
-                  <TextInput style={styles.inputCol} placeholder={`Units in Case: ${unitc}`} onChangeText={setUnitc} keyboardType="number-pad" />
+                <TextInput
+                  style={[styles.inputCol, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
+                  placeholder="Case Cost"
+                  placeholderTextColor={placeholderColor}
+                  value={casecost}
+                  onChangeText={setCaseCost}
+                  keyboardType="decimal-pad"
+                />
+                  <TextInput
+                    style={[styles.inputCol, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
+                    placeholder="Units in Case"
+                    placeholderTextColor={placeholderColor}
+                    value={unitc}
+                    onChangeText={setUnitc}
+                    keyboardType="number-pad"
+                  />
                   <TouchableOpacity style={styles.calcBtn} onPress={calculateUnitCost}>
                     <Text style={styles.calcBtnText}>Calculate</Text>
                   </TouchableOpacity>
@@ -438,30 +515,64 @@ console.log("access_token",token,"body",body);
 
               {/* Row 4: Qty | Category */}
                    <View style={[styles.rowGap, { marginTop: 10 }]}>
-                <TextInput style={styles.inputCol} placeholder={`Net QTY: ${qtyavailable}`} value={qtyavailable} onChangeText={setQtyAvailable} keyboardType="decimal-pad" />
-                <View style={styles.pickerCol}>
-                  <Picker selectedValue={categoryId} onValueChange={setCategoryId}>
+                <TextInput
+                  style={[styles.inputCol, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
+                  placeholder="Net QTY"
+                  placeholderTextColor={placeholderColor}
+                  value={qtyavailable}
+                  onChangeText={setQtyAvailable}
+                  keyboardType="decimal-pad"
+                />
+                <View style={[styles.pickerCol, { borderColor: inputBorder, backgroundColor: inputBg }]}>
+                  <Picker
+                    selectedValue={categoryId}
+                    onValueChange={setCategoryId}
+                    style={{ color: inputTextColor }}
+                    dropdownIconColor={iconColor}
+                  >
                     <Picker.Item label="Select Category" value="" />
                     {allCats.map(c => <Picker.Item key={c.id} label={c.name} value={c.id} />)}
                   </Picker>
                 </View>
               </View>
-              {/* Row 5: Vendors (multi) | Taxes (multi) */}
+              {/* Row 5: Vendors (search) | Taxes (multi) */}
               <View style={styles.rowGap}>
                 {/* Vendors */}
-                <TouchableOpacity style={[styles.pickerCol, styles.fakePicker]} onPress={() => setVendorModal(true)}>
-                  <Text style={styles.fakePickerText}>
-                    {idsToLabelSummary(selectedVendorIds, vendorList)}
-                  </Text>
-                  <Icon name="arrow-drop-down" size={24} color="#444" />
-                </TouchableOpacity>
+                <View style={styles.vendorBox}>
+                  <TextInput
+                    style={[styles.inputFlex, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
+                    placeholder="Search vendor (min 3 chars)"
+                    placeholderTextColor={placeholderColor}
+                    value={searchText}
+                    onChangeText={handleVendorSearch}
+                    autoCapitalize="none"
+                  />
+                  {showVendorDropdown && vendorList.length > 0 && (
+                    <View style={styles.vendorDropdown}>
+                      <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 180 }}>
+                        {vendorList.slice(0, 20).map(v => (
+                          <TouchableOpacity key={v.id} style={styles.vendorItem} onPress={() => pickVendor(v)}>
+                            <Text numberOfLines={1} style={styles.vendorText}>{v.name}</Text>
+                            <Text style={styles.vendorSub}>ID: {v.id}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                  {!!selectedVendorId && (
+                    <Text style={styles.selectedVendorNote}>Selected Vendor ID: {selectedVendorId}</Text>
+                  )}
+                </View>
 
                 {/* Taxes */}
-                <TouchableOpacity style={[styles.pickerCol, styles.fakePicker]} onPress={() => setTaxModal(true)}>
-                  <Text style={styles.fakePickerText}>
+                <TouchableOpacity
+                  style={[styles.pickerCol, styles.fakePicker, { borderColor: inputBorder, backgroundColor: inputBg }]}
+                  onPress={() => setTaxModal(true)}
+                >
+                  <Text style={[styles.fakePickerText, { color: inputTextColor }]}>
                     {idsToLabelSummary(selectedTaxIds, taxList)}
                   </Text>
-                  <Icon name="arrow-drop-down" size={24} color="#444" />
+                  <Icon name="arrow-drop-down" size={24} color={iconColor} />
                 </TouchableOpacity>
               </View>
 
@@ -521,16 +632,6 @@ console.log("access_token",token,"body",body);
         )}
       </RBSheet>
 
-      {/* Vendor multi-select modal */}
-      <MultiSelectModal
-        visible={vendorModal}
-        title="Select Vendors"
-        options={vendorList}
-        selectedIds={selectedVendorIds}
-        onChange={setSelectedVendorIds}
-        onClose={() => setVendorModal(false)}
-      />
-
       {/* Tax multi-select modal */}
       <MultiSelectModal
         visible={taxModal}
@@ -588,8 +689,26 @@ const styles = StyleSheet.create({
   ghostText: { color: '#333', fontWeight: '700' },
 
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 12, color: '#333', marginTop: 10 },
+  inputFlex: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    color: '#333',
+    backgroundColor: '#fff',
+  },
   inputCol: { flex: 1, borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 12, color: '#333' },
   inputWrapper: { position: 'relative' },
+  inlineHint: { fontSize: 11, marginBottom: 6, fontWeight: '600' },
+  readonlyField: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  readonlyText: { fontSize: 14, fontWeight: '600' },
   inputWithRightIcon: {
     borderWidth: 1, borderColor: '#ddd', borderRadius: 8,
     paddingVertical: 10, paddingLeft: 12, paddingRight: 44, color: '#333', backgroundColor: '#fff',
@@ -600,6 +719,27 @@ const styles = StyleSheet.create({
 
   fakePicker: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 12 },
   fakePickerText: { color: '#333' },
+  vendorBox: { flex: 1, position: 'relative' },
+  vendorDropdown: {
+    position: 'absolute',
+    top: 46,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    zIndex: 9999,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  vendorItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eee' },
+  vendorText: { color: '#111', fontWeight: '600' },
+  vendorSub: { color: '#666', fontSize: 12, marginTop: 2 },
+  selectedVendorNote: { fontSize: 12, color: '#2c1e70', marginTop: 6 },
 
   colWithButton: { flex: 1, flexDirection: 'column', gap: 8 },
   calcBtn: { backgroundColor: THEME.secondary, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, marginTop: 8, alignSelf: 'flex-end' },
@@ -616,25 +756,33 @@ const styles = StyleSheet.create({
   qtyText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   qtyValue: { marginHorizontal: 10, fontSize: 16, fontWeight: 'bold', color: '#000' },
 
-  subTitle: { marginTop: 12, marginBottom: 6, fontWeight: '700', color: '#333' },
+  subTitle: { marginTop: 12, marginBottom: 6, fontWeight: '700', color: '#111' },
   switchGrid: { flexDirection: 'row', gap: 10, marginTop: 10 },
   switchCell: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     borderWidth: StyleSheet.hairlineWidth, borderColor: '#eee', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 12,
   },
+  switchLabel: { color: '#111', fontWeight: '600' },
 });
 
 const msStyles = StyleSheet.create({
   container: { flex: 1, paddingTop: 20, paddingHorizontal: 16, backgroundColor: '#fff' },
-  title: { fontSize: 18, fontWeight: '700', color: THEME.primary, marginBottom: 12, textAlign: 'center' },
+  title: { fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 12, textAlign: 'center' },
   row: {
-    paddingVertical: 12, paddingHorizontal: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eee',
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eee',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
   },
-  label: { color: '#333', fontSize: 15, flex: 1, marginRight: 8 },
+  label: { color: '#111', fontSize: 15, flex: 1, marginRight: 8 },
+  emptyText: { color: '#111', textAlign: 'center', paddingVertical: 12 },
   footer: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, paddingVertical: 12 },
   btn: { backgroundColor: THEME.secondary, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8 },
   btnText: { color: '#fff', fontWeight: '700' },
   clear: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd' },
-  btnTextClear: { color: '#333', fontWeight: '700' },
+  btnTextClear: { color: '#111', fontWeight: '700' },
 });

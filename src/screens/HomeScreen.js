@@ -21,7 +21,7 @@ import { CartContext } from "../context/CartContext";
 import { PrintContext } from "../context/PrintContext";
 import { SvgUri } from "react-native-svg";
 import CreateProductModal from "../components/CreateProductModal";
-import ChatAI from "../components/ChatAI";
+import Chat from "../components/Chat";
 import { useNavigation } from "@react-navigation/native";
 import PrinterIcon from '../assets/icons/Printericon.svg';
 import Video from "react-native-video";
@@ -342,7 +342,7 @@ const currentBackground = useMemo(() => {
           </TouchableOpacity>
         </View> */}
 
-        <ChatAI style={{ bottom: 70 + insets.bottom, right: 16 }} />
+        <Chat style={{ bottom: 70 + insets.bottom, right: 16 }} />
       </View>
 
       {/* <CreateProductModal

@@ -9,8 +9,7 @@ function DefaultTabIcon({ active }) {
   const color = active ? ACTIVE_ICON : INACTIVE_ICON;
   return (
     <Svg width={32} height={32}>
-      {/* simple ring icon; no background highlight */}
-      <Circle cx={16} cy={16} r={13} fill="#FFFFFF" stroke={color} strokeWidth={2} />
+      <Circle cx={16} cy={16} r={13} fill={color} />
     </Svg>
   );
 }
@@ -41,8 +40,8 @@ export default function ReportTabs({ tabs = [], apiData = {}, loadingByTab = {},
           width={32}
           height={32}
           color={color}
-          stroke={color}
-          fill={color === INACTIVE_ICON ? "none" : color}
+          stroke="none"
+          fill={color}
         />
       );
     }
@@ -113,7 +112,6 @@ const styles = StyleSheet.create({
   // Footer: fixed, no shadow, no borders, plain background
   footer: {
     backgroundColor: "#fff",
-    paddingTop: 8,
   },
   footerHeader: { paddingHorizontal: 14, paddingBottom: 4 },
   footerTitle: { fontSize: 14, fontWeight: "800", color: "#111" },
