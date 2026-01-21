@@ -20,7 +20,10 @@ const PATHS = {
   CREATE_INVOICE: '/api/invoice/create_data',
   UPDATE_INVOICE: '/api/invoice/updateinvoicedetails',
   RED_PRODUCTS: '/api/proxy/redproducts',
-  UPDATE_RED_PRODUCTS: '/api/update-redproduct'
+  UPDATE_RED_PRODUCTS: '/api/update-redproduct',
+  ROWINOVICE: '/api/storeRawInvoice',
+  GET_ROWINOVICE: '/api/get_storeRawInvoice',
+  UPDATE_ROWINOVICE: '/api/update_invoice_status',
  
 };
 

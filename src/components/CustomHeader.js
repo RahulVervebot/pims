@@ -4,7 +4,7 @@ import { View, StyleSheet, ImageBackground, TouchableOpacity, Image, Text, useWi
 import Profile from "../assets/icons/Profile.svg";
 import Setting from "../assets/icons/Profile.svg";
 import TulsiLogo from '../assets/images/Tulsi.svg';
-import TulsiWhiteLogo from '../assets/icons/Icon_Tulsi.png'
+import TulsiWhiteLogo from '../assets/icons/Tulsi_Icon_white.svg';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
@@ -68,7 +68,7 @@ const renderContent = () => {
     <View style={[styles.content, isCompact && styles.contentCompact]}>
       {/* Left */}
       <View style={[styles.logo, isCompact && styles.logoCompact]}>
-        <Image source={TulsiWhiteLogo} style={styles.rowIcon} />
+        <TulsiWhiteLogo width={styles.rowIcon.width} height={styles.rowIcon.height} />
         <View style={styles.logoTextWrap}>
           <Text style={styles.headerUser}>Hello,</Text>
           <Text style={styles.headerName} numberOfLines={1} ellipsizeMode="tail">

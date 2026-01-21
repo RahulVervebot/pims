@@ -46,7 +46,7 @@ const renderContent = () => (
          navigation.navigate('Tabs'); // fallback screen
        }
      }} style={styles.leftIcon}>
-           <Ionicons name="arrow-back-outline" size={24} color="#000" />
+      <Ionicons name="arrow-back-outline" size={24} color="#000" />
          </TouchableOpacity>
     {/* Center (absolute) */}
     <View style={styles.titleOverlay} pointerEvents="none">

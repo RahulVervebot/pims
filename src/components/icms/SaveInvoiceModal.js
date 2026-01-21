@@ -1,10 +1,13 @@
-import React, { useState,useCallback } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API_ENDPOINTS, { initICMSBase } from '../../../icms_config/api';
+import DateTimePicker from '@react-native-community/datetimepicker';
 const SaveInvoiceModal = ({ isVisible, onClose,ImageURL, vendorName, tableData,cleardata,selectedVendor }) => {
   const [savedInvoiceNo, setSavedInvoiceNo] = useState('');
+  const [invoiceDate, setInvoiceDate] = useState(new Date());
+  const [showInvoiceDatePicker, setShowInvoiceDatePicker] = useState(false);
    const baseurl = "https://icmsfrontend.vervebot.io";
      const [ocrurl, setOcrUrl] = useState(null);
    
@@ -46,18 +49,19 @@ const SaveInvoiceModal = ({ isVisible, onClose,ImageURL, vendorName, tableData,c
         department: row.department || '',
         condition: row.condition || '',
       }))
+    const selectedDate = invoiceDate.toISOString().split('T')[0];
     const bodyPayload = {
       InvoicesImgUrls: ImageURL,
       InvoiceName: vendorName,
-      InvoiceDate: new Date().toISOString().split('T')[0],
+      InvoiceDate: selectedDate,
       InvoicePage: '',
       UserDetailInfo: {
        InvoiceUpdatedby: user_email,
-       date: new Date().toISOString().split('T')[0],
+       date: selectedDate,
       
       },
       InvoiceData: invdata,
-      SavedDate: new Date().toISOString().split('T')[0],
+      SavedDate: selectedDate,
       SavedInvoiceNo: savedInvoiceNo,
       Exist: false,
     };
@@ -100,7 +104,7 @@ const handleCreateInvoice = async () => {
   }
 
   const invoiceNo = savedInvoiceNo.trim();
-  const invoiceSavedDate = new Date().toISOString().split('T')[0];
+  const invoiceSavedDate = invoiceDate.toISOString().split('T')[0];
 
   // keep as a JSON string if your backend expects it in a header
        const vendordetails = selectedVendor;
@@ -186,6 +190,22 @@ const handleCreateInvoice = async () => {
             placeholder="Enter invoice number"
             placeholderTextColor="#aaa"
           />
+          <Text style={styles.label}>Invoice Date</Text>
+          <TouchableOpacity
+            style={styles.input}
+            onPress={() => setShowInvoiceDatePicker((prev) => !prev)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.dateText}>{invoiceDate.toISOString().split('T')[0]}</Text>
+          </TouchableOpacity>
+          {Platform.OS === 'ios' && showInvoiceDatePicker && (
+            <DateTimePicker
+              value={invoiceDate}
+              mode="date"
+              display="spinner"
+              onChange={(_e, d) => d && setInvoiceDate(d)}
+            />
+          )}
           <View style={styles.buttonContainer}>
             <TouchableOpacity style={styles.button} onPress={handleSubmit}>
               <Text style={styles.buttonText}>Submit</Text>
@@ -196,6 +216,17 @@ const handleCreateInvoice = async () => {
           </View>
         </View>
       </View>
+      {Platform.OS === 'android' && showInvoiceDatePicker && (
+        <DateTimePicker
+          value={invoiceDate}
+          mode="date"
+          display="default"
+          onChange={(_e, d) => {
+            setShowInvoiceDatePicker(false);
+            if (d) setInvoiceDate(d);
+          }}
+        />
+      )}
     </Modal>
   );
 };
@@ -234,7 +265,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     fontSize: 16,
-    marginBottom: 20,
+    marginBottom: 12,
+    color: '#333',
+  },
+  label: {
+    alignSelf: 'flex-start',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 6,
+  },
+  dateText: {
+    fontSize: 16,
     color: '#333',
   },
   buttonContainer: {

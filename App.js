@@ -37,6 +37,7 @@ import ICMS_invoice from './src/screens/icms/ICMS_invoice.js';
 import ICMS_VendorList from './src/screens/icms/ICMS_VendorList.js';
 import InvoiceDetails from './src/screens/icms/InvoiceDetails.js';
 import RedProductsScreen from './src/screens/icms/RedProductsScreen';
+import PendingInvoices from './src/components/icms/PendingInvoices';
 import ReportsByHours from './src/screens/HourlyReport.js';
 import TopSellingCategoriesReport from './src/screens/TopSellingCategoriesReport.js';
 import TopSellingProductsReportScreen from './src/screens/TopSellingProductsReport.js';
@@ -258,6 +259,11 @@ export default function App() {
             name="RedProducts"
             component={RedProductsScreen}
             options={{ title: 'Red Products' }}
+          />
+          <Stack.Screen
+            name="PedingInvoices"
+            component={PendingInvoices}
+            options={{ title: 'Pending Invoices' }}
           />
         </Stack.Navigator>
       </NavigationContainer>

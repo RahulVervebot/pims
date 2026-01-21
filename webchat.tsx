@@ -19,10 +19,32 @@ interface Conversation {
   last_message_at: string;
   message_count: number;
   conversation_type?: 'support' | 'ai';
+  escalated_to_support?: boolean;
+  had_ai_conversation?: boolean;
+  had_agent_conversation?: boolean;
+  chat_display_name?: string;
+  rating?: number;
+  rating_identifier?: 'client_rated' | 'auto_rated_default';
+  resolved_at?: string;
+  resolved_by?: string;
+  resolution_type?: 'auto_resolved' | 'client_closed' | 'agent_closed' | 'feedback_submitted';
+  feedback_requested_at?: string;
+  last_activity_at?: string;
 }
 
+// Helper function to get chat display name
+const getChatDisplayName = (conv: Conversation | null): string => {
+  if (!conv) return 'Support Chat';
+  if (conv.chat_display_name) return conv.chat_display_name;
+  // Fallback based on flags
+  if (conv.had_ai_conversation && conv.had_agent_conversation) return 'AI and Support Agent Chat';
+  if (conv.had_ai_conversation) return 'AI Agent Chat';
+  if (conv.conversation_type === 'ai') return 'AI Agent Chat';
+  return 'Support Agent Chat';
+};
+
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8002';
-const AI_WELCOME_MESSAGE = "Hi! I am Widgetly AI Agent. I am here to give information about your POS. Ask me anything about your POS data!";
+const AI_WELCOME_MESSAGE = "Hi! I am Tulsi AI Agent. I am here to give information about your POS. Ask me anything about your POS data!";
 
 export default function FloatingChatWidget() {
   const { user, accessToken } = useAuthStore();
@@ -40,6 +62,11 @@ export default function FloatingChatWidget() {
   const [pendingAttachments, setPendingAttachments] = useState<AttachmentFile[]>([]);
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
   const [waitingForAI, setWaitingForAI] = useState(false);
+  const [closingConversation, setClosingConversation] = useState(false);
+  const [showRatingUI, setShowRatingUI] = useState(false);
+  const [selectedRating, setSelectedRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [submittingRating, setSubmittingRating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const loadedConversationRef = useRef<string | null>(null);
@@ -165,6 +192,7 @@ export default function FloatingChatWidget() {
               sender_name: msg.sender_name,
               content: msg.content,
               message_type: msg.message_type,
+              metadata: msg.metadata,  // Preserve metadata for system messages (feedback_request)
               created_at: msg.created_at,
               is_read: msg.is_read,
               attachments: msg.attachments || [],
@@ -593,10 +621,17 @@ export default function FloatingChatWidget() {
       setSwitchingAgent(true);
       const newType: 'support' | 'ai' = selectedConversation.conversation_type === 'ai' ? 'support' : 'ai';
       
-      await apiService.switchAgent(selectedConversation.id, newType, accessToken);
+      const response = await apiService.switchAgent(selectedConversation.id, newType, accessToken);
       
-      // Update local state
-      const updatedConv: Conversation = { ...selectedConversation, conversation_type: newType };
+      // Update local state with the new conversation type and display name from API response
+      const updatedConv: Conversation = { 
+        ...selectedConversation, 
+        conversation_type: newType,
+        chat_display_name: response.chat_display_name || getChatDisplayName({...selectedConversation, conversation_type: newType}),
+        escalated_to_support: response.escalated || selectedConversation.escalated_to_support,
+        had_ai_conversation: newType === 'ai' ? true : selectedConversation.had_ai_conversation,
+        had_agent_conversation: newType === 'support' ? true : selectedConversation.had_agent_conversation,
+      };
       setSelectedConversation(updatedConv);
       
       // Update conversations list
@@ -616,6 +651,92 @@ export default function FloatingChatWidget() {
     }
   };
 
+  // Handle closing AI conversation
+  const handleCloseConversation = async () => {
+    if (!selectedConversation || !accessToken) return;
+    
+    try {
+      setClosingConversation(true);
+      await apiService.closeConversation(selectedConversation.id, accessToken);
+      
+      // Update local state
+      const updatedConv: Conversation = { 
+        ...selectedConversation, 
+        status: 'resolved'
+      };
+      setSelectedConversation(updatedConv);
+      
+      // Update conversations list
+      setConversations(prev =>
+        prev.map(c => c.id === selectedConversation.id ? updatedConv : c)
+      );
+      
+      // Reload messages to get closure notification
+      const msgs = await apiService.getConversationHistory(selectedConversation.id, accessToken);
+      setMessages(msgs);
+      
+    } catch (error: any) {
+      console.error('Failed to close conversation:', error);
+      alert(error.message || 'Failed to close conversation. Please try again.');
+    } finally {
+      setClosingConversation(false);
+    }
+  };
+
+  // Handle rating submission
+  const handleSubmitRating = async () => {
+    if (!selectedConversation || !accessToken || selectedRating === 0) return;
+    
+    try {
+      setSubmittingRating(true);
+      await apiService.submitRating(selectedConversation.id, selectedRating, ratingComment, accessToken);
+      
+      // Update local state
+      const updatedConv: Conversation = { 
+        ...selectedConversation, 
+        status: 'resolved',
+        rating: selectedRating,
+        rating_identifier: 'client_rated'
+      };
+      setSelectedConversation(updatedConv);
+      
+      // Update conversations list
+      setConversations(prev =>
+        prev.map(c => c.id === selectedConversation.id ? updatedConv : c)
+      );
+      
+      // Reload messages to get thank you notification
+      const msgs = await apiService.getConversationHistory(selectedConversation.id, accessToken);
+      setMessages(msgs);
+      
+      // Reset rating UI
+      setShowRatingUI(false);
+      setSelectedRating(0);
+      setRatingComment('');
+      
+    } catch (error: any) {
+      console.error('Failed to submit rating:', error);
+      alert(error.message || 'Failed to submit rating. Please try again.');
+    } finally {
+      setSubmittingRating(false);
+    }
+  };
+
+  // Check if conversation has feedback request in messages
+  const hasFeedbackRequest = messages.some(msg => 
+    msg.message_type === 'system' && msg.metadata && (msg.metadata as any).type === 'feedback_request'
+  );
+
+  // Determine if close button should be shown (AI-only, not escalated, active conversation)
+  const canCloseConversation = selectedConversation && 
+    selectedConversation.conversation_type === 'ai' && 
+    !selectedConversation.had_agent_conversation && 
+    !selectedConversation.escalated_to_support &&
+    selectedConversation.status === 'active';
+
+  // Determine if messages can be sent (active or waiting status)
+  const canSendMessages = selectedConversation && (selectedConversation.status === 'active' || selectedConversation.status === 'waiting');
+
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -629,7 +750,7 @@ export default function FloatingChatWidget() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg hover:bg-primary-700 transition-all hover:scale-110"
+          className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700 transition-all hover:scale-110"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -641,7 +762,7 @@ export default function FloatingChatWidget() {
       {isOpen && (
         <div className="fixed bottom-6 right-6 z-50 w-96 h-[600px] bg-white rounded-lg shadow-2xl flex flex-col">
           {/* Header */}
-          <div className="bg-primary-600 text-white p-4 rounded-t-lg flex items-center justify-between">
+          <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-4 rounded-t-lg flex items-center justify-between">
             <div className="flex items-center space-x-3">
               {selectedConversation && conversations.filter(c => c.status !== 'closed' && c.status !== 'resolved').length > 1 && (
                 <button
@@ -666,17 +787,31 @@ export default function FloatingChatWidget() {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold">
-                    {selectedConversation ? selectedConversation.subject || 'Support Chat' : 'Support Chat'}
+                    {selectedConversation ? getChatDisplayName(selectedConversation) : 'Support Chat'}
                   </h3>
                   {selectedConversation?.conversation_type === 'ai' && (
-                    <span className="text-xs bg-purple-500 px-2 py-0.5 rounded-full">AI</span>
+                    <span className="text-xs bg-gradient-to-r from-emerald-400 to-teal-400 text-white px-2 py-0.5 rounded-full font-medium shadow-sm">AI</span>
+                  )}
+                  {selectedConversation?.escalated_to_support && (
+                    <span className="text-xs bg-orange-400 text-white px-2 py-0.5 rounded-full font-medium shadow-sm">Escalated</span>
                   )}
                 </div>
                 <p className="text-xs text-white/80">{user?.first_name} {user?.last_name}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {selectedConversation && (
+              {/* Close AI Chat button - only for AI-only conversations */}
+              {canCloseConversation && (
+                <button
+                  onClick={handleCloseConversation}
+                  disabled={closingConversation}
+                  className="px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors disabled:opacity-50"
+                  title="Mark this chat as closed and resolved"
+                >
+                  {closingConversation ? 'Closing...' : 'Close Chat'}
+                </button>
+              )}
+              {selectedConversation && selectedConversation.status === 'active' && (
                 <button
                   onClick={handleSwitchAgent}
                   disabled={switchingAgent}
@@ -709,27 +844,38 @@ export default function FloatingChatWidget() {
                 }}
               />
             ) : !selectedConversation ? (
-              <div className="flex items-center justify-center h-full text-center text-gray-500">
-                <div className="w-full px-4">
+              <div className="flex flex-col items-center justify-start h-full text-center text-gray-500 py-4">
+                <div className="w-full px-4 flex flex-col h-full">
                   {conversations.filter(c => c.status !== 'closed' && c.status !== 'resolved').length > 0 ? (
-                    <div>
-                      <p className="text-lg font-medium mb-4">Select a conversation</p>
-                      <div className="space-y-2 text-left">
+                    <div className="flex flex-col h-full">
+                      <p className="text-lg font-medium mb-4 flex-shrink-0">Select a conversation</p>
+                      <div className="space-y-2 text-left overflow-y-auto flex-1 pr-2">
                         {conversations
                           .filter(c => c.status !== 'closed' && c.status !== 'resolved')
                           .map((conv) => (
                             <button
                               key={conv.id}
                               onClick={() => setSelectedConversation(conv)}
-                              className="w-full p-3 bg-white rounded-lg border border-gray-200 hover:border-primary-500 hover:bg-primary-50 transition-all text-left"
+                              className="w-full p-3 bg-white rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all text-left"
                             >
                               <div className="flex items-center justify-between">
                                 <div className="font-medium text-gray-900 text-sm">
-                                  {conv.subject || 'Support Request'}
+                                  {getChatDisplayName(conv)}
                                 </div>
-                                {conv.conversation_type === 'ai' && (
-                                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">AI</span>
-                                )}
+                                <div className="flex items-center gap-1">
+                                  {conv.had_ai_conversation && conv.had_agent_conversation && (
+                                    <span className="text-xs bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 px-2 py-0.5 rounded-full">AI+Support</span>
+                                  )}
+                                  {conv.conversation_type === 'ai' && !conv.had_agent_conversation && (
+                                    <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">AI</span>
+                                  )}
+                                  {conv.conversation_type === 'support' && !conv.had_ai_conversation && (
+                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Support</span>
+                                  )}
+                                  {conv.escalated_to_support && (
+                                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Escalated</span>
+                                  )}
+                                </div>
                               </div>
                               <div className="text-xs text-gray-500 mt-1">
                                 {conv.message_count} messages
@@ -740,7 +886,7 @@ export default function FloatingChatWidget() {
                       </div>
                       <button
                         onClick={() => setSelectedConversation(null)}
-                        className="mt-4 w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm"
+                        className="mt-4 w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm flex-shrink-0"
                       >
                         Start New Conversation
                       </button>
@@ -760,15 +906,76 @@ export default function FloatingChatWidget() {
               <div className="space-y-4">
                 {messages.map((msg) => {
                   const isClient = msg.sender_type === 'client';
-                  const isAI = (msg.sender_type === 'bot' || msg.sender_type === 'ai') && selectedConversation?.conversation_type === 'ai';
+                  // Render markdown for any AI/bot message, regardless of conversation type
+                  const isAIMessage = msg.sender_type === 'bot' || msg.sender_type === 'ai';
                   const isThinking = msg.id.startsWith('thinking-');
+                  const isSystemFeedback = msg.message_type === 'system' && msg.metadata && (msg.metadata as any).type === 'feedback_request';
+                  
+                  // Render feedback request as a special card with rating UI
+                  if (isSystemFeedback && !selectedConversation?.rating) {
+                    return (
+                      <div key={msg.id} className="flex justify-center">
+                        <div className="w-full max-w-[95%] bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200 shadow-sm">
+                          <div className="text-center">
+                            <div className="text-2xl mb-2">⭐</div>
+                            <p className="text-sm font-medium text-blue-800 mb-3">
+                              Share your feedback to help us improve our service.<br/>
+                              Your rating will close and resolve this conversation.
+                            </p>
+                            <div className="flex items-center justify-center space-x-2 mb-3">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                  key={star}
+                                  type="button"
+                                  onClick={() => setSelectedRating(star)}
+                                  className={`text-3xl transition-all transform hover:scale-110 ${
+                                    star <= selectedRating ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-200'
+                                  }`}
+                                >
+                                  ★
+                                </button>
+                              ))}
+                            </div>
+                            <textarea
+                              value={ratingComment}
+                              onChange={(e) => setRatingComment(e.target.value)}
+                              placeholder="Optional: Add a comment about your experience..."
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg mb-3 resize-none"
+                              rows={2}
+                            />
+                            <button
+                              onClick={handleSubmitRating}
+                              disabled={selectedRating === 0 || submittingRating}
+                              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm font-medium"
+                            >
+                              {submittingRating ? 'Submitting...' : 'Submit Rating & Close Chat'}
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 text-center mt-2">
+                            {formatTime(msg.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  // Skip rendering system feedback message if already rated
+                  if (isSystemFeedback && selectedConversation?.rating) {
+                    return (
+                      <div key={msg.id} className="flex justify-center">
+                        <div className="bg-green-50 rounded-lg px-4 py-2 border border-green-200">
+                          <p className="text-sm text-green-700">✅ Thank you for your feedback!</p>
+                        </div>
+                      </div>
+                    );
+                  }
                   
                   return (
                     <div key={msg.id} className={`flex ${isClient ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[85%] ${
                         isClient 
-                          ? 'bg-primary-600 text-white' 
-                          : isAI 
+                          ? 'bg-green-600 text-white' 
+                          : isAIMessage 
                             ? 'bg-purple-50 text-gray-900 border border-purple-200'
                             : 'bg-white text-gray-900'
                       } rounded-lg px-3 py-2 shadow-sm`}>
@@ -781,7 +988,7 @@ export default function FloatingChatWidget() {
                             </div>
                             <span className="text-sm text-purple-600">AI Agent is thinking...</span>
                           </div>
-                        ) : isAI ? (
+                        ) : isAIMessage ? (
                           <div className="text-sm prose prose-sm max-w-none prose-p:my-1 prose-p:leading-relaxed prose-strong:text-gray-900 prose-strong:font-semibold">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                               {msg.content}
@@ -839,19 +1046,50 @@ export default function FloatingChatWidget() {
 
           {/* Input */}
           <div className="p-4 border-t border-gray-200 bg-white rounded-b-lg">
-            {/* Pending Attachments Preview */}
-            {pendingAttachments.length > 0 && (
-              <div className="mb-3 p-2 bg-gray-50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-medium text-gray-700">Attachments ({pendingAttachments.length})</p>
-                  <button
-                    onClick={() => setPendingAttachments([])}
-                    className="text-xs text-red-600 hover:text-red-700"
-                    type="button"
-                  >
-                    Clear all
-                  </button>
+            {/* Show conversation closed/resolved message with options */}
+            {selectedConversation && selectedConversation.status !== 'active' && selectedConversation.status !== 'waiting' && (
+              <div className="text-center py-4">
+                <div className="inline-flex items-center px-4 py-2 bg-gray-100 rounded-lg mb-4">
+                  <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm text-gray-600">This conversation is {selectedConversation.status}</span>
                 </div>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => setSelectedConversation(null)}
+                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                  >
+                    Start New Conversation
+                  </button>
+                  {conversations.filter(c => c.status === 'active' || c.status === 'waiting').length > 0 && (
+                    <button
+                      onClick={() => setSelectedConversation(null)}
+                      className="w-full px-4 py-2 bg-white text-green-600 border border-green-600 rounded-lg hover:bg-green-50 transition-colors text-sm font-medium"
+                    >
+                      View Active Chats ({conversations.filter(c => c.status === 'active' || c.status === 'waiting').length})
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Only show input if conversation is active and no feedback pending, or if no conversation is selected (to start new one) */}
+            {(canSendMessages || !selectedConversation) && !hasFeedbackRequest && (
+              <>
+                {/* Pending Attachments Preview */}
+                {pendingAttachments.length > 0 && (
+                  <div className="mb-3 p-2 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-medium text-gray-700">Attachments ({pendingAttachments.length})</p>
+                      <button
+                        onClick={() => setPendingAttachments([])}
+                        className="text-xs text-red-600 hover:text-red-700"
+                        type="button"
+                      >
+                        Clear all
+                      </button>
+                    </div>
                 <div className="space-y-2">
                   {pendingAttachments.map((attachment) => (
                     <div
@@ -903,16 +1141,18 @@ export default function FloatingChatWidget() {
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Type your message..."
                 disabled={sending || uploadingAttachments}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
               />
               <button
                 type="submit"
                 disabled={(!message.trim() && pendingAttachments.length === 0) || sending || uploadingAttachments}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 text-sm"
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 text-sm"
               >
                 {uploadingAttachments ? 'Uploading...' : sending ? 'Sending...' : 'Send'}
               </button>
             </form>
+              </>
+            )}
           </div>
         </div>
       )}

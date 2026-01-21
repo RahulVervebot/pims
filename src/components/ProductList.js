@@ -186,7 +186,7 @@ const isGifBanner = useMemo(() => {
          horizontal
         keyExtractor={(item) => String(item.product_id)}
         renderItem={renderProduct}
-        // numColumns={COLS}
+        //numColumns={COLS}
         // columnWrapperStyle={{ gap: GAP }}          // horizontal gap between items
          contentContainerStyle={{
           paddingHorizontal: H_PADDING,

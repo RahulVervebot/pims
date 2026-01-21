@@ -85,6 +85,13 @@ const OcrScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [access_token, setAccessToken] = useState('');
+  const [buttonLoading, setButtonLoading] = useState({
+    selectInvoice: false,
+    generate: false,
+    clear: false,
+    snap: false,
+    gallery: false,
+  });
 
   useEffect(() => {
     (async () => {
@@ -109,8 +116,7 @@ const OcrScreen = () => {
       console.log("API_ENDPOINTS.SEARCHVENDOR",API_ENDPOINTS.SEARCHVENDOR);
 
        const token = await   AsyncStorage.getItem('access_token');
-        const icms_store = await   AsyncStorage.getItem('icms_store');
-       
+           const icms_store = await   AsyncStorage.getItem('icms_store');
        console.log("AsyncStorage:",token);
       const body = {
         "q" : query
@@ -128,7 +134,7 @@ const OcrScreen = () => {
 
       console.log('Vendor search result:', res)   
       const data = await res.json().catch(() => ({}));
-      console.log("data:",data);;
+      console.log("vendor data:",data);;
 
       if (Array.isArray(data.results)) {
         console.log('Vendor search results:', data.results);
@@ -157,6 +163,15 @@ const OcrScreen = () => {
     setSearchResults([]);
   };
 
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setSelectedValue('');
+    setSelectedDatabaseName('');
+    setSelectedVendorSlug('');
+    setSelectedVendor(null);
+  };
+
   const handleValueChange = itemValue => {
     setSelectedValue(itemValue);
     const found = invoiceList.find(i => i.value === itemValue);
@@ -180,20 +195,32 @@ const OcrScreen = () => {
     return result === RESULTS.GRANTED;
   };
 
+  const setBtnLoading = (key, value) => {
+    setButtonLoading(prev => ({ ...prev, [key]: value }));
+  };
+
   const handleOpenCamera = async () => {
-    const ok = await requestCameraPerm();
-    if (!ok) {
-      Alert.alert('Permission needed', 'Camera permission is required.');
-      return;
+    setBtnLoading('selectInvoice', true);
+    try {
+      const ok = await requestCameraPerm();
+      if (!ok) {
+        Alert.alert('Permission needed', 'Camera permission is required.');
+        return;
+      }
+      setShowCamera(true);
+      setIsResponseImg(true);
+    } catch (error) {
+      console.warn('Camera permission error:', error);
+    } finally {
+      setBtnLoading('selectInvoice', false);
     }
-    setShowCamera(true);
-    setIsResponseImg(true);
   };
 
   const handleCloseCamera = () => setShowCamera(false);
 
   const snapPhoto = async () => {
     if (!cameraRef.current) return;
+    setBtnLoading('snap', true);
     try {
       const photo = await cameraRef.current.capture();
       // CameraKit returns { uri: 'file://...' }
@@ -201,6 +228,8 @@ const OcrScreen = () => {
       setSnappedImages(prev => [...prev, { uri: photo?.uri, base64: null }]);
     } catch (e) {
       console.warn('Error snapping photo:', e);
+    } finally {
+      setBtnLoading('snap', false);
     }
   };
 
@@ -210,35 +239,42 @@ const OcrScreen = () => {
       ios: PERMISSIONS.IOS.PHOTO_LIBRARY,
       android: PERMISSIONS.ANDROID.READ_MEDIA_IMAGES,
     });
-    if (perm) {
-      const r = await request(perm);
-      if (r !== RESULTS.GRANTED && Platform.OS === 'android') {
-        // Older androids
-        const r2 = await request(PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE);
-        if (r2 !== RESULTS.GRANTED) {
+    setBtnLoading('gallery', true);
+    try {
+      if (perm) {
+        const r = await request(perm);
+        if (r !== RESULTS.GRANTED && Platform.OS === 'android') {
+          // Older androids
+          const r2 = await request(PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE);
+          if (r2 !== RESULTS.GRANTED) {
+            Alert.alert('Permission needed', 'Photos permission is required.');
+            return;
+          }
+        } else if (r !== RESULTS.GRANTED && Platform.OS === 'ios') {
           Alert.alert('Permission needed', 'Photos permission is required.');
           return;
         }
-      } else if (r !== RESULTS.GRANTED && Platform.OS === 'ios') {
-        Alert.alert('Permission needed', 'Photos permission is required.');
-        return;
       }
-    }
 
-    const res = await launchImageLibrary({
-      mediaType: 'photo',
-      quality: 0.8,
-      includeBase64: true,
-      selectionLimit: 0,
-    });
-    if (res?.assets?.length) {
-      const add = res.assets.map(a => ({
-        uri: a.uri,
-        base64: a.base64 || null,
-      }));
-      setSnappedImages(prev => [...prev, ...add]);
-      setIsResponseImg(true);
-       setShowCamera(false);
+      const res = await launchImageLibrary({
+        mediaType: 'photo',
+        quality: 0.8,
+        includeBase64: true,
+        selectionLimit: 0,
+      });
+      if (res?.assets?.length) {
+        const add = res.assets.map(a => ({
+          uri: a.uri,
+          base64: a.base64 || null,
+        }));
+        setSnappedImages(prev => [...prev, ...add]);
+        setIsResponseImg(true);
+         setShowCamera(false);
+      }
+    } catch (error) {
+      console.warn('Gallery picker error:', error);
+    } finally {
+      setBtnLoading('gallery', false);
     }
   };
 
@@ -254,7 +290,8 @@ const OcrScreen = () => {
   }
 
   // ====== Upload & Generate ======
-  const handleSave = async () => {
+
+  const handleGenerate = async () => {
     if (!selectedValue) {
       Alert.alert(
         'Select Vendor',
@@ -262,13 +299,18 @@ const OcrScreen = () => {
       );
       return;
     }
+    if (!selectedDatabaseName) {
+      Alert.alert('Vendor missing', 'Please pick a vendor before generating.');
+      return;
+    }
     if (!snappedImages.length) {
       Alert.alert('No images', 'Please capture or select at least one image.');
       return;
     }
 
+    setIsGenerate(true);
+    setBtnLoading('generate', true);
     try {
-      setIsGenerate(true);
       setUploadedFilenames([]);
       setUploadedImageURLs([]);
       setOcrJsons([]);
@@ -276,6 +318,7 @@ const OcrScreen = () => {
       const newFilenames = [];
       const newImageURLs = [];
         const token = await   AsyncStorage.getItem('access_token');
+          const icms_store = await   AsyncStorage.getItem('icms_store');
       // Upload each image
       for (let i = 0; i < snappedImages.length; i++) {
         const img = snappedImages[i];
@@ -292,7 +335,7 @@ const OcrScreen = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'multipart/form-data',
-            store: `${ocruploadstore}`,
+            store: `${icms_store}`,
             mode: 'MOBILE',
           'access_token': token,
           }, // user-id is missing in the headers
@@ -329,7 +372,7 @@ const OcrScreen = () => {
           'Content-Type': 'application/json',
           'access_token': token,
           'mode': 'MOBILE',
-          'store': ocruploadstore
+          'store': icms_store
         },
           
           body: JSON.stringify({
@@ -351,51 +394,57 @@ const OcrScreen = () => {
     } catch (e) {
       console.error('Upload/OCR failed:', e);
       Alert.alert('Error', e.message);
-      setIsGenerate(false);
       setIsResponseImg(false);
+      return;
+    } finally {
+      setBtnLoading('generate', false);
+      setIsGenerate(false);
     }
   };
 
   const generateInvoice = async allOcrJson => {
-    try {
-      const combinedBodies = allOcrJson.map(o => o.body);
-      const bodyPayload = {
-        InvoiceName: selectedVendorSlug,
-        ocrdata: combinedBodies,
-      };
-  const token = await   AsyncStorage.getItem('access_token');
-      const response = await fetch(API_ENDPOINTS.SETPRODUCTINTABLEFROMOCR, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          store: `${ocruploadstore}`,
-           'access_token': token,
-          'mode': 'MOBILE',
-        },
-        body: JSON.stringify(bodyPayload),
-      });
+    const combinedBodies = allOcrJson.map(o => o.body);
+    const bodyPayload = {
+      InvoiceName: selectedVendorSlug,
+      ocrdata: combinedBodies,
+    };
+    const token = await AsyncStorage.getItem('access_token');
+           const icms_store = await   AsyncStorage.getItem('icms_store');
+    const response = await fetch(API_ENDPOINTS.SETPRODUCTINTABLEFROMOCR, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        store: `${icms_store}`,
+        'access_token': token,
+        'mode': 'MOBILE',
+      },
+      body: JSON.stringify(bodyPayload),
+    });
 
-      if (!response.ok) {
-        const t = await response.text();
-        throw new Error(`Request failed: ${response.status} - ${t}`);
-      }
-      const responseData = await response.json();
-      console.log("responseData vendor:",responseData);
-      setTableData(responseData);
-      setIsGenerate(false);
-      setIsResponseImg(false);
-    } catch (e) {
-      setIsGenerate(false);
-      setIsResponseImg(false);
-      console.error('Error generating invoice:', e);
-      Alert.alert('Error', e.message);
+    if (!response.ok) {
+      const t = await response.text();
+      throw new Error(`Request failed: ${response.status} - ${t}`);
     }
+    const responseData = await response.json();
+    console.log("responseData vendor:",responseData);
+    setTableData(responseData);
+    setIsResponseImg(false);
   };
 
   const handleRemoveItem = index => {
     const updated = [...tableData];
     updated.splice(index, 1);
     setTableData(updated);
+  };
+
+  const removeSnappedImage = index => {
+    setSnappedImages(prev => {
+      const next = prev.filter((_, idx) => idx !== index);
+      if (!next.length) {
+        setIsResponseImg(false);
+      }
+      return next;
+    });
   };
 
   const clearAll = () => {
@@ -405,12 +454,43 @@ const OcrScreen = () => {
     setTableData([]);
     setUploadedFilenames([]);
     setUploadedImageURLs([]);
-    setSelectedValue('');
-    setSelectedDatabaseName('');
-    setSelectedVendorSlug('');
+    handleClearSearch();
     setIsGenerate(false);
     setIsResponseImg(false);
   };
+
+  const handleClearAll = () => {
+    setBtnLoading('clear', true);
+    clearAll();
+    setBtnLoading('clear', false);
+  };
+
+  const hasTableData = tableData.length > 0;
+
+  const ButtonWithLoader = ({
+    label,
+    onPress,
+    loading = false,
+    style,
+    disabled = false,
+  }) => (
+    <TouchableOpacity
+      style={[
+        styles.btn,
+        style,
+        (disabled || loading) && styles.btnDisabled,
+      ]}
+      onPress={onPress}
+      disabled={disabled || loading}
+      activeOpacity={0.85}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color="#fff" />
+      ) : (
+        <Text style={styles.btnText}>{label}</Text>
+      )}
+    </TouchableOpacity>
+  );
 
   const openModal = image => {
     setSelectedImage(image);
@@ -434,19 +514,30 @@ const OcrScreen = () => {
       ></AppHeader>
       {/* Controls Card */}
 
-    <View style={styles.row}>
+    <View style={styles.controlCard}>
   {/* Vendor Selector */}
   <View style={styles.searchWrap}>
-    <TextInput
-      style={styles.searchInput}
-      placeholder="Search Vendor..."
-      placeholderTextColor="#aaa"
-      value={searchQuery}
-      onChangeText={text => {
-        setSearchQuery(text);
-        debouncedSearch(text);
-      }}
-    />
+    <View style={styles.searchInputWrapper}>
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search Vendor..."
+        placeholderTextColor="#aaa"
+        value={searchQuery}
+        onChangeText={text => {
+          setSearchQuery(text);
+          debouncedSearch(text);
+        }}
+      />
+      {!!searchQuery && (
+        <TouchableOpacity
+          style={styles.clearSearchBtn}
+          onPress={handleClearSearch}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.clearSearchText}>×</Text>
+        </TouchableOpacity>
+      )}
+    </View>
 
     {searchResults.length > 0 && (
       <View style={styles.dropdownContainer}>
@@ -477,73 +568,81 @@ const OcrScreen = () => {
 
   {/* Button Row */}
   <View style={styles.btnRowInline}>
-    <TouchableOpacity
-      style={[styles.btn, styles.btnPrimary]}
+    <ButtonWithLoader
+      label={showCamera ? 'Camera Active' : 'Select Invoice'}
       onPress={handleOpenCamera}
-    >
+      loading={buttonLoading.selectInvoice}
+      style={styles.btnPrimary}
+    />
 
-      <Text style={styles.btnText}>Select Invoice</Text>
-    </TouchableOpacity>
-
-
-      <TouchableOpacity
-        style={[styles.btn, styles.btnSuccess]}
-        onPress={handleSave}
-      >
-        <Text style={styles.btnText}>Generate</Text>
-      </TouchableOpacity>
-    {tableData.length > 0 && (
-    <TouchableOpacity
-        style={[styles.btn, styles.btnSuccess]}
-        onPress={()=> setSaveInvoiceVisible((s)=>!s)}
-      >
-       
-        <Text style={styles.btnText}>Save</Text>
-      </TouchableOpacity>
-        )}
-          <TouchableOpacity
-      style={[styles.btn, styles.btnDanger]}
-      onPress={clearAll}
-    >
-      <Text style={styles.btnText}>Clear</Text>
-    </TouchableOpacity>
-
-  
+    <ButtonWithLoader
+      label="Generate"
+      onPress={handleGenerate}
+      loading={isGenerate || buttonLoading.generate}
+      style={styles.btnSuccess}
+      // disabled={!snappedImages.length || !selectedValue}
+    />
+    {hasTableData && (
+      <>
+        <ButtonWithLoader
+          label="Save"
+          onPress={() => setSaveInvoiceVisible(s => !s)}
+          style={styles.btnAccent}
+          loading={false}
+        />
+        <ButtonWithLoader
+          label="Clear"
+          onPress={handleClearAll}
+          loading={buttonLoading.clear}
+          style={styles.btnDanger}
+        />
+      </>
+    )}
   </View>
 </View>
 
 
       {/* Snapped / Selected Images Row OR OCR Preview */}
 
-      {isResponseImg
-        ? snappedImages.map((item, index) => (
-            <ScrollView
-              horizontal
-              style={styles.imageRow}
-              showsHorizontalScrollIndicator={false}
-            >
-              <TouchableOpacity key={index} onPress={() => openModal(item.uri)}>
+      {isResponseImg && snappedImages.length > 0 ? (
+        <ScrollView
+          horizontal
+          style={styles.imageRow}
+          showsHorizontalScrollIndicator={false}
+        >
+          {snappedImages.map((item, index) => (
+            <View key={`${item.uri}-${index}`} style={styles.thumbWrap}>
+              <View style={styles.thumbActions}>
+                <TouchableOpacity
+                  style={styles.thumbClose}
+                  onPress={() => removeSnappedImage(index)}
+                  hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                >
+                  <Text style={styles.thumbCloseText}>×</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity onPress={() => openModal(item.uri)}>
                 <Image source={{ uri: item.uri }} style={styles.thumb} />
               </TouchableOpacity>
-            </ScrollView>
-          ))
-        : tableData.length > 0 &&
-          uploadedFilenames.length > 0 &&
-          uploadedImageURLs.length > 0 && (
-            <ScrollView
-              horizontal
-              style={styles.imageRow}
-              showsHorizontalScrollIndicator={false}
-            >
-              <OCRPreviewComponent
-                filenames={uploadedFilenames}
-                vendorName={selectedDatabaseName}
-                imageURIs={uploadedImageURLs}
-                tableData={tableData}
-                ocrurl={ocrurl}
-              />
-            </ScrollView>
-          )}
+            </View>
+          ))}
+        </ScrollView>
+      ) : hasTableData && uploadedFilenames.length > 0 && uploadedImageURLs.length > 0 ? (
+        <ScrollView
+          horizontal
+          style={styles.imageRow}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.previewScroll}
+        >
+          <OCRPreviewComponent
+            filenames={uploadedFilenames}
+            vendorName={selectedDatabaseName}
+            imageURIs={uploadedImageURLs}
+            tableData={tableData}
+            ocrurl={ocrurl}
+          />
+        </ScrollView>
+      ) : null}
 
       {/* Full Image View */}
       <Modal visible={modalVisible} transparent animationType="fade">
@@ -592,18 +691,18 @@ const OcrScreen = () => {
             zoomMode="on"
           />
           <View style={styles.cameraControls}>
-            <TouchableOpacity
-              style={[styles.btn, styles.btnPrimary]}
+            <ButtonWithLoader
+              label="Snap Photo"
               onPress={snapPhoto}
-            >
-              <Text style={styles.btnText}>Snap Photo</Text>
-            </TouchableOpacity>
-               <TouchableOpacity
-              style={[styles.btn, styles.btnPrimary]}
+              loading={buttonLoading.snap}
+              style={styles.btnPrimary}
+            />
+            <ButtonWithLoader
+              label="From Gallery"
               onPress={pickFromGallery}
-            >
-              <Text style={styles.btnText}>From Gallery</Text>
-            </TouchableOpacity>
+              loading={buttonLoading.gallery}
+              style={styles.btnPrimary}
+            />
             <TouchableOpacity
               style={[styles.btn, styles.btnDanger]}
               onPress={handleCloseCamera}
@@ -640,7 +739,14 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: 12,
     padding: 12,
-    marginBottom: 10,
+    marginHorizontal: 10,
+    marginVertical: 12,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 4,
   },
 
   btnRow: {
@@ -660,6 +766,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
+  },
+  btnDisabled: {
+    opacity: 0.6,
   },
  btnText: {
     fontSize: 14,
@@ -681,19 +790,52 @@ const styles = StyleSheet.create({
 
 
   imageRow: {
-    minHeight: 88,
-    maxHeight: 88,
-    margin: 10,
+    minHeight: 120,
+    maxHeight: 200,
+    marginHorizontal: 10,
+    marginVertical: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
-    paddingVertical: 6,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+  },
+  previewScroll: {
+    alignItems: 'center',
+  },
+  thumbWrap: {
+    marginHorizontal: 6,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.card,
+    paddingBottom: 6,
+    width: 110,
+  },
+  thumbActions: {
+    alignItems: 'flex-end',
+    padding: 6,
+  },
+  thumbClose: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#1f1f1f',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumbCloseText: {
+    color: '#fff',
+    fontSize: 14,
+    lineHeight: 16,
+    fontWeight: '700',
   },
   thumb: {
-    width: 80,
-    height: 80,
-    marginHorizontal: 6,
-    borderRadius: 6,
-    backgroundColor: '#ddd',
+    width: 96,
+    height: 96,
+    backgroundColor: '#f1f1f1',
   },
 
   modalBg: {
@@ -729,14 +871,6 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flexWrap: 'wrap', // wraps on small screens
-    margin: 10,
-  },
-
   fakeInput: {
     flexDirection: 'row',
   },
@@ -760,12 +894,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
 
-  btnRowInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 0, // keep buttons compact, don’t stretch
-  },
   pickerWrap: {
     margin: 10,
   },
@@ -861,12 +989,7 @@ const styles = StyleSheet.create({
   },
   tick: { fontSize: 16, color: COLORS.primary },
 
-  // Keep your existing row + button styles
- row: {
-    flexDirection: "column",
-    gap: 12, // spacing between search and buttons
-  },
-    btnRowInline: {
+  btnRowInline: {
     flexDirection: "row",
     flexWrap: "wrap", // allows wrapping if small screen
     justifyContent: "space-between",
@@ -876,16 +999,37 @@ const styles = StyleSheet.create({
   searchWrap: {
     position: 'relative',
     width: '100%',
-    padding:10
+    padding: 10,
+  },
+  searchInputWrapper: {
+    position: 'relative',
+    width: '100%',
+    justifyContent: 'center',
   },
   searchInput: {
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 10,
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     fontSize: 16,
     backgroundColor: '#fff',
-     padding:10
+    color: COLORS.text,
+  },
+  clearSearchBtn: {
+    position: 'absolute',
+    right: 14,
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: '#e0e0e0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearSearchText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
+    marginTop: -2,
   },
   dropdownContainer: {
     position: 'absolute',

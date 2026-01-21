@@ -28,6 +28,7 @@ import AppHeader from '../AppHeader';
 import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import DateTimePicker from '@react-native-community/datetimepicker';
 const COLORS = {
   bg: '#ffffff',
   card: '#f7f9fc',
@@ -53,6 +54,13 @@ const OcrScreen = () => {
   const [isGenerate, setIsGenerate] = useState(false);
   const [isResponseImg, setIsResponseImg] = useState(false);
   const [vendorModalVisible, setVendorModalVisible] = useState(false);
+  const [newVendor, setNewVendor] = useState('');
+  const [newVendorInput, setNewVendorInput] = useState('');
+  const [newVendorModalVisible, setNewVendorModalVisible] = useState(false);
+  const [saveInvoiceNo, setSaveInvoiceNo] = useState('');
+  const [saveInvoiceNoVisible, setSaveInvoiceNoVisible] = useState(false);
+  const [invoiceDate, setInvoiceDate] = useState(new Date());
+  const [showInvoiceDatePicker, setShowInvoiceDatePicker] = useState(false);
   // Vendor dropdown related
   const [selectedValue, setSelectedValue] = useState('');
   const [selectedDatabaseName, setSelectedDatabaseName] = useState('');
@@ -457,6 +465,10 @@ const OcrScreen = () => {
     handleClearSearch();
     setIsGenerate(false);
     setIsResponseImg(false);
+    setNewVendor('');
+    setNewVendorInput('');
+    setSaveInvoiceNo('');
+    setInvoiceDate(new Date());
   };
 
   const handleClearAll = () => {
@@ -501,6 +513,158 @@ const OcrScreen = () => {
     setSelectedImage(null);
   };
 
+  const handleOpenNewVendorModal = () => {
+    setNewVendorInput(newVendor);
+    setNewVendorModalVisible(true);
+  };
+
+  const handleSaveNewVendor = () => {
+    const trimmed = newVendorInput.trim();
+    if (!trimmed) {
+      Alert.alert('Missing Vendor', 'Please enter a vendor name.');
+      return;
+    }
+    setNewVendor(trimmed);
+    setNewVendorModalVisible(false);
+  };
+
+  const handleRemoveNewVendor = () => {
+    setNewVendor('');
+    setNewVendorInput('');
+  };
+
+  const handleUploadPress = () => {
+    if (!snappedImages.length) {
+      Alert.alert('No images', 'Please capture or select at least one image.');
+      return;
+    }
+    const hasNewVendor = !!newVendor.trim();
+    const hasSearchVendor = !!searchQuery.trim();
+    if (hasNewVendor && !hasSearchVendor) {
+      setSaveInvoiceNoVisible(true);
+      return;
+    }
+    handleGenerate();
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!saveInvoiceNo.trim()) {
+      Alert.alert('Missing Invoice Number', 'Please enter a valid invoice number.');
+      return;
+    }
+    setShowInvoiceDatePicker(false);
+    setSaveInvoiceNoVisible(false);
+    if (newVendor.trim()) {
+      await generateNewVendorData();
+      return;
+    }
+    await handleGenerate();
+  };
+
+  const generateNewVendorData = async () => {
+    if (!newVendor.trim()) {
+      Alert.alert('Missing Vendor', 'Please add a new vendor name.');
+      return;
+    }
+    if (!snappedImages.length) {
+      Alert.alert('No images', 'Please capture or select at least one image.');
+      return;
+    }
+
+    setIsGenerate(true);
+    setBtnLoading('generate', true);
+    try {
+      setUploadedFilenames([]);
+      setUploadedImageURLs([]);
+      setOcrJsons([]);
+
+      const newFilenames = [];
+      const newImageURLs = [];
+      const token = await AsyncStorage.getItem('access_token');
+      const icms_store = await AsyncStorage.getItem('icms_store');
+
+      for (let i = 0; i < snappedImages.length; i++) {
+        const img = snappedImages[i];
+        const fileOriginalName = `${newVendor.trim()},jpg`;
+        const formData = new FormData();
+        formData.append('file', {
+          uri: img.uri,
+          type: 'image/jpeg',
+          name: fileOriginalName,
+        });
+
+        const uploadResponse = await fetch(API_ENDPOINTS.UPLOAD_IMAGE, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            store: `${icms_store}`,
+            mode: 'MOBILE',
+            'access_token': token,
+          },
+          body: formData,
+        });
+        if (!uploadResponse.ok) {
+          const t = await uploadResponse.text();
+          throw new Error(`Upload failed (${uploadResponse.status}): ${t}`);
+        }
+
+        const uploadJson = await uploadResponse.json();
+        const filename = uploadJson?.filename;
+        const imageURL = uploadJson?.message?.imageURL?.Location;
+        if (filename && imageURL) {
+          newFilenames.push(filename);
+          newImageURLs.push(imageURL);
+        } else {
+          throw new Error(`Missing filename or imageURL in upload index ${i}`);
+        }
+      }
+
+      setUploadedFilenames(newFilenames);
+      setUploadedImageURLs(newImageURLs);
+
+      const userEmail = await AsyncStorage.getItem('userEmail');
+      const savedDate = invoiceDate.toISOString().split('T')[0];
+      const storePayload = {
+        UserInvoiceName: newVendor.trim(),
+        status: 'REQUESTED',
+        SavedDate: savedDate,
+        SavedInvoiceNo: saveInvoiceNo.trim(),
+        InvoicesImgUrls: newImageURLs,
+        MobileIcmsUserEmail: userEmail || '',
+        IcmsUserEmail: '',
+      };
+
+      const storeResponse = await fetch(API_ENDPOINTS.ROWINOVICE, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'access_token': token,
+          'mode': 'MOBILE',
+          'store': icms_store,
+        },
+        body: JSON.stringify(storePayload),
+      });
+
+      if (!storeResponse.ok) {
+        const t = await storeResponse.text();
+        throw new Error(`Store invoice failed (${storeResponse.status}): ${t}`);
+      }
+
+      Alert.alert('Success', 'Invoice request submitted.');
+      clearAll();
+      setNewVendor('');
+      setNewVendorInput('');
+      setSaveInvoiceNo('');
+    } catch (e) {
+      console.error('Upload/store failed:', e);
+      Alert.alert('Error', e.message);
+      setIsResponseImg(false);
+    } finally {
+      setBtnLoading('generate', false);
+      setIsGenerate(false);
+    }
+  };
+
   return (
     <ImageBackground
       source={getImageSource(reportbg)}
@@ -517,26 +681,28 @@ const OcrScreen = () => {
     <View style={styles.controlCard}>
   {/* Vendor Selector */}
   <View style={styles.searchWrap}>
-    <View style={styles.searchInputWrapper}>
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search Vendor..."
-        placeholderTextColor="#aaa"
-        value={searchQuery}
-        onChangeText={text => {
-          setSearchQuery(text);
-          debouncedSearch(text);
-        }}
-      />
-      {!!searchQuery && (
-        <TouchableOpacity
-          style={styles.clearSearchBtn}
-          onPress={handleClearSearch}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={styles.clearSearchText}>×</Text>
-        </TouchableOpacity>
-      )}
+    <View style={styles.searchRow}>
+      <View style={styles.searchInputWrapper}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search Vendor..."
+          placeholderTextColor="#aaa"
+          value={searchQuery}
+          onChangeText={text => {
+            setSearchQuery(text);
+            debouncedSearch(text);
+          }}
+        />
+        {!!searchQuery && (
+          <TouchableOpacity
+            style={styles.clearSearchBtn}
+            onPress={handleClearSearch}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.clearSearchText}>×</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
 
     {searchResults.length > 0 && (
@@ -569,6 +735,13 @@ const OcrScreen = () => {
   {/* Button Row */}
   <View style={styles.btnRowInline}>
     <ButtonWithLoader
+      label={newVendor ? 'Remove Vendor' : 'Add New Vendor'}
+      onPress={newVendor ? handleRemoveNewVendor : handleOpenNewVendorModal}
+      loading={false}
+      style={newVendor ? styles.btnDanger : styles.btnVendor}
+    />
+
+    <ButtonWithLoader
       label={showCamera ? 'Camera Active' : 'Select Invoice'}
       onPress={handleOpenCamera}
       loading={buttonLoading.selectInvoice}
@@ -576,12 +749,13 @@ const OcrScreen = () => {
     />
 
     <ButtonWithLoader
-      label="Generate"
-      onPress={handleGenerate}
+      label="Upload Invoice"
+      onPress={handleUploadPress}
       loading={isGenerate || buttonLoading.generate}
       style={styles.btnSuccess}
       // disabled={!snappedImages.length || !selectedValue}
     />
+    
     {hasTableData && (
       <>
         <ButtonWithLoader
@@ -604,7 +778,7 @@ const OcrScreen = () => {
 
       {/* Snapped / Selected Images Row OR OCR Preview */}
 
-      {isResponseImg && snappedImages.length > 0 ? (
+      {snappedImages.length > 0 ? (
         <ScrollView
           horizontal
           style={styles.imageRow}
@@ -618,7 +792,7 @@ const OcrScreen = () => {
                   onPress={() => removeSnappedImage(index)}
                   hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
                 >
-                  <Text style={styles.thumbCloseText}>×</Text>
+                  <Text style={styles.thumbCloseText}>x</Text>
                 </TouchableOpacity>
               </View>
               <TouchableOpacity onPress={() => openModal(item.uri)}>
@@ -658,6 +832,128 @@ const OcrScreen = () => {
           />
         </View>
       </Modal>
+
+      {/* New Vendor Modal */}
+      <Modal visible={newVendorModalVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity
+            style={styles.modalBackdropTouch}
+            onPress={() => setNewVendorModalVisible(false)}
+          />
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add New Vendor</Text>
+              <TouchableOpacity onPress={() => setNewVendorModalVisible(false)}>
+                <Text style={styles.clearLink}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              <TextInput
+                style={styles.modalInput}
+                value={newVendorInput}
+                onChangeText={setNewVendorInput}
+                placeholder="Enter vendor name"
+                placeholderTextColor="#aaa"
+              />
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.btn, styles.btnPrimary, styles.modalActionBtn]}
+                  onPress={handleSaveNewVendor}
+                >
+                  <Text style={styles.btnText}>Save</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.btn, styles.btnDanger, styles.modalActionBtn]}
+                  onPress={() => setNewVendorModalVisible(false)}
+                >
+                  <Text style={styles.btnText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Save Invoice Number Modal */}
+      <Modal visible={saveInvoiceNoVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity
+            style={styles.modalBackdropTouch}
+            onPress={() => {
+              setShowInvoiceDatePicker(false);
+              setSaveInvoiceNoVisible(false);
+            }}
+          />
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Enter Invoice Number</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowInvoiceDatePicker(false);
+                  setSaveInvoiceNoVisible(false);
+                }}
+              >
+                <Text style={styles.clearLink}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              <TextInput
+                style={styles.modalInput}
+                value={saveInvoiceNo}
+                onChangeText={setSaveInvoiceNo}
+                placeholder="Enter invoice number"
+                placeholderTextColor="#aaa"
+              />
+              <Text style={styles.modalLabel}>Invoice Date</Text>
+              <TouchableOpacity
+                style={styles.modalInput}
+                onPress={() => setShowInvoiceDatePicker(prev => !prev)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalDateText}>
+                  {invoiceDate.toISOString().split('T')[0]}
+                </Text>
+              </TouchableOpacity>
+              {Platform.OS === 'ios' && showInvoiceDatePicker && (
+                <DateTimePicker
+                  value={invoiceDate}
+                  mode="date"
+                  display="spinner"
+                  onChange={(_e, d) => d && setInvoiceDate(d)}
+                />
+              )}
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.btn, styles.btnPrimary, styles.modalActionBtn]}
+                  onPress={handleConfirmUpload}
+                >
+                  <Text style={styles.btnText}>Continue</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.btn, styles.btnDanger, styles.modalActionBtn]}
+                  onPress={() => {
+                    setShowInvoiceDatePicker(false);
+                    setSaveInvoiceNoVisible(false);
+                  }}
+                >
+                  <Text style={styles.btnText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {Platform.OS === 'android' && showInvoiceDatePicker && (
+        <DateTimePicker
+          value={invoiceDate}
+          mode="date"
+          display="default"
+          onChange={(_e, d) => {
+            setShowInvoiceDatePicker(false);
+            if (d) setInvoiceDate(d);
+          }}
+        />
+      )}
 
       {/* Table */}
       <SearchTableComponent
@@ -777,6 +1073,9 @@ const styles = StyleSheet.create({
   },
   btnPrimary: {
     backgroundColor: "#007bff",
+  },
+  btnVendor: {
+    backgroundColor: "#ff8c00",
   },
   btnAccent: {
     backgroundColor:COLORS.accent,
@@ -947,6 +1246,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  modalBody: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: COLORS.text,
+    backgroundColor: '#fff',
+  },
+  modalLabel: {
+    marginTop: 10,
+    marginBottom: 6,
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.sub,
+  },
+  modalDateText: {
+    color: COLORS.text,
+    fontSize: 14,
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  modalActionBtn: {
+    flex: 1,
+  },
   modalHeader: {
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -1001,9 +1332,14 @@ const styles = StyleSheet.create({
     width: '100%',
     padding: 10,
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   searchInputWrapper: {
     position: 'relative',
-    width: '100%',
+    flex: 1,
     justifyContent: 'center',
   },
   searchInput: {

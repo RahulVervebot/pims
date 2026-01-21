@@ -53,6 +53,9 @@ resizeMode="cover"
                   <TouchableOpacity onPress={() => navigation.navigate('RedProducts')}>
                     <Row icon={TopSellingProducts} label="Red Products" isLast />
                   </TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.navigate('PedingInvoices')}>
+                    <Row icon={TopSellingProducts} label="Pending Invoices" isLast />
+                  </TouchableOpacity>
         </View>
         </ImageBackground>
   );

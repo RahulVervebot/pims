@@ -1,5 +1,3 @@
-api.ts:
-
 /**
  * API service layer for Django backend communication
  */
@@ -40,6 +38,11 @@ export interface CreateConversationResponse {
   tenant: string;
   status: string;
   created_at: string;
+  conversation_type?: 'ai' | 'support';
+  escalated_to_support?: boolean;
+  had_ai_conversation?: boolean;
+  had_agent_conversation?: boolean;
+  chat_display_name?: string;
 }
 
 export interface SendMessageRequest {
@@ -57,10 +60,11 @@ export interface MessageResponse {
     first_name: string;
     last_name: string;
   } | null;
-  sender_type: 'client' | 'agent' | 'bot' | 'ai';
+  sender_type: 'client' | 'agent' | 'bot' | 'ai' | 'system';
   sender_name?: string;
   content: string;
-  message_type: 'text' | 'image' | 'file' | 'ai_response';
+  message_type: 'text' | 'image' | 'file' | 'ai_response' | 'system';
+  metadata?: Record<string, any>;
   created_at: string;
   is_read: boolean;
   attachments?: Array<{
@@ -371,6 +375,47 @@ class ApiService {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Failed to upload attachment' }));
       throw new Error(error.detail || 'Failed to upload attachment');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Close an AI conversation (client only)
+   */
+  async closeConversation(conversationId: string, token: string): Promise<any> {
+    const response = await fetch(
+      `${this.baseUrl}/api/chat/conversations/${conversationId}/close/`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(token),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to close conversation' }));
+      throw new Error(error.detail || 'Failed to close conversation');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Submit rating for a conversation
+   */
+  async submitRating(conversationId: string, rating: number, comment: string, token: string): Promise<any> {
+    const response = await fetch(
+      `${this.baseUrl}/api/chat/conversations/${conversationId}/submit-rating/`,
+      {
+        method: 'POST',
+        headers: this.getAuthHeaders(token),
+        body: JSON.stringify({ rating, comment }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to submit rating' }));
+      throw new Error(error.detail || 'Failed to submit rating');
     }
 
     return response.json();

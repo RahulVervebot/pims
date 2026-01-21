@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import TulsiLogo from '../assets/images/Tulsi.svg';
+import TulsiLogo from '../assets/icons/Tulsi_Icon_white.svg';
 import { dbPromise } from '../firebaseConfig';
 
 export default function LoginScreen({ navigation }) {

@@ -24,13 +24,16 @@ import AttachmentPreview from './AttachmentPreview';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const normalizeBaseUrl = (value) => String(value || '').replace(/\/$/, '');
+
 const normalizeAttachmentBase = (value) => {
+
   const base = normalizeBaseUrl(value);
   if (!base) return '';
   const apiIndex = base.indexOf('/api');
   if (apiIndex === -1) return base;
   return base.slice(0, apiIndex);
 };
+
 const normalizeWsUrl = (value) => {
   const raw = String(value || '').replace(/\/$/, '');
   if (!raw) return '';
@@ -39,13 +42,16 @@ const normalizeWsUrl = (value) => {
   if (raw.startsWith('http://')) return `ws://${raw.slice('http://'.length)}`;
   return raw;
 };
+
 const withTrailingSlash = (value) => (value.endsWith('/') ? value : `${value}/`);
+
 const buildApiUrl = (base, path) => {
   const normalized = normalizeBaseUrl(base);
   if (!normalized) return path;
   const hasApiSegment = /\/api(\/|$)/.test(normalized);
   return hasApiSegment ? `${normalized}${path}` : `${normalized}/api${path}`;
 };
+
 const parseJsonSafe = async (res, context = '') => {
   const text = await res.text();
   try {
@@ -106,6 +112,9 @@ export default function Chat({ style, buttonStyle }) {
   const [pendingAttachments, setPendingAttachments] = useState([]);
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
   const [waitingForAI, setWaitingForAI] = useState(false);
+  const [selectedRating, setSelectedRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [submittingRating, setSubmittingRating] = useState(false);
   const [accessToken, setAccessToken] = useState('');
   const [userName, setUserName] = useState('');
   const [apiBase, setApiBase] = useState('');
@@ -228,7 +237,8 @@ export default function Chat({ style, buttonStyle }) {
       conversationHistory: (id) => withTrailingSlash(buildApiUrl(apiBase, `/chat/conversations/${id}/messages`)),
       sendMessage: (id) => withTrailingSlash(buildApiUrl(apiBase, `/chat/conversations/${id}/messages`)),
       createConversation: withTrailingSlash(buildApiUrl(apiBase, '/chat/conversations')),
-      switchAgent: (id) => withTrailingSlash(buildApiUrl(apiBase, `/chat/conversations/${id}/switch-agent`)),
+      switchAgent: (id) => withTrailingSlash(buildApiUrl(apiBase, `/ai/chat/${id}/switch-agent`)),
+      submitRating: (id) => withTrailingSlash(buildApiUrl(apiBase, `/chat/conversations/${id}/submit-rating`)),
       uploadAttachment: withTrailingSlash(buildApiUrl(apiBase, '/chat/attachments/upload')),
     };
   }, [apiBase]);
@@ -348,6 +358,7 @@ export default function Chat({ style, buttonStyle }) {
               sender_name: msg.sender_name,
               content: msg.content,
               message_type: msg.message_type,
+              metadata: msg.metadata,
               created_at: msg.created_at,
               is_read: msg.is_read,
               attachments: msg.attachments || [],
@@ -740,18 +751,89 @@ export default function Chat({ style, buttonStyle }) {
   };
 
   const handleSwitchAgent = async () => {
-    setSwitchingAgent(true);
-    setShowTypeSelector(true);
-    setSelectedConversation(null);
-    setMessages([]);
-    setWaitingForAI(false);
-    setSwitchingAgent(false);
+    if (!selectedConversation || !accessToken || !endpoints) return;
+
+    try {
+      setSwitchingAgent(true);
+      const newType = selectedConversation.conversation_type === 'ai' ? 'support' : 'ai';
+      const res = await fetch(endpoints.switchAgent(selectedConversation.id), {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ agent_type: newType }),
+      });
+      const data = await parseJsonSafe(res, endpoints.switchAgent(selectedConversation.id));
+      if (!res.ok) {
+        throw new Error(data?.detail || 'Failed to switch agent');
+      }
+
+      const updatedConv = {
+        ...selectedConversation,
+        conversation_type: newType,
+        subject: data?.subject || selectedConversation.subject,
+        chat_display_name: data?.chat_display_name || selectedConversation.chat_display_name,
+      };
+      setSelectedConversation(updatedConv);
+      setConversations((prev) =>
+        prev.map((c) => (String(c.id) === String(selectedConversation.id) ? updatedConv : c))
+      );
+
+      const msgsRes = await fetch(endpoints.conversationHistory(selectedConversation.id), {
+        method: 'GET',
+        headers: authHeaders,
+      });
+      const msgs = await parseJsonSafe(msgsRes, endpoints.conversationHistory(selectedConversation.id));
+      setMessages(transformMessages(msgs || []));
+      setWaitingForAI(false);
+    } catch (error) {
+      console.error('Failed to switch agent:', error);
+    } finally {
+      setSwitchingAgent(false);
+    }
+  };
+
+  const handleSubmitRating = async () => {
+    if (!selectedConversation || !accessToken || !endpoints || selectedRating === 0) return;
+    try {
+      setSubmittingRating(true);
+      const res = await fetch(endpoints.submitRating(selectedConversation.id), {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ rating: selectedRating, comment: ratingComment }),
+      });
+      const data = await parseJsonSafe(res, endpoints.submitRating(selectedConversation.id));
+      if (!res.ok) {
+        throw new Error(data?.detail || 'Failed to submit rating');
+      }
+
+      const updatedConv = {
+        ...selectedConversation,
+        rating: selectedRating,
+        rating_identifier: 'client_rated',
+        status: 'resolved',
+      };
+      setSelectedConversation(updatedConv);
+      setConversations((prev) =>
+        prev.map((c) => (String(c.id) === String(selectedConversation.id) ? updatedConv : c))
+      );
+      setSelectedRating(0);
+      setRatingComment('');
+    } catch (error) {
+      console.error('Failed to submit rating:', error);
+    } finally {
+      setSubmittingRating(false);
+    }
   };
 
   const formatTime = (dateString) => {
     const date = new Date(dateString);
     if (Number.isNaN(date.getTime())) return '';
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatShortDate = (dateString) => {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   const openExport = async (url) => {
@@ -762,6 +844,13 @@ export default function Chat({ style, buttonStyle }) {
   };
 
   if (!isAuthenticated) return null;
+
+  const hasFeedbackRequest = messages.some(
+    (msg) => msg.message_type === 'system' && msg.metadata && msg.metadata.type === 'feedback_request'
+  );
+
+  const shouldShowFeedback = hasFeedbackRequest;
+  const inputBlocked = shouldShowFeedback && selectedConversation && !selectedConversation?.rating;
 
   return (
     <View pointerEvents="box-none" style={[styles.container, style]}>
@@ -776,6 +865,15 @@ export default function Chat({ style, buttonStyle }) {
         <KeyboardAvoidingView behavior={Platform.select({ ios: 'padding', android: undefined })} style={styles.sheetWrap}>
           <View style={[styles.sheet, { height: sheetHeight }]}>
             <View style={styles.header}>
+              <View style={styles.headerLeft}>
+                <View style={styles.headerIcon}>
+                  <Icon
+                    name={selectedConversation?.conversation_type === 'ai' ? 'smart-toy' : 'support-agent'}
+                    size={20}
+                    color="#fff"
+                  />
+                </View>
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.headerTitle}>
                   {selectedConversation ? selectedConversation.subject || 'Support Chat' : 'Support Chat'}
@@ -812,7 +910,7 @@ export default function Chat({ style, buttonStyle }) {
                 <ScrollView contentContainerStyle={styles.emptyWrap}>
                   {conversations.filter((c) => c.status !== 'closed' && c.status !== 'resolved').length > 0 ? (
                     <View style={{ gap: 10 }}>
-                      <Text style={styles.emptyTitle}>Select a conversation</Text>
+                   
                       {conversations
                         .filter((c) => c.status !== 'closed' && c.status !== 'resolved')
                         .map((conv) => (
@@ -822,12 +920,36 @@ export default function Chat({ style, buttonStyle }) {
                             onPress={() => setSelectedConversation(conv)}
                           >
                             <View style={styles.conversationRow}>
-                              <Text style={styles.conversationTitle}>{conv.subject || 'Support Request'}</Text>
-                              {conv.conversation_type === 'ai' && (
-                                <Text style={styles.aiBadge}>AI</Text>
-                              )}
+                              <View style={styles.conversationIcon}>
+                                <Icon
+                                  name={conv.conversation_type === 'ai' ? 'smart-toy' : 'support-agent'}
+                                  size={22}
+                                  color={conv.conversation_type === 'ai' ? '#5B21B6' : '#0F8B65'}
+                                />
+                              </View>
+                              <View style={styles.conversationBody}>
+                                <View style={styles.conversationHeaderRow}>
+                                  <Text style={styles.conversationTitle} numberOfLines={1}>
+                                    {conv.subject || 'Support Request'}
+                                  </Text>
+                                  <View
+                                    style={[
+                                      styles.conversationBadge,
+                                      conv.conversation_type === 'ai'
+                                        ? styles.conversationBadgeAi
+                                        : styles.conversationBadgeSupport,
+                                    ]}
+                                  >
+                                    <Text style={styles.conversationBadgeText}>
+                                      {conv.conversation_type === 'ai' ? 'AI Agent' : 'Support'}
+                                    </Text>
+                                  </View>
+                                </View>
+                                <Text style={styles.conversationMeta}>
+                                  {conv.message_count} messages · {formatShortDate(conv.last_message_at || conv.created_at)}
+                                </Text>
+                              </View>
                             </View>
-                            <Text style={styles.conversationMeta}>{conv.message_count} messages</Text>
                           </TouchableOpacity>
                         ))}
                       <TouchableOpacity
@@ -839,6 +961,9 @@ export default function Chat({ style, buttonStyle }) {
                           setWaitingForAI(false);
                         }}
                       >
+                        <View style={styles.startBtnIcon}>
+                          <Icon name="add-circle" size={18} color="#fff" />
+                        </View>
                         <Text style={styles.startBtnText}>Start New Conversation</Text>
                       </TouchableOpacity>
                     </View>
@@ -860,6 +985,76 @@ export default function Chat({ style, buttonStyle }) {
                     const isAI = (msg.sender_type === 'bot' || msg.sender_type === 'ai') &&
                       selectedConversation?.conversation_type === 'ai';
                     const isThinking = String(msg.id || '').startsWith('thinking-');
+                    const isSystemFeedback = msg.message_type === 'system' && msg.metadata && msg.metadata.type === 'feedback_request';
+                    if (isSystemFeedback && shouldShowFeedback && !selectedConversation?.rating) {
+                      return (
+                        <View key={msg.id} style={styles.feedbackWrap}>
+                          <View style={styles.feedbackCard}>
+                            <Text style={styles.feedbackTitle}>Share your feedback</Text>
+                            <Text style={styles.feedbackText}>
+                              Your rating will close and resolve this conversation.
+                            </Text>
+                            <View style={styles.feedbackStars}>
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <TouchableOpacity
+                                  key={star}
+                                  onPress={() => setSelectedRating(star)}
+                                  style={styles.feedbackStarBtn}
+                                >
+                                  <Text style={[
+                                    styles.feedbackStar,
+                                    star <= selectedRating && styles.feedbackStarActive,
+                                  ]}>
+                                    ★
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                            <TextInput
+                              value={ratingComment}
+                              onChangeText={setRatingComment}
+                              placeholder="Optional: Add a comment..."
+                              placeholderTextColor="#9CA3AF"
+                              style={styles.feedbackInput}
+                              multiline
+                            />
+                            <TouchableOpacity
+                              style={[styles.feedbackSubmit, (selectedRating === 0 || submittingRating) && styles.feedbackSubmitDisabled]}
+                              onPress={handleSubmitRating}
+                              disabled={selectedRating === 0 || submittingRating}
+                            >
+                              <Text style={styles.feedbackSubmitText}>
+                                {submittingRating ? 'Submitting...' : 'Submit Rating'}
+                              </Text>
+                            </TouchableOpacity>
+                            <Text style={styles.feedbackTime}>{formatTime(msg.created_at)}</Text>
+                          </View>
+                        </View>
+                      );
+                    }
+                    if (isSystemFeedback && shouldShowFeedback && selectedConversation?.rating) {
+                      return (
+                        <View key={msg.id} style={styles.feedbackWrap}>
+                          <View style={styles.feedbackThanks}>
+                            <Text style={styles.feedbackThanksText}>Thank you for your feedback!</Text>
+                            <Text style={styles.feedbackResolveText}>
+                              This conversation is resolved. Please start a new conversation.
+                            </Text>
+                            <TouchableOpacity
+                              style={styles.feedbackStartBtn}
+                              onPress={() => {
+                                setSelectedConversation(null);
+                                setMessages([]);
+                                setShowTypeSelector(true);
+                                setWaitingForAI(false);
+                              }}
+                            >
+                              <Text style={styles.feedbackStartBtnText}>Start New Conversation</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    }
                     return (
                       <View key={msg.id} style={[styles.messageRow, isClient && styles.messageRowRight]}>
                         <View style={[
@@ -933,7 +1128,7 @@ export default function Chat({ style, buttonStyle }) {
                 {showAttachments && (
                   <AttachmentButton
                     onFileSelect={handleFileSelect}
-                    disabled={uploadingAttachments || sending}
+                    disabled={uploadingAttachments || sending || inputBlocked}
                   />
                 )}
                 <View style={styles.inputWrapInner}>
@@ -943,7 +1138,7 @@ export default function Chat({ style, buttonStyle }) {
                     onChangeText={setMessage}
                     placeholder="Type your message..."
                     placeholderTextColor="#9CA3AF"
-                    editable={!sending && !uploadingAttachments}
+                    editable={!sending && !uploadingAttachments && !inputBlocked}
                     returnKeyType="send"
                     blurOnSubmit={false}
                     onSubmitEditing={() => handleSendMessage()}
@@ -960,7 +1155,7 @@ export default function Chat({ style, buttonStyle }) {
                 <TouchableOpacity
                   style={[styles.sendBtn, (sending || uploadingAttachments) && styles.sendBtnDisabled]}
                   onPress={() => handleSendMessage()}
-                  disabled={(!message.trim() && pendingAttachments.length === 0) || sending || uploadingAttachments}
+                  disabled={inputBlocked || (!message.trim() && pendingAttachments.length === 0) || sending || uploadingAttachments}
                 >
                   <Text style={styles.sendBtnText}>
                     {uploadingAttachments ? 'Uploading...' : sending ? 'Sending...' : 'Send'}
@@ -1019,21 +1214,78 @@ const styles = StyleSheet.create({
   },
   headerTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
   headerSubtitle: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
-  headerActions: { flexDirection: 'row', gap: 8 },
+  headerLeft: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  headerIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   headerBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.15)' },
   headerBtnDisabled: { opacity: 0.6 },
   headerBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
 
   messagesPanel: { flex: 1, backgroundColor: '#F5F5F5' },
-  emptyWrap: { padding: 16, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 6 },
+  emptyWrap: { paddingVertical: 16, paddingHorizontal: 12, alignItems: 'stretch', justifyContent: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 6,textAlign:"center" },
   emptyText: { fontSize: 13, color: '#666', textAlign: 'center' },
-  conversationCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E5E7EB' },
-  conversationRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  conversationTitle: { fontSize: 14, fontWeight: '700', color: '#111' },
-  conversationMeta: { fontSize: 12, color: '#666', marginTop: 4 },
-  aiBadge: { fontSize: 10, fontWeight: '700', color: '#6D28D9', backgroundColor: '#EDE9FE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
-  startBtn: { backgroundColor: '#16A34A', paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+  conversationCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#111',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+    width: '80%',
+    alignSelf: 'center',
+  },
+  conversationRow: { flexDirection: 'row', gap: 16, alignItems: 'center' },
+  conversationIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  conversationBody: { flex: 1 },
+  conversationHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  conversationTitle: { fontSize: 17, fontWeight: '700', color: '#111', flex: 1 },
+  conversationMeta: { fontSize: 13, color: '#667085', fontWeight: '600', marginTop: 6 },
+  conversationBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  conversationBadgeAi: { backgroundColor: '#EDE9FE' },
+  conversationBadgeSupport: { backgroundColor: '#DCFCE7' },
+  conversationBadgeText: { fontSize: 10, fontWeight: '700', color: '#111' },
+  startBtn: {
+    backgroundColor: '#16A34A',
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    width: '80%',
+    alignSelf: 'center',
+  },
+  startBtnIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   startBtnText: { color: '#fff', fontWeight: '700' },
 
   messageRow: { flexDirection: 'row', paddingHorizontal: 12, marginBottom: 10 },
@@ -1048,6 +1300,63 @@ const styles = StyleSheet.create({
   thinkingText: { color: '#6D28D9', fontSize: 13 },
   timeText: { marginTop: 6, fontSize: 10, color: '#666' },
   timeTextClient: { marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.7)' },
+
+  feedbackWrap: { paddingHorizontal: 12, marginBottom: 10, alignItems: 'center' },
+  feedbackCard: {
+    width: '100%',
+    backgroundColor: '#ECFDF5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    padding: 12,
+  },
+  feedbackTitle: { fontSize: 14, fontWeight: '700', color: '#166534', textAlign: 'center' },
+  feedbackText: { fontSize: 12, color: '#15803D', textAlign: 'center', marginTop: 4 },
+  feedbackStars: { flexDirection: 'row', justifyContent: 'center', marginTop: 10 },
+  feedbackStarBtn: { paddingHorizontal: 4 },
+  feedbackStar: { fontSize: 26, color: '#D1D5DB' },
+  feedbackStarActive: { color: '#F59E0B' },
+  feedbackInput: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    fontSize: 12,
+    color: '#111',
+    minHeight: 60,
+  },
+  feedbackSubmit: {
+    marginTop: 10,
+    backgroundColor: '#16A34A',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  feedbackSubmitDisabled: { opacity: 0.6 },
+  feedbackSubmitText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  feedbackTime: { marginTop: 8, fontSize: 10, color: '#6B7280', textAlign: 'center' },
+  feedbackThanks: {
+    backgroundColor: '#ECFDF3',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  feedbackThanksText: { fontSize: 12, color: '#166534', fontWeight: '700' },
+  feedbackResolveText: { marginTop: 6, fontSize: 11, color: '#15803D' },
+  feedbackStartBtn: {
+    marginTop: 10,
+    backgroundColor: '#16A34A',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  feedbackStartBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
 
   exportCard: {
     marginTop: 8,

@@ -40,6 +40,15 @@ export default function UserScreen({ navigation }) {
     checkLogin();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (e.data.action?.type !== 'GO_BACK') return;
+      e.preventDefault();
+      navigation.navigate('Tabs', { screen: 'Home' });
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   const initials = useMemo(() => {
     if (!user_name) return 'U';
     const parts = user_name.trim().split(/\s+/);
