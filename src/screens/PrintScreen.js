@@ -17,17 +17,16 @@ export default function PrintScreen() {
 
   const renderItem = ({ item }) => (
     <View style={styles.printItem}>
-      <View>
+      <View style={styles.printInfo}>
         <Text style={styles.name}>{item.productName}</Text>
         {item.barcode ? <Text style={styles.barcode}>{item.barcode}</Text> : null}
       </View>
-
-      <Text style={styles.price}>${Number(item.price ?? item.salePrice ?? 0).toFixed(2)}</Text>
-
+      <View style={styles.printMeta}>
+        <Text style={styles.price}>${Number(item.price ?? item.salePrice ?? 0).toFixed(2)}</Text>
         <TouchableOpacity style={styles.removeBtn} onPress={() => removeFromprint(item.product_id)}>
-          <Text style={{ color: '#fff' }}>Remove</Text>
+          <Text style={styles.removeBtnText}>Remove</Text>
         </TouchableOpacity>
-
+      </View>
     </View>
   );
 
@@ -70,7 +69,10 @@ const styles = StyleSheet.create({
     padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    flexWrap: 'wrap',
   },
+  printInfo: { flex: 1, minWidth: 160 },
+  printMeta: { alignItems: 'flex-end', justifyContent: 'center' },
   name: { fontWeight: '600', fontSize: 15, color: THEME.primary },
   barcode: { fontSize: 12, color: '#666', marginTop: 2 },
   price: { fontWeight: 'bold', color: THEME.price},
@@ -79,7 +81,8 @@ const styles = StyleSheet.create({
   qtyBtn: { backgroundColor: '#2c1e70', padding: 6, borderRadius: 5 },
   qtyText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   qtyValue: { marginHorizontal: 10, fontSize: 16, fontWeight: 'bold' },
-  removeBtn: { backgroundColor: '#319241', padding: 6, borderRadius: 5, marginTop: 8, alignSelf: 'flex-end' },
+  removeBtn: { backgroundColor: '#319241', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 5, marginTop: 8 },
+  removeBtnText: { color: '#fff', fontWeight: '600' },
   empty: { textAlign: 'center', marginTop: 50, fontSize: 16, color: '#888' },
   footer: { position: 'absolute', bottom: 0, left: 0, right: 0 },
 });

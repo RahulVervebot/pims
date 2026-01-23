@@ -876,11 +876,24 @@ export default function Chat({ style, buttonStyle }) {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.headerTitle}>
-                  {selectedConversation ? selectedConversation.subject || 'Support Chat' : 'Support Chat'}
+                  {selectedConversation?.conversation_type === 'ai' ? "AI Agent" : 'Support Chat'}
                 </Text>
                 <Text style={styles.headerSubtitle}>{userName}</Text>
               </View>
               <View style={styles.headerActions}>
+                                {selectedConversation && (
+                  <TouchableOpacity
+                    style={styles.headerBtn}
+                    onPress={() => {
+                      setSelectedConversation(null);
+                      setMessages([]);
+                      setShowTypeSelector(false);
+                      setWaitingForAI(false);
+                    }}
+                  >
+                    <Text style={styles.headerBtnText}>Dashboard</Text>
+                  </TouchableOpacity>
+                )}
                 {selectedConversation && (
                   <TouchableOpacity
                     style={[styles.headerBtn, switchingAgent && styles.headerBtnDisabled]}

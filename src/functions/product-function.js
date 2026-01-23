@@ -253,3 +253,63 @@ console.log("function text:",text);
   const json = await res.json();
   return Array.isArray(json) ? json : [];
 }
+
+export async function createCustomVariantProduct(payload) {
+  const [storeUrl, token] = await Promise.all([
+    AsyncStorage.getItem('storeurl'),
+    AsyncStorage.getItem('access_token'),
+  ]);
+
+  if (!storeUrl || !token) {
+    throw new Error('Missing store_url or access_token in AsyncStorage.');
+  }
+
+  const res = await fetch(
+    `${storeUrl}/api/pos/app/product/create/custom-attributes-and-variants`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        access_token: token,
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  const data = await res.json().catch(() => ({}));
+  console.log("variant data:",data)
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || 'Failed to create variant product');
+  }
+  return data;
+}
+
+export async function updateCustomVariantProduct(productId, payload) {
+  const [storeUrl, token] = await Promise.all([
+    AsyncStorage.getItem('storeurl'),
+    AsyncStorage.getItem('access_token'),
+  ]);
+
+  if (!storeUrl || !token) {
+    throw new Error('Missing store_url or access_token in AsyncStorage.');
+  }
+
+  const res = await fetch(
+    `${storeUrl}/api/pos/app/product/update/custom-attributes-and-variants/${productId}`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        access_token: token,
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  const data = await res.json().catch(() => ({}));
+ 
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || 'Failed to update variant product');
+  }
+  return data;
+}

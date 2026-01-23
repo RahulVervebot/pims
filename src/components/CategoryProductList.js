@@ -13,6 +13,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { CartContext } from '../context/CartContext';
 import { PrintContext } from '../context/PrintContext';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import { getCategoryProducts, getLatestProducts } from '../functions/product-function';
 import fallbackBg from '../assets/images/green-bg.jpg';
 import ProductBottomSheet from './ProductBottomSheet';
@@ -27,7 +28,7 @@ export default function CategoryProductList({ id, category, backgroundUri, showF
     const [userrole, setUserRole] = useState('');
    
   const { cart, addToCart, increaseQty, decreaseQty } = useContext(CartContext);
-  const { print, addToPrint, increasePrintQty, decreasePrintQty } = useContext(PrintContext);
+  const { print, addToPrint, increasePrintQty, decreasePrintQty, removeFromprint } = useContext(PrintContext);
   const sheetRef = useRef(null);
 
   const { width } = useWindowDimensions();
@@ -114,15 +115,9 @@ const renderProduct = ({ item }) => {
                 </TouchableOpacity>
               ))
             : (inPrint ? (
-                <View style={[styles.qtyRow, { marginTop: 8 }]}>
-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => decreasePrintQty(item.product_id)}>
-                    <Text style={styles.qtyText}>-</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.qtyValue}>{inPrint.qty}</Text>
-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => increasePrintQty(item.product_id)}>
-                    <Text style={styles.qtyText}>+</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity style={styles.removePrintBtn} onPress={() => removeFromprint(item.product_id)}>
+                  <Icon name="delete" size={22} color="#fff" />
+                </TouchableOpacity>
               ) : (
                 <TouchableOpacity onPress={() => addToPrint(item)}>
                   <PrinterIcon width={30} height={30} fill="rgba(245, 114, 0, 1)" />
@@ -251,6 +246,14 @@ const styles = StyleSheet.create({
   qtyBtn: { backgroundColor: '#2c1e70', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 },
   qtyText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   qtyValue: { marginHorizontal: 10, fontSize: 16, fontWeight: 'bold', color: '#000' },
+  removePrintBtn: {
+    backgroundColor: '#D9534F',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 6,
+    marginTop: 8,
+  },
 
   floatingCart: {
     position: 'absolute',

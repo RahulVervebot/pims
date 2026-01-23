@@ -15,6 +15,7 @@ import {
   TextInput,
   Platform,
   ImageBackground,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, CameraType } from 'react-native-camera-kit';
@@ -77,6 +78,8 @@ const OcrScreen = () => {
   const [showCamera, setShowCamera] = useState(false);
   // URLs
   const [ocrurl, setOcrUrl] = useState(null);
+  const { width: windowWidth } = useWindowDimensions();
+  const isNarrow = windowWidth < 420;
   // Dedup vendors by "value" and keep first occuitemrrence
   const uniqueVendors = React.useMemo(() => {
     const map = new Map();
@@ -489,6 +492,7 @@ const OcrScreen = () => {
     <TouchableOpacity
       style={[
         styles.btn,
+        isNarrow ? styles.btnNarrow : styles.btnWide,
         style,
         (disabled || loading) && styles.btnDisabled,
       ]}
@@ -676,6 +680,10 @@ const OcrScreen = () => {
         backgroundType="image"
         backgroundValue={reportbg}
       ></AppHeader>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
       {/* Controls Card */}
 
     <View style={styles.controlCard}>
@@ -976,6 +984,7 @@ const OcrScreen = () => {
           ])
         }
       />
+      </ScrollView>
 
       {/* Camera Fullscreen */}
       {showCamera && (
@@ -986,7 +995,7 @@ const OcrScreen = () => {
             cameraType={CameraType.Back}
             zoomMode="on"
           />
-          <View style={styles.cameraControls}>
+          <View style={[styles.cameraControls, isNarrow && styles.cameraControlsNarrow]}>
             <ButtonWithLoader
               label="Snap Photo"
               onPress={snapPhoto}
@@ -997,10 +1006,14 @@ const OcrScreen = () => {
               label="From Gallery"
               onPress={pickFromGallery}
               loading={buttonLoading.gallery}
-              style={styles.btnPrimary}
+              style={styles.btnSuccess}
             />
             <TouchableOpacity
-              style={[styles.btn, styles.btnDanger]}
+              style={[
+                styles.btn,
+                isNarrow ? styles.btnNarrow : styles.btnWide,
+                styles.btnDanger,
+              ]}
               onPress={handleCloseCamera}
             >
               <Text style={styles.btnText}>Close</Text>
@@ -1029,6 +1042,10 @@ export default OcrScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg, padding: 16 },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 0,
+  },
   controlCard: {
     backgroundColor: COLORS.card,
     borderWidth: 1,
@@ -1053,7 +1070,6 @@ const styles = StyleSheet.create({
   },
  btn: {
     flexGrow: 1,
-    minWidth: "22%", // keeps uniform sizing in row
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: "center",
@@ -1065,6 +1081,13 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.6,
+  },
+  btnWide: {
+    minWidth: "22%",
+  },
+  btnNarrow: {
+    flexBasis: "48%",
+    minWidth: "48%",
   },
  btnText: {
     fontSize: 14,
@@ -1166,6 +1189,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: COLORS.border,
     backgroundColor: COLORS.card,
+  },
+  cameraControlsNarrow: {
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
   },
   screen: {
     flex: 1,

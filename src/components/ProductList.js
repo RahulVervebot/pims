@@ -13,6 +13,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { CartContext } from '../context/CartContext';
 import { PrintContext } from '../context/PrintContext';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import { getCategoryProducts, getLatestProducts } from '../functions/product-function';
 import fallbackBg from '../assets/images/green-bg.jpg';
 import ProductBottomSheet from './ProductBottomSheet';
@@ -26,7 +27,7 @@ export default function ProductList({id, category, backgroundUri, showFloatingCa
   const [refreshing, setRefreshing] = useState(false);
     const [userrole, setUserRole] = useState('');
   const { cart, addToCart, increaseQty, decreaseQty } = useContext(CartContext);
-  const { print, addToPrint, increasePrintQty, decreasePrintQty } = useContext(PrintContext);
+  const { print, addToPrint, increasePrintQty, decreasePrintQty, removeFromprint } = useContext(PrintContext);
   const sheetRef = useRef(null);
 
   const { width } = useWindowDimensions();
@@ -127,15 +128,9 @@ const isGifBanner = useMemo(() => {
           </TouchableOpacity>
         ))
       : (inPrint ? (
-          <View style={styles.qtyRow}>
-            <TouchableOpacity style={styles.qtyBtn} onPress={() => decreasePrintQty(item.product_id)}>
-              <Text style={styles.qtyText}>-</Text>
-            </TouchableOpacity>
-            <Text style={styles.qtyValue}>{inPrint.qty}</Text>
-            <TouchableOpacity style={styles.qtyBtn} onPress={() => increasePrintQty(item.product_id)}>
-              <Text style={styles.qtyText}>+</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.removePrintBtn} onPress={() => removeFromprint(item.product_id)}>
+            <Icon name="delete" size={22} color="#fff" />
+          </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.cartprint} onPress={() => addToPrint(item)}>
             <PrinterIcon width={30} height={30} fill="rgba(245, 114, 0, 1)" />
@@ -286,6 +281,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 4,
+  },
+  removePrintBtn: {
+    backgroundColor: '#D9534F',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 6,
   },
 
   qtyBtn: { backgroundColor: '#2c1e70', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6 },

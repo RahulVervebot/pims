@@ -11,7 +11,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { Camera, CameraType } from 'react-native-camera-kit';
-import { getTopCategories, VendorList, TaxList } from '../functions/product-function';
+import { getTopCategories, VendorList, TaxList, createCustomVariantProduct, updateCustomVariantProduct } from '../functions/product-function';
 import { CartContext } from '../context/CartContext';
 import { PrintContext } from '../context/PrintContext';
 import { Picker } from '@react-native-picker/picker';
@@ -64,7 +64,7 @@ const MultiSelectModal = ({ visible, title, options, selectedIds, onChange, onCl
 const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   const sheetRef = useRef(null);
   const { cart, addToCart, increaseQty, decreaseQty } = useContext(CartContext);
-  const { print, addToPrint, increasePrintQty, decreasePrintQty } = useContext(PrintContext);
+  const { print, addToPrint, increasePrintQty, decreasePrintQty, removeFromprint } = useContext(PrintContext);
   const _isDark = useColorScheme() === 'dark';
   const inputTextColor = '#111';
   const placeholderColor = '#6B7280';
@@ -118,6 +118,17 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
 
   // Multi-select modals
   const [taxModal, setTaxModal] = useState(false);
+  const [variantModalVisible, setVariantModalVisible] = useState(false);
+  const [variantName, setVariantName] = useState('');
+  const [variantCode, setVariantCode] = useState('');
+  const [variantBarcode, setVariantBarcode] = useState('');
+  const [variantPrice, setVariantPrice] = useState('');
+  const [variantSubmitting, setVariantSubmitting] = useState(false);
+  const [variantsModalVisible, setVariantsModalVisible] = useState(false);
+  const [variantsList, setVariantsList] = useState([]);
+  const [editingVariantId, setEditingVariantId] = useState(null);
+  const [editingVariantName, setEditingVariantName] = useState('');
+  const [editingVariantPrice, setEditingVariantPrice] = useState('');
 
   // UI
   const [submitting, setSubmitting] = useState(false);
@@ -188,7 +199,7 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
         setID(String(p.product_id ?? p.id ?? ''));
         setName(p.productName ?? p.name ?? '');         // new_name
         setSize(p.productSize ?? p.size ?? '');         // size
-        setBarcodeOriginal(p.barcode ?? p.default_code ?? '');
+        setBarcodeOriginal(p.barcode || '');
         setNewBarcode(''); // new scan/type
 
         setPrice(p.salePrice != null ? String(p.salePrice) : '');   // new_price
@@ -217,11 +228,122 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
 
         setImgBase64('');
         setImgMime('image/jpeg');
+        setVariantsList(Array.isArray(p.variants) ? p.variants : []);
+        setEditingVariantId(null);
       }
       sheetRef.current?.open();
     },
     close: () => sheetRef.current?.close(),
   }));
+
+  const openVariantModal = () => {
+    setVariantName('');
+    setVariantCode('');
+    setVariantBarcode(barcodeOriginal || '');
+    setVariantPrice('');
+    setVariantModalVisible(true);
+  };
+
+  const handleCreateVariant = async () => {
+    const baseId = Number(id || product?.product_id || product?.id);
+    if (!Number.isFinite(baseId)) {
+      Alert.alert('Error', 'Missing product id.');
+      return;
+    }
+    if (!variantName.trim()) {
+      Alert.alert('Missing Name', 'Please enter a variant name.');
+      return;
+    }
+    if (!variantCode.trim()) {
+      Alert.alert('Missing Code', 'Please enter a default code.');
+      return;
+    }
+    const priceValue = parseFloat(variantPrice);
+    if (!Number.isFinite(priceValue)) {
+      Alert.alert('Invalid Price', 'Please enter a valid price.');
+      return;
+    }
+
+    try {
+      setVariantSubmitting(true);
+   const variantrespnse =   await createCustomVariantProduct({
+        name: variantName,
+        default_code: variantCode.trim(),
+        barcode: (variantBarcode.trim() || barcodeOriginal || ''),
+        list_price: priceValue,
+        parent_id: baseId,
+      });
+      console.log("variantrespnse:",variantrespnse.result);
+      if(variantrespnse.result.error){
+      Alert.alert("Error:",variantrespnse.result.error);
+      }
+     else if(variantrespnse.result.message){
+      Alert.alert(variantrespnse.result.message);
+      }
+      setVariantModalVisible(false);
+    } catch (e) {
+      Alert.alert('Error', e.message || 'Failed to create variant product.');
+    } finally {
+      setVariantSubmitting(false);
+    }
+  };
+
+  const openVariantsModal = () => {
+    setVariantsModalVisible(true);
+    setEditingVariantId(null);
+  };
+
+  const formatVariantName = (value) => {
+    const raw = String(value || '');
+    return raw.replace(/^\s*\[[^\]]+\]\s*/, '').trim();
+  };
+
+  const startEditVariant = (variant) => {
+    setEditingVariantId(variant.product_id);
+    setEditingVariantName(formatVariantName(variant.productName || ''));
+    setEditingVariantPrice(
+      variant.salePrice != null ? String(variant.salePrice) : ''
+    );
+  };
+
+  const handleUpdateVariantLocal = async (variantId) => {
+    const priceValue = parseFloat(editingVariantPrice);
+    if (!editingVariantName.trim()) {
+      Alert.alert('Missing Name', 'Please enter a product name.');
+      return;
+    }
+    if (!Number.isFinite(priceValue)) {
+      Alert.alert('Invalid Price', 'Please enter a valid price.');
+      return;
+    }
+
+    try {
+      setVariantSubmitting(true);
+      const updateresponsevariant = await updateCustomVariantProduct(variantId, {
+        name: editingVariantName.trim(),
+        list_price: priceValue,
+      });
+      setVariantsList((prev) =>
+        prev.map((v) =>
+          v.product_id === variantId 
+            ? { ...v, productName: editingVariantName.trim(), salePrice: priceValue }
+            : v
+        )
+      );
+      console.log("updateresponsevariant:",updateresponsevariant);
+      if(updateresponsevariant.result.message){
+        Alert.alert(updateresponsevariant.result.message);
+      }
+      else if(updateresponsevariant.result.error){
+      Alert.alert("Error:",updateresponsevariant.result.message);
+      }
+      setEditingVariantId(null);
+    } catch (e) {
+      Alert.alert('Error', e.message || 'Failed to update variant product.');
+    } finally {
+      setVariantSubmitting(false);
+    }
+  };
 
   const pickFromGallery = async () => {
     try {
@@ -353,8 +475,10 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
       to_weight: String(!!toWeight),
       barcode: (newBarcode?.trim() || barcodeOriginal || ''),
     };
+
     Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);
-console.log("access_token",token,"body",body);
+   console.log("access_token",token,"body",body);
+
     try {
       setSubmitting(true);
       const res = await fetch(`${storeUrl}/pos/app/product/update`, {
@@ -362,6 +486,7 @@ console.log("access_token",token,"body",body);
         headers: {'access_token': token },
         body: JSON.stringify(body),
       });
+
       const data = await res.json().catch(() => ({}));
       console.log("update res:",res);
         console.log("update data:",data);
@@ -403,8 +528,8 @@ console.log("access_token",token,"body",body);
     }
   };
 
-  const inCart = cart.find((p) => p.product_id === id);
-  const inPrint = print.find((p) => p.product_id === id);
+  const inCart = cart.find((p) => String(p.product_id) === String(id));
+  const inPrint = print.find((p) => String(p.product_id) === String(id));
 
   return (
     <>
@@ -586,12 +711,28 @@ console.log("access_token",token,"body",body);
               <View style={styles.switchGrid}>
                 <View style={styles.switchCell}><Text style={styles.switchLabel}>EWIC</Text><Switch value={ewic} onValueChange={setEwic} /></View>
                 <View style={styles.switchCell}><Text style={styles.switchLabel}>OTC</Text><Switch value={otc} onValueChange={setOtc} /></View>
-                <View style={[styles.switchCell, { opacity: 0 }]} />
+                <View style={styles.switchCell}>
+                  {variantsList.length > 0 ? (
+                    <TouchableOpacity style={styles.variantToggleBtn} onPress={openVariantsModal}>
+                      <Text style={styles.variantToggleText}>Variants</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View />
+                  )}
+                </View>
               </View>
             </View>
 
             {/* Cart / Print buttons (unchanged) */}
-            <View style={[styles.row, { marginTop: 16 }]}>
+            {userrole !== 'customer' && (
+              <TouchableOpacity
+                style={[styles.btn, styles.variantBtn, { marginTop: 16 }]}
+                onPress={openVariantModal}
+              >
+                <Text style={styles.btnText}>Create Variant Product</Text>
+              </TouchableOpacity>
+            )}
+            <View style={[styles.row, { marginTop: 12 }]}>
            {userrole === 'customer' ?
       
               inCart ? (
@@ -608,13 +749,17 @@ console.log("access_token",token,"body",body);
             
 :
               inPrint ? (
-                <View style={[styles.qtyRow, { marginTop: 8 }]}>
-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => decreasePrintQty(product.product_id)}><Text style={styles.qtyText}>-</Text></TouchableOpacity>
-                  <Text style={styles.qtyValue}>{inPrint.qty}</Text>
-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => increasePrintQty(product.product_id)}><Text style={styles.qtyText}>+</Text></TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  style={[styles.btn, styles.removePrintBtn]}
+                  onPress={() => removeFromprint(product.product_id)}
+                >
+                  <Text style={styles.btnText}>Remove from Print</Text>
+                </TouchableOpacity>
               ) : (
-                <TouchableOpacity style={[styles.btn, { backgroundColor: THEME.primary }]} onPress={() => addToPrint(product)}>
+                <TouchableOpacity
+                  style={[styles.btn, { backgroundColor: THEME.primary }]}
+                  onPress={() => addToPrint(product)}
+                >
                   <Text style={styles.btnText}>Add to Print</Text>
                 </TouchableOpacity>
               )
@@ -641,6 +786,128 @@ console.log("access_token",token,"body",body);
         onChange={setSelectedTaxIds}
         onClose={() => setTaxModal(false)}
       />
+
+      <Modal visible={variantModalVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Create Variant Product</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={variantName}
+              onChangeText={setVariantName}
+              placeholder="Name"
+              placeholderTextColor="#9CA3AF"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={variantCode}
+              onChangeText={setVariantCode}
+              placeholder="Default Code"
+              placeholderTextColor="#9CA3AF"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={variantBarcode}
+              onChangeText={setVariantBarcode}
+              placeholder="Barcode"
+              placeholderTextColor="#9CA3AF"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={variantPrice}
+              onChangeText={setVariantPrice}
+              placeholder="Price"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="decimal-pad"
+            />
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={[styles.btn, styles.variantBtn]}
+                onPress={handleCreateVariant}
+                disabled={variantSubmitting}
+              >
+                <Text style={styles.btnText}>
+                  {variantSubmitting ? 'Submitting...' : 'Submit'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btn, styles.modalCancelBtn]}
+                onPress={() => setVariantModalVisible(false)}
+              >
+                <Text style={styles.btnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={variantsModalVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Variants</Text>
+            <ScrollView contentContainerStyle={{ paddingBottom: 8 }}>
+              {variantsList.map((variant) => {
+                const isEditing = editingVariantId === variant.product_id;
+                return (
+                  <View key={variant.product_id} style={styles.variantCard}>
+                    {isEditing ? (
+                      <>
+                        <TextInput
+                          style={styles.modalInput}
+                          value={editingVariantName}
+                          onChangeText={setEditingVariantName}
+                          placeholder="Product Name"
+                          placeholderTextColor="#9CA3AF"
+                        />
+                        <TextInput
+                          style={styles.modalInput}
+                          value={editingVariantPrice}
+                          onChangeText={setEditingVariantPrice}
+                          placeholder="Sale Price"
+                          placeholderTextColor="#9CA3AF"
+                          keyboardType="decimal-pad"
+                        />
+                        <TouchableOpacity
+                          style={[styles.btn, styles.variantBtn]}
+                          onPress={() => handleUpdateVariantLocal(variant.product_id)}
+                          disabled={variantSubmitting}
+                        >
+                          <Text style={styles.btnText}>Update</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <View style={styles.variantRow}>
+                        <View style={styles.variantInfo}>
+                          <Text style={styles.variantName}>
+                            {formatVariantName(variant.productName)}
+                          </Text>
+                          <Text style={styles.variantPrice}>
+                            ${Number(variant.salePrice || 0).toFixed(2)}
+                          </Text>
+                        </View>
+                        <TouchableOpacity onPress={() => startEditVariant(variant)}>
+                          <Icon name="edit" size={20} color="#333" />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+              {variantsList.length === 0 && (
+                <Text style={styles.emptyVariantsText}>No variants available.</Text>
+              )}
+            </ScrollView>
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={[styles.btn, styles.modalCancelBtn]}
+                onPress={() => setVariantsModalVisible(false)}
+              >
+                <Text style={styles.btnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Fullscreen Scanner */}
       <Modal visible={scannerVisible} animationType="slide">
@@ -758,6 +1025,56 @@ const styles = StyleSheet.create({
 
   subTitle: { marginTop: 12, marginBottom: 6, fontWeight: '700', color: '#111' },
   switchGrid: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  variantBtn: { backgroundColor: THEME.secondary },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 10 },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    color: '#111',
+    marginBottom: 10,
+  },
+  modalBtnRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  modalCancelBtn: { backgroundColor: '#D9534F' },
+  variantToggleBtn: {
+    backgroundColor: '#1B9C85',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  variantToggleText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  variantCard: {
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+    backgroundColor: '#fff',
+  },
+  variantRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  variantInfo: { flex: 1, paddingRight: 10 },
+  variantName: { fontSize: 14, fontWeight: '700', color: '#111' },
+  variantPrice: { marginTop: 4, fontSize: 12, color: '#319241', fontWeight: '700' },
+  emptyVariantsText: { color: '#6B7280', textAlign: 'center', paddingVertical: 8 },
+  removePrintBtn: { backgroundColor: '#D9534F' },
   switchCell: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     borderWidth: StyleSheet.hairlineWidth, borderColor: '#eee', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 12,

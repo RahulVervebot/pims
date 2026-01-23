@@ -139,7 +139,11 @@ const SearchTableComponent = ({ tableData, setTableData, onRemoveRow, onAddManua
       </View>
 
       {/* Body */}
-      <ScrollView style={styles.scroll} nestedScrollEnabled>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        nestedScrollEnabled
+      >
         {filteredData.length === 0 ? (
           <Text style={styles.infoText}>No data available.</Text>
         ) : (
@@ -313,7 +317,8 @@ const styles = StyleSheet.create({
   tableHeaderCell: { alignItems: 'center', justifyContent: 'center' },
   headerText: { fontWeight: '700', color: COLORS.text, fontSize: 13 },
 
-  scroll: { marginTop: 6, maxHeight: 420 },
+  scroll: { marginTop: 6, flex: 1 },
+  scrollContent: { flexGrow: 1 },
   tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
