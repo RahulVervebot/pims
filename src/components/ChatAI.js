@@ -24,13 +24,16 @@ import AttachmentPreview from './AttachmentPreview';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const normalizeBaseUrl = (value) => String(value || '').replace(/\/$/, '');
+
 const normalizeAttachmentBase = (value) => {
+
   const base = normalizeBaseUrl(value);
   if (!base) return '';
   const apiIndex = base.indexOf('/api');
   if (apiIndex === -1) return base;
   return base.slice(0, apiIndex);
 };
+
 const normalizeWsUrl = (value) => {
   const raw = String(value || '').replace(/\/$/, '');
   if (!raw) return '';
@@ -39,13 +42,38 @@ const normalizeWsUrl = (value) => {
   if (raw.startsWith('http://')) return `ws://${raw.slice('http://'.length)}`;
   return raw;
 };
+
 const withTrailingSlash = (value) => (value.endsWith('/') ? value : `${value}/`);
+
 const buildApiUrl = (base, path) => {
   const normalized = normalizeBaseUrl(base);
   if (!normalized) return path;
   const hasApiSegment = /\/api(\/|$)/.test(normalized);
   return hasApiSegment ? `${normalized}${path}` : `${normalized}/api${path}`;
 };
+
+const splitNumericTokens = (value) => {
+  const text = String(value ?? '');
+  if (!text) return [];
+  const tokens = [];
+  const pattern = /\d+(?:[.,]\d+)?/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = pattern.exec(text))) {
+    if (match.index > lastIndex) {
+      tokens.push({ type: 'text', value: text.slice(lastIndex, match.index) });
+    }
+    tokens.push({ type: 'number', value: match[0] });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    tokens.push({ type: 'text', value: text.slice(lastIndex) });
+  }
+  return tokens;
+};
+
+const stripMarkdownBold = (value) => String(value ?? '').replace(/\*\*/g, '');
+
 const parseJsonSafe = async (res, context = '') => {
   const text = await res.text();
   try {
@@ -106,6 +134,9 @@ export default function Chat({ style, buttonStyle }) {
   const [pendingAttachments, setPendingAttachments] = useState([]);
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
   const [waitingForAI, setWaitingForAI] = useState(false);
+  const [selectedRating, setSelectedRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [submittingRating, setSubmittingRating] = useState(false);
   const [accessToken, setAccessToken] = useState('');
   const [userName, setUserName] = useState('');
   const [apiBase, setApiBase] = useState('');
@@ -128,6 +159,32 @@ export default function Chat({ style, buttonStyle }) {
 
   const isAuthenticated = !!accessToken;
   const showAttachments = true;
+
+  const renderMessageContent = (msg, isClient, isAI) => {
+    const baseStyle = isClient ? styles.clientText : styles.otherText;
+    const content = isAI ? stripMarkdownBold(msg.content) : msg.content;
+    if (!isAI || isClient) {
+      return <Text style={baseStyle}>{content}</Text>;
+    }
+    const tokens = splitNumericTokens(content);
+    if (tokens.length === 0) {
+      return <Text style={baseStyle}>{content}</Text>;
+    }
+    return (
+      <Text style={baseStyle}>
+        {tokens.map((token, index) => {
+          if (token.type === 'number') {
+            return (
+              <Text key={`num-${index}`} style={[baseStyle, styles.aiNumberBold]}>
+                {token.value}
+              </Text>
+            );
+          }
+          return token.value;
+        })}
+      </Text>
+    );
+  };
 
   useEffect(() => {
     (async () => {
@@ -228,7 +285,8 @@ export default function Chat({ style, buttonStyle }) {
       conversationHistory: (id) => withTrailingSlash(buildApiUrl(apiBase, `/chat/conversations/${id}/messages`)),
       sendMessage: (id) => withTrailingSlash(buildApiUrl(apiBase, `/chat/conversations/${id}/messages`)),
       createConversation: withTrailingSlash(buildApiUrl(apiBase, '/chat/conversations')),
-      switchAgent: (id) => withTrailingSlash(buildApiUrl(apiBase, `/chat/conversations/${id}/switch-agent`)),
+      switchAgent: (id) => withTrailingSlash(buildApiUrl(apiBase, `/ai/chat/${id}/switch-agent`)),
+      submitRating: (id) => withTrailingSlash(buildApiUrl(apiBase, `/chat/conversations/${id}/submit-rating`)),
       uploadAttachment: withTrailingSlash(buildApiUrl(apiBase, '/chat/attachments/upload')),
     };
   }, [apiBase]);
@@ -348,6 +406,7 @@ export default function Chat({ style, buttonStyle }) {
               sender_name: msg.sender_name,
               content: msg.content,
               message_type: msg.message_type,
+              metadata: msg.metadata,
               created_at: msg.created_at,
               is_read: msg.is_read,
               attachments: msg.attachments || [],
@@ -740,12 +799,77 @@ export default function Chat({ style, buttonStyle }) {
   };
 
   const handleSwitchAgent = async () => {
-    setSwitchingAgent(true);
-    setShowTypeSelector(true);
-    setSelectedConversation(null);
-    setMessages([]);
-    setWaitingForAI(false);
-    setSwitchingAgent(false);
+    if (!selectedConversation || !accessToken || !endpoints) return;
+
+    try {
+      setSwitchingAgent(true);
+      const newType = selectedConversation.conversation_type === 'ai' ? 'support' : 'ai';
+      const res = await fetch(endpoints.switchAgent(selectedConversation.id), {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ agent_type: newType }),
+      });
+      const data = await parseJsonSafe(res, endpoints.switchAgent(selectedConversation.id));
+      if (!res.ok) {
+        throw new Error(data?.detail || 'Failed to switch agent');
+      }
+
+      const updatedConv = {
+        ...selectedConversation,
+        conversation_type: newType,
+        subject: data?.subject || selectedConversation.subject,
+        chat_display_name: data?.chat_display_name || selectedConversation.chat_display_name,
+      };
+      setSelectedConversation(updatedConv);
+      setConversations((prev) =>
+        prev.map((c) => (String(c.id) === String(selectedConversation.id) ? updatedConv : c))
+      );
+
+      const msgsRes = await fetch(endpoints.conversationHistory(selectedConversation.id), {
+        method: 'GET',
+        headers: authHeaders,
+      });
+      const msgs = await parseJsonSafe(msgsRes, endpoints.conversationHistory(selectedConversation.id));
+      setMessages(transformMessages(msgs || []));
+      setWaitingForAI(false);
+    } catch (error) {
+      console.error('Failed to switch agent:', error);
+    } finally {
+      setSwitchingAgent(false);
+    }
+  };
+
+  const handleSubmitRating = async () => {
+    if (!selectedConversation || !accessToken || !endpoints || selectedRating === 0) return;
+    try {
+      setSubmittingRating(true);
+      const res = await fetch(endpoints.submitRating(selectedConversation.id), {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ rating: selectedRating, comment: ratingComment }),
+      });
+      const data = await parseJsonSafe(res, endpoints.submitRating(selectedConversation.id));
+      if (!res.ok) {
+        throw new Error(data?.detail || 'Failed to submit rating');
+      }
+
+      const updatedConv = {
+        ...selectedConversation,
+        rating: selectedRating,
+        rating_identifier: 'client_rated',
+        status: 'resolved',
+      };
+      setSelectedConversation(updatedConv);
+      setConversations((prev) =>
+        prev.map((c) => (String(c.id) === String(selectedConversation.id) ? updatedConv : c))
+      );
+      setSelectedRating(0);
+      setRatingComment('');
+    } catch (error) {
+      console.error('Failed to submit rating:', error);
+    } finally {
+      setSubmittingRating(false);
+    }
   };
 
   const formatTime = (dateString) => {
@@ -768,6 +892,13 @@ export default function Chat({ style, buttonStyle }) {
   };
 
   if (!isAuthenticated) return null;
+
+  const hasFeedbackRequest = messages.some(
+    (msg) => msg.message_type === 'system' && msg.metadata && msg.metadata.type === 'feedback_request'
+  );
+
+  const shouldShowFeedback = hasFeedbackRequest;
+  const inputBlocked = shouldShowFeedback && selectedConversation && !selectedConversation?.rating;
 
   return (
     <View pointerEvents="box-none" style={[styles.container, style]}>
@@ -793,11 +924,24 @@ export default function Chat({ style, buttonStyle }) {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.headerTitle}>
-                  {selectedConversation ? selectedConversation.subject || 'Support Chat' : 'Support Chat'}
+                  {selectedConversation?.conversation_type === 'ai' ? "AI Agent" : 'Support Chat'}
                 </Text>
                 <Text style={styles.headerSubtitle}>{userName}</Text>
               </View>
               <View style={styles.headerActions}>
+                                {selectedConversation && (
+                  <TouchableOpacity
+                    style={styles.headerBtn}
+                    onPress={() => {
+                      setSelectedConversation(null);
+                      setMessages([]);
+                      setShowTypeSelector(false);
+                      setWaitingForAI(false);
+                    }}
+                  >
+                    <Text style={styles.headerBtnText}>Dashboard</Text>
+                  </TouchableOpacity>
+                )}
                 {selectedConversation && (
                   <TouchableOpacity
                     style={[styles.headerBtn, switchingAgent && styles.headerBtnDisabled]}
@@ -902,6 +1046,76 @@ export default function Chat({ style, buttonStyle }) {
                     const isAI = (msg.sender_type === 'bot' || msg.sender_type === 'ai') &&
                       selectedConversation?.conversation_type === 'ai';
                     const isThinking = String(msg.id || '').startsWith('thinking-');
+                    const isSystemFeedback = msg.message_type === 'system' && msg.metadata && msg.metadata.type === 'feedback_request';
+                    if (isSystemFeedback && shouldShowFeedback && !selectedConversation?.rating) {
+                      return (
+                        <View key={msg.id} style={styles.feedbackWrap}>
+                          <View style={styles.feedbackCard}>
+                            <Text style={styles.feedbackTitle}>Share your feedback</Text>
+                            <Text style={styles.feedbackText}>
+                              Your rating will close and resolve this conversation.
+                            </Text>
+                            <View style={styles.feedbackStars}>
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <TouchableOpacity
+                                  key={star}
+                                  onPress={() => setSelectedRating(star)}
+                                  style={styles.feedbackStarBtn}
+                                >
+                                  <Text style={[
+                                    styles.feedbackStar,
+                                    star <= selectedRating && styles.feedbackStarActive,
+                                  ]}>
+                                    ★
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                            <TextInput
+                              value={ratingComment}
+                              onChangeText={setRatingComment}
+                              placeholder="Optional: Add a comment..."
+                              placeholderTextColor="#9CA3AF"
+                              style={styles.feedbackInput}
+                              multiline
+                            />
+                            <TouchableOpacity
+                              style={[styles.feedbackSubmit, (selectedRating === 0 || submittingRating) && styles.feedbackSubmitDisabled]}
+                              onPress={handleSubmitRating}
+                              disabled={selectedRating === 0 || submittingRating}
+                            >
+                              <Text style={styles.feedbackSubmitText}>
+                                {submittingRating ? 'Submitting...' : 'Submit Rating'}
+                              </Text>
+                            </TouchableOpacity>
+                            <Text style={styles.feedbackTime}>{formatTime(msg.created_at)}</Text>
+                          </View>
+                        </View>
+                      );
+                    }
+                    if (isSystemFeedback && shouldShowFeedback && selectedConversation?.rating) {
+                      return (
+                        <View key={msg.id} style={styles.feedbackWrap}>
+                          <View style={styles.feedbackThanks}>
+                            <Text style={styles.feedbackThanksText}>Thank you for your feedback!</Text>
+                            <Text style={styles.feedbackResolveText}>
+                              This conversation is resolved. Please start a new conversation.
+                            </Text>
+                            <TouchableOpacity
+                              style={styles.feedbackStartBtn}
+                              onPress={() => {
+                                setSelectedConversation(null);
+                                setMessages([]);
+                                setShowTypeSelector(true);
+                                setWaitingForAI(false);
+                              }}
+                            >
+                              <Text style={styles.feedbackStartBtnText}>Start New Conversation</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    }
                     return (
                       <View key={msg.id} style={[styles.messageRow, isClient && styles.messageRowRight]}>
                         <View style={[
@@ -915,7 +1129,7 @@ export default function Chat({ style, buttonStyle }) {
                               <Text style={styles.thinkingText}>AI Agent is thinking...</Text>
                             </View>
                           ) : (
-                            <Text style={isClient ? styles.clientText : styles.otherText}>{msg.content}</Text>
+                            renderMessageContent(msg, isClient, isAI)
                           )}
 
                           {msg.attachments && msg.attachments.length > 0 && (
@@ -975,7 +1189,7 @@ export default function Chat({ style, buttonStyle }) {
                 {showAttachments && (
                   <AttachmentButton
                     onFileSelect={handleFileSelect}
-                    disabled={uploadingAttachments || sending}
+                    disabled={uploadingAttachments || sending || inputBlocked}
                   />
                 )}
                 <View style={styles.inputWrapInner}>
@@ -985,7 +1199,7 @@ export default function Chat({ style, buttonStyle }) {
                     onChangeText={setMessage}
                     placeholder="Type your message..."
                     placeholderTextColor="#9CA3AF"
-                    editable={!sending && !uploadingAttachments}
+                    editable={!sending && !uploadingAttachments && !inputBlocked}
                     returnKeyType="send"
                     blurOnSubmit={false}
                     onSubmitEditing={() => handleSendMessage()}
@@ -1002,7 +1216,7 @@ export default function Chat({ style, buttonStyle }) {
                 <TouchableOpacity
                   style={[styles.sendBtn, (sending || uploadingAttachments) && styles.sendBtnDisabled]}
                   onPress={() => handleSendMessage()}
-                  disabled={(!message.trim() && pendingAttachments.length === 0) || sending || uploadingAttachments}
+                  disabled={inputBlocked || (!message.trim() && pendingAttachments.length === 0) || sending || uploadingAttachments}
                 >
                   <Text style={styles.sendBtnText}>
                     {uploadingAttachments ? 'Uploading...' : sending ? 'Sending...' : 'Send'}
@@ -1143,10 +1357,68 @@ const styles = StyleSheet.create({
   aiBubble: { borderWidth: 1, borderColor: '#E9D5FF', backgroundColor: '#F5F3FF' },
   clientText: { color: '#fff', fontSize: 13 },
   otherText: { color: '#111', fontSize: 13 },
+  aiNumberBold: { fontWeight: '700' },
   thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   thinkingText: { color: '#6D28D9', fontSize: 13 },
   timeText: { marginTop: 6, fontSize: 10, color: '#666' },
   timeTextClient: { marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.7)' },
+
+  feedbackWrap: { paddingHorizontal: 12, marginBottom: 10, alignItems: 'center' },
+  feedbackCard: {
+    width: '100%',
+    backgroundColor: '#ECFDF5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    padding: 12,
+  },
+  feedbackTitle: { fontSize: 14, fontWeight: '700', color: '#166534', textAlign: 'center' },
+  feedbackText: { fontSize: 12, color: '#15803D', textAlign: 'center', marginTop: 4 },
+  feedbackStars: { flexDirection: 'row', justifyContent: 'center', marginTop: 10 },
+  feedbackStarBtn: { paddingHorizontal: 4 },
+  feedbackStar: { fontSize: 26, color: '#D1D5DB' },
+  feedbackStarActive: { color: '#F59E0B' },
+  feedbackInput: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    fontSize: 12,
+    color: '#111',
+    minHeight: 60,
+  },
+  feedbackSubmit: {
+    marginTop: 10,
+    backgroundColor: '#16A34A',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  feedbackSubmitDisabled: { opacity: 0.6 },
+  feedbackSubmitText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  feedbackTime: { marginTop: 8, fontSize: 10, color: '#6B7280', textAlign: 'center' },
+  feedbackThanks: {
+    backgroundColor: '#ECFDF3',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  feedbackThanksText: { fontSize: 12, color: '#166534', fontWeight: '700' },
+  feedbackResolveText: { marginTop: 6, fontSize: 11, color: '#15803D' },
+  feedbackStartBtn: {
+    marginTop: 10,
+    backgroundColor: '#16A34A',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  feedbackStartBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
 
   exportCard: {
     marginTop: 8,

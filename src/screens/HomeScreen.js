@@ -21,7 +21,6 @@ import { CartContext } from "../context/CartContext";
 import { PrintContext } from "../context/PrintContext";
 import { SvgUri } from "react-native-svg";
 import CreateProductModal from "../components/CreateProductModal";
-import Chat from "../components/Chat";
 import { useNavigation } from "@react-navigation/native";
 import PrinterIcon from '../assets/icons/Printericon.svg';
 import Video from "react-native-video";
@@ -160,23 +159,23 @@ const currentBackground = useMemo(() => {
   }, []);
 
   // Full-screen loader video
-  if (showScreen) {
-    return (
-      <View style={styles.loaderWrap}>
-        <StatusBar backgroundColor="black" barStyle="light-content" />
-        <Video
-          source={require("../assets/images/Loader.mp4")}
-          style={styles.video}
-          resizeMode="cover"
-          repeat
-          muted
-          playWhenInactive
-          playInBackground={false}
-        />
+  // if (showScreen) {
+  //   return (
+  //     <View style={styles.loaderWrap}>
+  //       <StatusBar backgroundColor="black" barStyle="light-content" />
+  //       <Video
+  //         source={require("../assets/images/Loader.mp4")}
+  //         style={styles.video}
+  //         resizeMode="cover"
+  //         repeat
+  //         muted
+  //         playWhenInactive
+  //         playInBackground={false}
+  //       />
 
-      </View>
-    );
-  }
+  //     </View>
+  //   );
+  // }
 
   return (
     <SafeAreaView
@@ -342,7 +341,6 @@ const currentBackground = useMemo(() => {
           </TouchableOpacity>
         </View> */}
 
-        <Chat style={{ bottom: 70 + insets.bottom, right: 16 }} />
       </View>
 
       {/* <CreateProductModal

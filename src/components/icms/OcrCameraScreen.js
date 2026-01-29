@@ -34,13 +34,17 @@ const COLORS = {
   bg: '#ffffff',
   card: '#f7f9fc',
   border: '#e6e8ef',
-  primary: '#2C62FF',
-  success: '#2e8b57',
+  primary: '#319241',
+  success: '#319241',
   danger: '#D9534F',
   accent: '#319241',
   text: '#111',
   sub: '#777',
 };
+const GREEN_LIGHT = '#e6f6ec';
+const GREEN_DARK = '#256f3a';
+const GREY_LIGHT = '#eef1f4';
+const GREY_DARK = '#5b6675';
 
 const OcrScreen = () => {
   const insets = useSafeAreaInsets();
@@ -488,6 +492,7 @@ const OcrScreen = () => {
     loading = false,
     style,
     disabled = false,
+    textStyle,
   }) => (
     <TouchableOpacity
       style={[
@@ -503,7 +508,7 @@ const OcrScreen = () => {
       {loading ? (
         <ActivityIndicator size="small" color="#fff" />
       ) : (
-        <Text style={styles.btnText}>{label}</Text>
+        <Text style={[styles.btnText, textStyle]}>{label}</Text>
       )}
     </TouchableOpacity>
   );
@@ -746,21 +751,24 @@ const OcrScreen = () => {
       label={newVendor ? 'Remove Vendor' : 'Add New Vendor'}
       onPress={newVendor ? handleRemoveNewVendor : handleOpenNewVendorModal}
       loading={false}
-      style={newVendor ? styles.btnDanger : styles.btnVendor}
+      style={newVendor ? styles.btnDanger : styles.btnLight}
+      textStyle={newVendor ? null : styles.btnLightText}
     />
 
     <ButtonWithLoader
       label={showCamera ? 'Camera Active' : 'Select Invoice'}
       onPress={handleOpenCamera}
       loading={buttonLoading.selectInvoice}
-      style={styles.btnPrimary}
+      style={styles.btnLight}
+      textStyle={styles.btnLightText}
     />
 
     <ButtonWithLoader
       label="Upload Invoice"
       onPress={handleUploadPress}
       loading={isGenerate || buttonLoading.generate}
-      style={styles.btnSuccess}
+      style={styles.btnLight}
+      textStyle={styles.btnLightText}
       // disabled={!snappedImages.length || !selectedValue}
     />
     
@@ -769,7 +777,7 @@ const OcrScreen = () => {
         <ButtonWithLoader
           label="Save"
           onPress={() => setSaveInvoiceVisible(s => !s)}
-          style={styles.btnAccent}
+          style={styles.btnPrimary}
           loading={false}
         />
         <ButtonWithLoader
@@ -932,10 +940,10 @@ const OcrScreen = () => {
               )}
               <View style={styles.modalActionRow}>
                 <TouchableOpacity
-                  style={[styles.btn, styles.btnPrimary, styles.modalActionBtn]}
+                  style={[styles.btn, styles.btnLight, styles.modalActionBtn]}
                   onPress={handleConfirmUpload}
                 >
-                  <Text style={styles.btnText}>Continue</Text>
+                  <Text style={[styles.btnText, styles.btnLightText]}>Continue</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.btn, styles.btnDanger, styles.modalActionBtn]}
@@ -1000,13 +1008,15 @@ const OcrScreen = () => {
               label="Snap Photo"
               onPress={snapPhoto}
               loading={buttonLoading.snap}
-              style={styles.btnPrimary}
+              style={styles.btnGrey}
+              textStyle={styles.btnGreyText}
             />
             <ButtonWithLoader
               label="From Gallery"
               onPress={pickFromGallery}
               loading={buttonLoading.gallery}
-              style={styles.btnSuccess}
+              style={styles.btnLight}
+              textStyle={styles.btnLightText}
             />
             <TouchableOpacity
               style={[
@@ -1089,25 +1099,34 @@ const styles = StyleSheet.create({
     flexBasis: "48%",
     minWidth: "48%",
   },
- btnText: {
+  btnText: {
     fontSize: 14,
     fontWeight: "600",
     color: "#fff",
   },
   btnPrimary: {
-    backgroundColor: "#007bff",
+    backgroundColor: COLORS.primary,
   },
-  btnVendor: {
-    backgroundColor: "#ff8c00",
+  btnLight: {
+    backgroundColor: GREEN_LIGHT,
+  },
+  btnLightText: {
+    color: GREEN_DARK,
+  },
+  btnGrey: {
+    backgroundColor: GREY_LIGHT,
+  },
+  btnGreyText: {
+    color: GREY_DARK,
   },
   btnAccent: {
-    backgroundColor:COLORS.accent,
+    backgroundColor: COLORS.primary,
   },
   btnSuccess: {
-    backgroundColor: "#28a745",
+    backgroundColor: COLORS.primary,
   },
   btnDanger: {
-    backgroundColor: "#dc3545",
+    backgroundColor: COLORS.danger,
   },
 
 
@@ -1189,6 +1208,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: COLORS.border,
     backgroundColor: COLORS.card,
+    gap: 10,
   },
   cameraControlsNarrow: {
     flexWrap: 'wrap',
@@ -1321,7 +1341,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   clearLink: {
-    color: COLORS.danger,
+    color: COLORS.primary,
     fontWeight: '700',
   },
   optionRow: {
@@ -1385,14 +1405,14 @@ const styles = StyleSheet.create({
     right: 14,
     padding: 4,
     borderRadius: 12,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: GREEN_LIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },
   clearSearchText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#333',
+    color: GREEN_DARK,
     marginTop: -2,
   },
   dropdownContainer: {
@@ -1422,7 +1442,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff', // white
   },
   dropdownItemOdd: {
-    backgroundColor: '#f5f7fa', // light gray/blue shade
+    backgroundColor: '#eef8f2', // light green shade
   },
   dropdownText: {
     fontSize: 15,

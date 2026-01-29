@@ -26,6 +26,7 @@
     "d3-scale": "^4.0.2",
     "react": "19.1.0",
     "react-native": "0.80.2",
+    "react-native-blob-util": "^0.24.6",
     "react-native-camera-kit": "^15.1.0",
     "react-native-dotenv": "^3.4.11",
     "react-native-fast-image": "^8.6.3",

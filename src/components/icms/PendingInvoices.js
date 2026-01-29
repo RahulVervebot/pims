@@ -1,11 +1,10 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TextInput,
   FlatList,
-  ImageBackground,
   ActivityIndicator,
   TouchableOpacity,
   Modal,
@@ -14,7 +13,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API_ENDPOINTS, { initICMSBase } from '../../../icms_config/api';
 import AppHeader from '../AppHeader';
-import reportbg from '../../assets/images/report-bg.png';
+const LIGHT_GREEN = '#e6f6ec';
+const HEADER_FALLBACK = '#ffffff';
 
 const COLORS = {
   bg: '#f6f8fb',
@@ -22,13 +22,11 @@ const COLORS = {
   border: '#e4e7ee',
   text: '#14181f',
   sub: '#657081',
-  primary: '#2C62FF',
+  primary: '#7bcf95',
   accent: '#0F8B65',
   danger: '#D9534F',
   shadow: '#0b1220',
 };
-
-const getImageSource = val => (typeof val === 'number' ? val : { uri: val });
 
 const formatDate = value => {
   if (!value) return '-';
@@ -45,6 +43,23 @@ export default function PendingInvoices() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [notifyModalVisible, setNotifyModalVisible] = useState(false);
   const [pendingNotifyIds, setPendingNotifyIds] = useState([]);
+  const [headerBg, setHeaderBg] = useState({ type: 'color', value: HEADER_FALLBACK });
+
+  useEffect(() => {
+    const loadHeader = async () => {
+      try {
+        const topBanner = await AsyncStorage.getItem('topabanner');
+        if (topBanner) {
+          setHeaderBg({ type: 'image', value: topBanner });
+        } else {
+          setHeaderBg({ type: 'color', value: HEADER_FALLBACK });
+        }
+      } catch (e) {
+        setHeaderBg({ type: 'color', value: HEADER_FALLBACK });
+      }
+    };
+    loadHeader();
+  }, []);
 
   const fetchPendingInvoices = useCallback(async () => {
     setLoading(true);
@@ -257,12 +272,8 @@ export default function PendingInvoices() {
   );
 
   return (
-    <ImageBackground
-      source={getImageSource(reportbg)}
-      style={styles.screen}
-      resizeMode="cover"
-    >
-      <AppHeader Title="PENDING INVOICES" backgroundType="image" backgroundValue={reportbg} />
+    <View style={styles.screen}>
+      <AppHeader Title="PENDING INVOICES" backgroundType={headerBg.type} backgroundValue={headerBg.value} />
 
       <View style={styles.content}>
         <View style={styles.searchCard}>
@@ -348,13 +359,14 @@ export default function PendingInvoices() {
           </View>
         </View>
       </Modal>
-    </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: LIGHT_GREEN,
   },
   content: {
     flex: 1,
@@ -499,7 +511,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statusRequested: {
-    backgroundColor: '#E8F0FF',
+    backgroundColor: '#e6f6ec',
     borderColor: '#C9DAFF',
   },
   statusText: {
@@ -609,7 +621,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   modalBtnGhost: {
-    backgroundColor: '#eef2f7',
+    backgroundColor: '#eaf7ef',
   },
   modalBtnText: {
     color: '#fff',

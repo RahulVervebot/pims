@@ -9,11 +9,13 @@ const COLORS = {
   bg: '#ffffff',
   card: '#f7f9fc',
   border: '#e6e8ef',
-  primary: '#2C62FF',
+  primary: '#319241',
   danger: '#D9534F',
   text: '#111',
   sub: '#666',
 };
+const GREEN_LIGHT = '#e6f6ec';
+const GREEN_DARK = '#256f3a';
 
 const SearchTableComponent = ({ tableData, setTableData, onRemoveRow, onAddManual }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -114,8 +116,8 @@ const SearchTableComponent = ({ tableData, setTableData, onRemoveRow, onAddManua
           onChangeText={onSearch}
           placeholderTextColor={COLORS.sub}
         />
-        <TouchableOpacity style={[styles.btn, styles.btnPrimary]} onPress={openEditorForNew}>
-          <Text style={styles.btnText}>Add Manually</Text>
+        <TouchableOpacity style={[styles.btn, styles.btnLight]} onPress={openEditorForNew}>
+          <Text style={[styles.btnText, styles.btnLightText]}>Add Manually</Text>
         </TouchableOpacity>
       </View>
 
@@ -303,11 +305,13 @@ const styles = StyleSheet.create({
   btn: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8 },
   btnText: { color: '#fff', fontWeight: '700' },
   btnPrimary: { backgroundColor: COLORS.primary },
+  btnLight: { backgroundColor: GREEN_LIGHT },
+  btnLightText: { color: GREEN_DARK },
   btnDanger: { backgroundColor: COLORS.danger },
 
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#eef2ff',
+    backgroundColor: '#eef8f2',
     paddingVertical: 8,
     borderWidth: 1,
     borderColor: COLORS.border,

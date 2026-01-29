@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Voice from '@react-native-voice/voice';
 import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import Sound from 'react-native-sound';
+import RNBlobUtil from 'react-native-blob-util';
 
 import AttachmentButton from './AttachmentButton';
 import AttachmentPreview from './AttachmentPreview';
@@ -50,6 +51,36 @@ const buildApiUrl = (base, path) => {
   if (!normalized) return path;
   const hasApiSegment = /\/api(\/|$)/.test(normalized);
   return hasApiSegment ? `${normalized}${path}` : `${normalized}/api${path}`;
+};
+
+const splitNumericTokens = (value) => {
+  const text = String(value ?? '');
+  if (!text) return [];
+  const tokens = [];
+  const pattern = /\d+(?:[.,]\d+)?/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = pattern.exec(text))) {
+    if (match.index > lastIndex) {
+      tokens.push({ type: 'text', value: text.slice(lastIndex, match.index) });
+    }
+    tokens.push({ type: 'number', value: match[0] });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    tokens.push({ type: 'text', value: text.slice(lastIndex) });
+  }
+  return tokens;
+};
+
+const stripMarkdownBold = (value) => String(value ?? '').replace(/\*\*/g, '');
+
+const getFileNameFromUrl = (value) => {
+  const raw = String(value || '').split('?')[0].split('#')[0];
+  const name = raw.split('/').filter(Boolean).pop() || '';
+  if (name) return decodeURIComponent(name);
+  const stamp = new Date().toISOString().slice(0, 10);
+  return `export-${stamp}.xlsx`;
 };
 
 const parseJsonSafe = async (res, context = '') => {
@@ -137,6 +168,32 @@ export default function Chat({ style, buttonStyle }) {
 
   const isAuthenticated = !!accessToken;
   const showAttachments = true;
+
+  const renderMessageContent = (msg, isClient, isAI) => {
+    const baseStyle = isClient ? styles.clientText : styles.otherText;
+    const content = isAI ? stripMarkdownBold(msg.content) : msg.content;
+    if (!isAI || isClient) {
+      return <Text style={baseStyle}>{content}</Text>;
+    }
+    const tokens = splitNumericTokens(content);
+    if (tokens.length === 0) {
+      return <Text style={baseStyle}>{content}</Text>;
+    }
+    return (
+      <Text style={baseStyle}>
+        {tokens.map((token, index) => {
+          if (token.type === 'number') {
+            return (
+              <Text key={`num-${index}`} style={[baseStyle, styles.aiNumberBold]}>
+                {token.value}
+              </Text>
+            );
+          }
+          return token.value;
+        })}
+      </Text>
+    );
+  };
 
   useEffect(() => {
     (async () => {
@@ -836,8 +893,40 @@ export default function Chat({ style, buttonStyle }) {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
+  const downloadExport = async (url) => {
+    const full = String(url || '');
+    if (!full) return null;
+    const fileName = getFileNameFromUrl(full);
+    const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    try {
+      if (Platform.OS === 'android') {
+        const downloadDir = RNBlobUtil.fs.dirs.DownloadDir;
+        const path = `${downloadDir}/${fileName}`;
+        await RNBlobUtil.config({
+          addAndroidDownloads: {
+            useDownloadManager: true,
+            notification: true,
+            path,
+            title: fileName,
+            description: 'Downloading export',
+            mime,
+            mediaScannable: true,
+          },
+        }).fetch('GET', full);
+        return path;
+      }
+      const path = `${RNBlobUtil.fs.dirs.DocumentDir}/${fileName}`;
+      const res = await RNBlobUtil.config({ path, fileCache: true }).fetch('GET', full);
+      return res.path();
+    } catch (error) {
+      console.warn('Export download failed:', error);
+      return null;
+    }
+  };
+
   const openExport = async (url) => {
     const full = String(url || '').startsWith('http') ? url : `${apiBase}${url}`;
+    await downloadExport(full);
     if (await Linking.canOpenURL(full)) {
       Linking.openURL(full);
     }
@@ -1081,7 +1170,7 @@ export default function Chat({ style, buttonStyle }) {
                               <Text style={styles.thinkingText}>AI Agent is thinking...</Text>
                             </View>
                           ) : (
-                            <Text style={isClient ? styles.clientText : styles.otherText}>{msg.content}</Text>
+                            renderMessageContent(msg, isClient, isAI)
                           )}
 
                           {msg.attachments && msg.attachments.length > 0 && (
@@ -1309,6 +1398,7 @@ const styles = StyleSheet.create({
   aiBubble: { borderWidth: 1, borderColor: '#E9D5FF', backgroundColor: '#F5F3FF' },
   clientText: { color: '#fff', fontSize: 13 },
   otherText: { color: '#111', fontSize: 13 },
+  aiNumberBold: { fontWeight: '700' },
   thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   thinkingText: { color: '#6D28D9', fontSize: 13 },
   timeText: { marginTop: 6, fontSize: 10, color: '#666' },

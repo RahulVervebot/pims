@@ -10,7 +10,7 @@ import {
   Platform
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -19,12 +19,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
+import Dashboard from './src/screens/Dashboard';
 import CategoryProductsScreen from './src/screens/CategoryProductsScreen';
 import SignupScreen from './src/screens/SignupScreen';
 import ReportScreen from './src/screens/ReportScreen';
 import UserScreen from './src/screens/UserScreen';
 import CartScreen from './src/screens/CartScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
+import Chat from './src/components/Chat';
 import CategoryListScreen from './src/components/CategoryListScreen';
 import SaleSummaryReport from './src/screens/SalesSummaryReport';
 import PrintScreen from './src/screens/PrintScreen';
@@ -116,6 +118,7 @@ function BottomTabs() {
         tabBarIcon: ({ focused, size }) => {
           let IconComp;
           switch (route.name) {
+            case 'Dashboard':   IconComp = HomeIcon; break;
             case 'Home':   IconComp = HomeIcon; break;
             case 'Report': IconComp = ReportIcon; break;
             case 'ICMSScreen':   IconComp = CartIcon; break;
@@ -155,6 +158,7 @@ function BottomTabs() {
       })}
     >
 
+      <Tab.Screen name="Dashboard" component={Dashboard} />
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Report" component={ReportScreen} />
       <Tab.Screen name="POSScreen" component={POSScreen} />
@@ -177,6 +181,11 @@ function MainDrawer() {
     </Drawer.Navigator>
   );
 }
+function ChatOverlay() {
+  const insets = useSafeAreaInsets();
+  return <Chat style={{ bottom: 70 + insets.bottom, right: 16 }} />;
+}
+
 export default function App() {
   const [initialRoute, setInitialRoute] = useState(null);
 
@@ -202,8 +211,10 @@ export default function App() {
 
   return (
     <AppProviders>
-      <NavigationContainer>
-        <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
+      <SafeAreaProvider>
+        <NavigationContainer>
+        <View style={{ flex: 1 }}>
+          <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Cart" component={CartScreen} />
        <Stack.Screen name="Checkout" component={CheckoutScreen} />    
@@ -265,8 +276,11 @@ export default function App() {
             component={PendingInvoices}
             options={{ title: 'Pending Invoices' }}
           />
-        </Stack.Navigator>
-      </NavigationContainer>
+          </Stack.Navigator>
+          <ChatOverlay />
+        </View>
+        </NavigationContainer>
+      </SafeAreaProvider>
     </AppProviders>
   );
 }
