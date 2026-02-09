@@ -32,6 +32,8 @@ export async function searchVendors(query) {
 export async function fetchRedProducts({ startDate, endDate } = {}) {
     const token = await AsyncStorage.getItem('access_token');
   const icms_store = await AsyncStorage.getItem('icms_store');
+  const dbname = await AsyncStorage.getItem('dbname');
+  
   const body = { q: '' };
   if (startDate) body.startDate = startDate;
   if (endDate) body.endDate = endDate;
@@ -42,7 +44,7 @@ export async function fetchRedProducts({ startDate, endDate } = {}) {
       'Content-Type': 'application/json',
       'access_token': token ?? '',
       'mode': 'MOBILE',
-      'store': 'deepanshu_test',
+      'store': dbname,
     },
     body: JSON.stringify(body),
   });

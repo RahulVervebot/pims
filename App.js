@@ -44,10 +44,13 @@ import ReportsByHours from './src/screens/HourlyReport.js';
 import TopSellingCategoriesReport from './src/screens/TopSellingCategoriesReport.js';
 import TopSellingProductsReportScreen from './src/screens/TopSellingProductsReport.js';
 import TopSellingCustomerReport from './src/screens/TopSellingCustomerReport.js';
+import SessionReports from './src/components/reports/SessionReports.js';
+import OrdersScreen from './src/components/orders/order.js';
 import MixMatchScreen from './src/screens/promotions/mixmatch.js';
 //icons 
 import HomeIcon from './src/assets/icons/HomeIcon.svg';
-import CartIconold from './src/assets/icons/Carticon.svg';
+import ProductIcon from './src/assets/icons/Products.svg';
+import ProductScreen from './src/screens/ProductScreen.js';
 import CartIcon from './src/assets/icons/inventory_1.svg';
 import POSIcon from './src/assets/icons/payment_2.svg';
 import ReportIcon from './src/assets/icons/Reportsicon.svg'; 
@@ -119,7 +122,7 @@ function BottomTabs() {
           let IconComp;
           switch (route.name) {
             case 'Dashboard':   IconComp = HomeIcon; break;
-            case 'Home':   IconComp = HomeIcon; break;
+            case 'ProductScreen':   IconComp = ProductIcon; break;
             case 'Report': IconComp = ReportIcon; break;
             case 'ICMSScreen':   IconComp = CartIcon; break;
             case 'POSScreen':  IconComp = POSIcon; break;
@@ -137,7 +140,6 @@ function BottomTabs() {
                 overflow: 'hidden', 
               }}
             >
-              {/* Top strip ATTACHED to the bar’s inner top edge */}
               <View
                 // style={{
                 //   position: 'absolute',
@@ -146,7 +148,6 @@ function BottomTabs() {
                 //   backgroundColor: focused ? '#319241' : 'transparent',
                 // }}
               />
-              {/* Icon */}
               <IconComp
                 width={size ?? 24}
                 height={size ?? 24}
@@ -159,7 +160,7 @@ function BottomTabs() {
     >
 
       <Tab.Screen name="Dashboard" component={Dashboard} />
-      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="ProductScreen" component={ProductScreen} />
       <Tab.Screen name="Report" component={ReportScreen} />
       <Tab.Screen name="POSScreen" component={POSScreen} />
        <Tab.Screen name="ICMSScreen" component={ICMSScreen} />
@@ -223,6 +224,10 @@ export default function App() {
    <Stack.Screen name="TopSellingCategoriesReport" component={TopSellingCategoriesReport} /> 
 <Stack.Screen name="TopSellingProductsReportScreen" component={TopSellingProductsReportScreen} /> 
 <Stack.Screen name="TopSellingCustomerReport" component={TopSellingCustomerReport} /> 
+<Stack.Screen name="SessionReports" component={SessionReports} /> 
+<Stack.Screen name="OrdersScreen" component={OrdersScreen} /> 
+
+
       <Stack.Screen name="OcrScreen" component={OcrScreen} />     
        <Stack.Screen name="SettingScreen" component={SettingScreen} />    
             <Stack.Screen name="CategoryListScreen" component={CategoryListScreen} />  

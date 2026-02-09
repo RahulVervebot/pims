@@ -7,14 +7,9 @@ import AppHeader from '../../components/AppHeader';
 import reportbg from '../../assets/images/report-bg.png';
 import { searchVendors } from '../../components/icms/vendorApi';
 
+
+
 const getImageSource = val => (typeof val === 'number' ? val : { uri: val });
-// ?value=Chetak&slug=chetak&jsonName=chetak-products.json&emptyColumn= true&databaseName=chetakproducts
-  // "value": "Chetak",
-  //           "slug": "chetak",
-  //           "jsonName": "chetak-products.json",
-  //           "emptyColumn": true,
-  //           "databaseName": "chetakproducts"
-/** Build GET URL with vendor params (adjust keys to what backend expects) */
 function buildFetchInvoiceUrl(vendor) {
   const base = new URL(API_ENDPOINTS.FETCH_INVOICE);
   if (vendor?.value) base.searchParams.set('value', vendor.value);
@@ -23,7 +18,6 @@ function buildFetchInvoiceUrl(vendor) {
     if (vendor?.emptyColumn) base.searchParams.set('emptyColumn', vendor.emptyColumn);
   if (vendor?.databaseName) base.searchParams.set('databaseName', vendor.databaseName);
   // if your API expects different keys, set them here
-
   return base.toString();
 }
 
@@ -76,7 +70,6 @@ export default function InvoiceList() {
   const [selectedVendor, setSelectedVendor] = useState(null);
 const [vendorSearching, setVendorSearching] = useState(false);
 const [vendorSearchError, setVendorSearchError] = useState('');
-
   // invoices state
   const [loading, setLoading] = useState(false);
   const [allInvoices, setAllInvoices] = useState([]);
@@ -139,7 +132,6 @@ const onPressSearchVendor = async () => {
   setVendorSearching(true);
   try {
     const results = await searchVendors(vendorQuery);
-
     if (!Array.isArray(results) || results.length === 0) {
       // no match: clear list + show message
       setVendorResults([]);
@@ -240,10 +232,10 @@ const onSelectVendor = async (v) => {
               onSubmitEditing={onPressSearchVendor}
             />
             <TouchableOpacity
-  style={styles.vendorSearchBtn}
-  onPress={onPressSearchVendor}
-  disabled={vendorSearching}
->
+              style={styles.vendorSearchBtn}
+              onPress={onPressSearchVendor}
+              disabled={vendorSearching}
+            >
   {vendorSearching
     ? <ActivityIndicator size="small" color="#fff" />
     : <Text style={styles.vendorSearchBtnText}>Search</Text>}
@@ -302,7 +294,14 @@ const onSelectVendor = async (v) => {
                   {item?.InvoiceStatus === 'not_seen' && (
                     <View style={styles.badge}><Text style={styles.badgeText}>new</Text></View>
                   )}
-                  <TouchableOpacity onPress={() => navigation.navigate('InvoiceDetails', { Invoice: item })}>
+                  <TouchableOpacity
+                    onPress={() =>
+                      navigation.navigate('InvoiceDetails', {
+                        Invoice: item,
+                        vendorDatabaseName: selectedVendor?.databaseName,
+                      })
+                    }
+                  >
                     <Text style={styles.link}>Open</Text>
                   </TouchableOpacity>
                 </View>

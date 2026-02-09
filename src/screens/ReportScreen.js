@@ -7,6 +7,9 @@ import SaleSummaryReport from '../assets/icons/Sales-Summary-Report.png';
 import TopCustumerList from '../assets/icons/Top-Customers-List.png';
 import TopSellingProducts from '../assets/icons/Top-Selling-Products.png'
 import TopSellingCategories from '../assets/icons/Top-Selling-Categories.png'
+import SessionReports from '../assets/icons/Session-report.png'
+import Orders from '../assets/icons/Orders.png'
+
 import { useNavigation } from '@react-navigation/native';
 const PANEL_RADIUS = 28;
 
@@ -44,6 +47,12 @@ export default function ReportScreen() {
         >
           <Row icon={SaleSummaryReport} label="Sales Summary Reports" isFirst />
         </TouchableOpacity>
+         <TouchableOpacity
+          style={styles.checkoutBtn}
+          onPress={() => navigation.navigate('OrdersScreen')}
+        >
+          <Row icon={Orders} label="Orders" isFirst />
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.checkoutBtn}
           onPress={() => navigation.navigate('ReportsByHours')}
@@ -55,9 +64,8 @@ export default function ReportScreen() {
           onPress={() => navigation.navigate('TopSellingCustomerReport')}
         >
         <Row icon={TopCustumerList} label="Top Customer List" />
-</TouchableOpacity>
+       </TouchableOpacity>
 
-        
         <TouchableOpacity
           style={styles.checkoutBtn}
           onPress={() => navigation.navigate('TopSellingProductsReportScreen')}
@@ -68,7 +76,13 @@ export default function ReportScreen() {
           style={styles.checkoutBtn}
           onPress={() => navigation.navigate('TopSellingCategoriesReport')}
         >
-          <Row icon={TopSellingCategories} label="Top Selling Categories" isLast />
+        <Row icon={TopSellingCategories} label="Top Selling Categories" />
+        </TouchableOpacity>
+             <TouchableOpacity
+          style={styles.checkoutBtn}
+          onPress={() => navigation.navigate('SessionReports')}
+        >
+          <Row icon={SessionReports} label="Sessions Report" isLast />
         </TouchableOpacity>
       </View>
 

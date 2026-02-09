@@ -1,9 +1,10 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import React, { useEffect, useState, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AppHeader from "../components/AppHeader";
 import reportbg from '../assets/images/report-bg.png';
+const LIGHT_GREEN = '#e6f6ec';
 
 export default function UserScreen({ navigation }) {
   const [access_token, setAccessToken] = useState('');
@@ -16,8 +17,6 @@ export default function UserScreen({ navigation }) {
     await AsyncStorage.multiRemove(['access_token', 'userRole', 'userEmail', 'userName']);
     navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
   };
-
-  const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
 
   useEffect(() => {
     const checkLogin = async () => {
@@ -65,9 +64,7 @@ export default function UserScreen({ navigation }) {
 
 
   return (
-    <ImageBackground source={getImageSource(reportbg)} style={styles.screen} resizeMode="cover">
-      <View style={styles.backdrop} />
-
+    <View style={styles.screen}>
       <AppHeader Title="PROFILE" backgroundType="image" backgroundValue={reportbg} />
 
       <View style={styles.container}>
@@ -120,7 +117,7 @@ export default function UserScreen({ navigation }) {
     </TouchableOpacity>
   )}
 
-  {user_role !== 'customer' && (
+  {/* {user_role !== 'customer' && (
     <TouchableOpacity
       style={[styles.button, styles.primary]}
       onPress={() => navigation.navigate('SignupScreen')}
@@ -128,7 +125,7 @@ export default function UserScreen({ navigation }) {
     >
       <Text style={styles.buttonText}>Go to Signup</Text>
     </TouchableOpacity>
-  )}
+  )} */}
 
   <TouchableOpacity
     style={[styles.button, styles.danger]}
@@ -153,7 +150,7 @@ export default function UserScreen({ navigation }) {
           </View>
         )}
       </View>
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -162,7 +159,7 @@ const COLORS = {
   text: '#1E1E1E',
   sub: '#6B7280',
   primary: '#2C1E70',
-  primaryDark: '#211759',
+  primaryDark: '#66666685',
   danger: '#E53935',
   roleBG: '#319241',
   roleText: '#5B4500',
@@ -170,11 +167,7 @@ const COLORS = {
 };
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.25)', // improves contrast over bg image
-  },
+  screen: { flex: 1, backgroundColor: LIGHT_GREEN },
   container: {
     flex: 1,
     padding: 16,

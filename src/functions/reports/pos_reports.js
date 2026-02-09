@@ -1,6 +1,19 @@
 // src/function/reports/pos_reports.js
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+async function getReportAuth() {
+  const [storeUrl, baseUrl, token] = await Promise.all([
+    AsyncStorage.getItem('storeurl'),
+    AsyncStorage.getItem('baseurl'),
+    AsyncStorage.getItem('access_token'),
+  ]);
+  const apiBase = storeUrl || baseUrl;
+  if (!apiBase || !token) {
+    throw new Error('Missing storeurl/baseurl or access_token in AsyncStorage.');
+  }
+  return { apiBase, token };
+}
+
 export async function SaleSummaryPaymentType(startdate, enddate) {
   const [storeUrl, token] = await Promise.all([
     AsyncStorage.getItem('storeurl'),
@@ -404,4 +417,103 @@ export async function TopSellingCustomersReport(startdate, enddate, numberOfCust
 
   console.log('[Customers Report][normalized array length]:', arr.length);
   return arr;
+}
+
+export async function getTodaySessions(page = 1, limit = 10) {
+  const { apiBase, token } = await getReportAuth();
+  const qs = new URLSearchParams({ page: String(page), limit: String(limit) }).toString();
+  const res = await fetch(`${apiBase}/api/pos/app/get-today-sessions?${qs}`, {
+    method: 'GET',
+    headers: { accept: 'application/json', access_token: token },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch today sessions (${res.status}): ${text || 'No details'}`);
+  }
+  const json = await res.json();
+  return Array.isArray(json?.sessions) ? json.sessions : [];
+}
+
+export async function getYesterdaySessions(page = 1, limit = 10) {
+  const { apiBase, token } = await getReportAuth();
+  const qs = new URLSearchParams({ page: String(page), limit: String(limit) }).toString();
+  const res = await fetch(`${apiBase}/api/pos/app/get-yesterday-sessions?${qs}`, {
+    method: 'GET',
+    headers: { accept: 'application/json', access_token: token },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch yesterday sessions (${res.status}): ${text || 'No details'}`);
+  }
+  const json = await res.json();
+  return Array.isArray(json?.sessions) ? json.sessions : [];
+}
+
+export async function getCustomDateSessions(fromDate, toDate, page = 1, limit = 10) {
+  if (!fromDate || !toDate) return [];
+  const { apiBase, token } = await getReportAuth();
+  const qs = new URLSearchParams({
+    from_date: fromDate,
+    to_date: toDate,
+    page: String(page),
+    limit: String(limit),
+  }).toString();
+  const res = await fetch(`${apiBase}/api/pos/app/custom-date-sessions?${qs}`, {
+    method: 'GET',
+    headers: { accept: 'application/json', access_token: token },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch custom date sessions (${res.status}): ${text || 'No details'}`);
+  }
+  const json = await res.json();
+  return Array.isArray(json?.sessions) ? json.sessions : [];
+}
+
+export async function getSessionZReportPreview(sessionId) {
+  if (!sessionId) throw new Error('Missing session_id');
+  const { apiBase, token } = await getReportAuth();
+  const qs = new URLSearchParams({ session_id: String(sessionId) }).toString();
+  console.log("check id first:",qs);
+  const res = await fetch(`${apiBase}/pos/app/session/z-report/preview?${qs}`, {
+    method: 'GET',
+    headers: { accept: 'application/json', access_token: token },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch session report (${res.status}): ${text || 'No details'}`);
+  }
+  return res.json();
+}
+
+export async function getRegisterList() {
+  const { apiBase, token } = await getReportAuth();
+  const res = await fetch(`${apiBase}/api/pos/app/get-register-list`, {
+    method: 'GET',
+    headers: { accept: 'application/json', access_token: token },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch registers (${res.status}): ${text || 'No details'}`);
+  }
+  const json = await res.json();
+  return Array.isArray(json?.registers) ? json.registers : [];
+}
+
+export async function printSessionReport(sessionIds, regId) {
+  const { apiBase, token } = await getReportAuth();
+  const res = await fetch(`${apiBase}/pos/app/print/session/report`, {
+    method: 'POST',
+    headers: { accept: 'application/json', 'Content-Type': 'application/json', access_token: token },
+    body: JSON.stringify({
+      session_ids: Array.isArray(sessionIds) ? sessionIds : [sessionIds],
+      reg_id: regId,
+    }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json?.message || json?.error?.message || 'Failed to print';
+    throw new Error(msg);
+  }
+  return json;
 }

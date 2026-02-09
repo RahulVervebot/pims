@@ -18,7 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Voice from '@react-native-voice/voice';
 import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import Sound from 'react-native-sound';
-
+import RNBlobUtil from 'react-native-blob-util';
 import AttachmentButton from './AttachmentButton';
 import AttachmentPreview from './AttachmentPreview';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -73,6 +73,14 @@ const splitNumericTokens = (value) => {
 };
 
 const stripMarkdownBold = (value) => String(value ?? '').replace(/\*\*/g, '');
+
+const getFileNameFromUrl = (value, fallbackExt = 'xlsx') => {
+  const raw = String(value || '').split('?')[0].split('#')[0];
+  const name = raw.split('/').filter(Boolean).pop() || '';
+  if (name) return decodeURIComponent(name);
+  const stamp = new Date().toISOString().slice(0, 10);
+  return `export-${stamp}.${fallbackExt}`;
+};
 
 const parseJsonSafe = async (res, context = '') => {
   const text = await res.text();
@@ -137,9 +145,13 @@ export default function Chat({ style, buttonStyle }) {
   const [selectedRating, setSelectedRating] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [submittingRating, setSubmittingRating] = useState(false);
+  const [aiFeedbackMap, setAiFeedbackMap] = useState({});
+  const [submittingAIFeedbackId, setSubmittingAIFeedbackId] = useState(null);
   const [accessToken, setAccessToken] = useState('');
   const [userName, setUserName] = useState('');
   const [apiBase, setApiBase] = useState('');
+  const [frontBase, setFrontBase] = useState('');
+  const [downloadedExports, setDownloadedExports] = useState({});
   const [wsBase, setWsBase] = useState('');
   const [recording, setRecording] = useState(false);
   const [micGranted, setMicGranted] = useState(false);
@@ -195,6 +207,7 @@ export default function Chat({ style, buttonStyle }) {
         'chatai_email',
         'tulsi_ai_backend',
         'tulsi_websocket',
+        'tulsifrontendurl'
       ]);
       const getEntry = (key) => entries.find(([k]) => k === key)?.[1];
       const token = getEntry('chatai_access');
@@ -202,10 +215,13 @@ export default function Chat({ style, buttonStyle }) {
       const userHandle = getEntry('chatai_username');
       const userEmail = getEntry('chatai_email');
       const apiUrl = getEntry('tulsi_ai_backend');
+      const frontUrl = getEntry('tulsifrontendurl');
       const wsUrl = getEntry('tulsi_websocket');
       setAccessToken(token || '');
       setUserName(fullName || userHandle || userEmail || 'You');
       setApiBase(normalizeBaseUrl(apiUrl));
+      setFrontBase(normalizeBaseUrl(frontUrl));
+    
       setWsBase(normalizeWsUrl(wsUrl));
     })();
   }, []);
@@ -287,11 +303,19 @@ export default function Chat({ style, buttonStyle }) {
       createConversation: withTrailingSlash(buildApiUrl(apiBase, '/chat/conversations')),
       switchAgent: (id) => withTrailingSlash(buildApiUrl(apiBase, `/ai/chat/${id}/switch-agent`)),
       submitRating: (id) => withTrailingSlash(buildApiUrl(apiBase, `/chat/conversations/${id}/submit-rating`)),
+      // submitAIFeedback: (id) => withTrailingSlash(buildApiUrl(apiBase, `/chat/messages/${id}/ai-feedback`)),
+      submitAIFeedback: (id) => withTrailingSlash(buildApiUrl(apiBase, `/ai/feedback/${id}`)),
       uploadAttachment: withTrailingSlash(buildApiUrl(apiBase, '/chat/attachments/upload')),
     };
   }, [apiBase]);
 
   const attachmentBase = useMemo(() => normalizeAttachmentBase(apiBase), [apiBase]);
+  const withApiBase = (url) =>
+    url && !String(url).startsWith('http') ? `${apiBase}${url}` : url;
+  const withFrontBase = (url) => {
+    const base = frontBase || apiBase;
+    return url && !String(url).startsWith('http') ? `${base}${url}` : url;
+  };
 
   const normalizeList = (input) => {
     if (Array.isArray(input)) return input;
@@ -310,6 +334,7 @@ export default function Chat({ style, buttonStyle }) {
             sql: msg.metadata.sql,
             results: msg.metadata.results,
             export_url: msg.metadata.export_url,
+            pdf_url: msg.metadata.pdf_url,
             error: msg.metadata.error,
           },
         };
@@ -409,11 +434,13 @@ export default function Chat({ style, buttonStyle }) {
               metadata: msg.metadata,
               created_at: msg.created_at,
               is_read: msg.is_read,
+              ai_feedback: msg.ai_feedback,
               attachments: msg.attachments || [],
               ai_data: msg.metadata ? {
                 sql: msg.metadata.sql,
                 results: msg.metadata.results_summary || msg.metadata.results,
                 export_url: msg.metadata.export_url,
+                pdf_url: msg.metadata.pdf_url,
                 error: msg.metadata.error,
               } : undefined,
             };
@@ -512,6 +539,18 @@ export default function Chat({ style, buttonStyle }) {
   useEffect(() => {
     messagesEndRef.current?.scrollToEnd?.({ animated: true });
   }, [messages, sending, uploadingAttachments]);
+
+  useEffect(() => {
+    const feedbackMap = {};
+    messages.forEach((msg) => {
+      if (msg?.ai_feedback === 'positive' || msg?.ai_feedback === 'negative') {
+        feedbackMap[msg.id] = msg.ai_feedback;
+      }
+    });
+    if (Object.keys(feedbackMap).length > 0) {
+      setAiFeedbackMap((prev) => ({ ...prev, ...feedbackMap }));
+    }
+  }, [messages]);
 
   const loadConversations = async () => {
     try {
@@ -872,6 +911,27 @@ export default function Chat({ style, buttonStyle }) {
     }
   };
 
+  const handleAIFeedback = async (messageId, feedback) => {
+    if (!accessToken || !endpoints || submittingAIFeedbackId === messageId) return;
+    try {
+      setSubmittingAIFeedbackId(messageId);
+      const res = await fetch(endpoints.submitAIFeedback(messageId), {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ feedback, comment: '' }),
+      });
+      const data = await parseJsonSafe(res, endpoints.submitAIFeedback(messageId));
+      if (!res.ok) {
+        throw new Error(data?.detail || 'Failed to submit feedback');
+      }
+      setAiFeedbackMap((prev) => ({ ...prev, [messageId]: feedback }));
+    } catch (error) {
+      console.error('Failed to submit AI feedback:', error);
+    } finally {
+      setSubmittingAIFeedbackId(null);
+    }
+  };
+
   const formatTime = (dateString) => {
     const date = new Date(dateString);
     if (Number.isNaN(date.getTime())) return '';
@@ -884,10 +944,86 @@ export default function Chat({ style, buttonStyle }) {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const openExport = async (url) => {
-    const full = String(url || '').startsWith('http') ? url : `${apiBase}${url}`;
-    if (await Linking.canOpenURL(full)) {
-      Linking.openURL(full);
+  const EXPORT_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const PDF_MIME = 'application/pdf';
+
+  const getExportMeta = (url) => {
+    const lower = String(url || '').toLowerCase();
+    if (lower.endsWith('.pdf')) return { mime: PDF_MIME, fallbackExt: 'pdf' };
+    return { mime: EXPORT_MIME, fallbackExt: 'xlsx' };
+  };
+
+  const downloadExport = async (url) => {
+    const full = String(url || '');
+    if (!full) return null;
+    const meta = getExportMeta(full);
+    const fileName = getFileNameFromUrl(full, meta.fallbackExt);
+    try {
+      if (Platform.OS === 'android') {
+        const downloadDir = RNBlobUtil.fs.dirs.DownloadDir;
+        const path = `${downloadDir}/${fileName}`;
+        await RNBlobUtil.config({
+          addAndroidDownloads: {
+            useDownloadManager: true,
+            notification: true,
+            path,
+            title: fileName,
+            description: 'Downloading export',
+            mime: meta.mime,
+            mediaScannable: true,
+          },
+        }).fetch('GET', full);
+        return path;
+      }
+      const path = `${RNBlobUtil.fs.dirs.DocumentDir}/${fileName}`;
+      const res = await RNBlobUtil.config({ path, fileCache: true }).fetch('GET', full);
+      return res.path();
+    } catch (error) {
+      console.warn('Export download failed:', error);
+      return null;
+    }
+  };
+
+  const openLocalExport = async (path, mime) => {
+    if (!path) return;
+    const localPath = String(path);
+    const fileUrl = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
+    try {
+      if (Platform.OS === 'android' && RNBlobUtil.android?.actionViewIntent) {
+        await RNBlobUtil.android.actionViewIntent(localPath, mime || EXPORT_MIME);
+        return;
+      }
+      if (await Linking.canOpenURL(fileUrl)) {
+        await Linking.openURL(fileUrl);
+      } else {
+        await Linking.openURL(fileUrl);
+      }
+    } catch (error) {
+      console.warn('Open export failed:', error);
+    }
+  };
+
+  const handleExportPress = async (url, { useBaseUrl = true } = {}) => {
+    const full = useBaseUrl ? withFrontBase(url) : String(url || '');
+    console.log("full url:",full);
+    if (!full) return;
+    const meta = getExportMeta(full);
+    const existing = downloadedExports[full];
+    if (existing) {
+      const exists = await RNBlobUtil.fs.exists(existing);
+      if (exists) {
+        await openLocalExport(existing, meta.mime);
+        return;
+      }
+      setDownloadedExports((prev) => {
+        const next = { ...prev };
+        delete next[full];
+        return next;
+      });
+    }
+    const path = await downloadExport(full);
+    if (path) {
+      setDownloadedExports((prev) => ({ ...prev, [full]: path }));
     }
   };
 
@@ -929,7 +1065,7 @@ export default function Chat({ style, buttonStyle }) {
                 <Text style={styles.headerSubtitle}>{userName}</Text>
               </View>
               <View style={styles.headerActions}>
-                                {selectedConversation && (
+                {selectedConversation && (
                   <TouchableOpacity
                     style={styles.headerBtn}
                     onPress={() => {
@@ -1047,6 +1183,13 @@ export default function Chat({ style, buttonStyle }) {
                       selectedConversation?.conversation_type === 'ai';
                     const isThinking = String(msg.id || '').startsWith('thinking-');
                     const isSystemFeedback = msg.message_type === 'system' && msg.metadata && msg.metadata.type === 'feedback_request';
+                    const showAIFeedback =
+                      selectedConversation?.conversation_type === 'ai' &&
+                      (msg.sender_type === 'bot' || msg.sender_type === 'ai') &&
+                      !isThinking &&
+                      !isSystemFeedback &&
+                      msg.sender_type !== 'system';
+                    const selectedAIFeedback = aiFeedbackMap[msg.id];
                     if (isSystemFeedback && shouldShowFeedback && !selectedConversation?.rating) {
                       return (
                         <View key={msg.id} style={styles.feedbackWrap}>
@@ -1116,6 +1259,10 @@ export default function Chat({ style, buttonStyle }) {
                         </View>
                       );
                     }
+                    const exportUrl = withFrontBase(msg.ai_data?.export_url);
+                    const pdfUrl = withFrontBase(msg.ai_data?.pdf_url);
+                    const isDownloaded = !!(exportUrl && downloadedExports[exportUrl]);
+                    const isPdfDownloaded = !!(pdfUrl && downloadedExports[pdfUrl]);
                     return (
                       <View key={msg.id} style={[styles.messageRow, isClient && styles.messageRowRight]}>
                         <View style={[
@@ -1145,9 +1292,26 @@ export default function Chat({ style, buttonStyle }) {
                               </Text>
                               <TouchableOpacity
                                 style={styles.exportBtn}
-                                onPress={() => openExport(msg.ai_data.export_url)}
+                                onPress={() => handleExportPress(msg.ai_data.export_url)}
                               >
-                                <Text style={styles.exportBtnText}>Open</Text>
+                                <Icon name={isDownloaded ? 'open-in-new' : 'download'} size={14} color="#fff" />
+                                <Text style={styles.exportBtnText}>{isDownloaded ? 'Open' : 'Download'}</Text>
+
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                           {msg.ai_data?.pdf_url  && (
+                            <View style={styles.exportCard}>
+                              <Text style={styles.exportText}>
+                                Download PDF ({msg.ai_data.results?.total_rows?.toLocaleString()} records)
+                              </Text>
+                              <TouchableOpacity
+                                style={styles.exportBtn}
+                                onPress={() => handleExportPress(msg.ai_data.pdf_url, { useBaseUrl: false })}
+                              >
+                                <Icon name={isPdfDownloaded ? 'open-in-new' : 'download'} size={14} color="#fff" />
+                                <Text style={styles.exportBtnText}>{isPdfDownloaded ? 'Open' : 'Download'}</Text>
+
                               </TouchableOpacity>
                             </View>
                           )}
@@ -1155,6 +1319,57 @@ export default function Chat({ style, buttonStyle }) {
                           <Text style={isClient ? styles.timeTextClient : styles.timeText}>
                             {formatTime(msg.created_at)}
                           </Text>
+
+                          {showAIFeedback && (
+                            <View style={styles.aiFeedbackRow}>
+                              <TouchableOpacity
+                                onPress={() => handleAIFeedback(msg.id, 'positive')}
+                                disabled={submittingAIFeedbackId === msg.id || !!selectedAIFeedback}
+                                style={[
+                                  styles.aiFeedbackBtn,
+                                  selectedAIFeedback === 'positive' && styles.aiFeedbackBtnPositive,
+                                  selectedAIFeedback && styles.aiFeedbackBtnSelected,
+                                ]}
+                              >
+                                <Icon
+                                  name="thumb-up"
+                                  size={14}
+                                  color={selectedAIFeedback === 'positive' ? '#15803D' : '#6B7280'}
+                                />
+                                <Text
+                                  style={[
+                                    styles.aiFeedbackText,
+                                    selectedAIFeedback === 'positive' && styles.aiFeedbackTextPositive,
+                                  ]}
+                                >
+                                  Helpful
+                                </Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => handleAIFeedback(msg.id, 'negative')}
+                                disabled={submittingAIFeedbackId === msg.id || !!selectedAIFeedback}
+                                style={[
+                                  styles.aiFeedbackBtn,
+                                  selectedAIFeedback === 'negative' && styles.aiFeedbackBtnNegative,
+                                  selectedAIFeedback && styles.aiFeedbackBtnSelected,
+                                ]}
+                              >
+                                <Icon
+                                  name="thumb-down"
+                                  size={14}
+                                  color={selectedAIFeedback === 'negative' ? '#BE123C' : '#6B7280'}
+                                />
+                                <Text
+                                  style={[
+                                    styles.aiFeedbackText,
+                                    selectedAIFeedback === 'negative' && styles.aiFeedbackTextNegative,
+                                  ]}
+                                >
+                                  Not helpful
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
                         </View>
                       </View>
                     );
@@ -1362,6 +1577,24 @@ const styles = StyleSheet.create({
   thinkingText: { color: '#6D28D9', fontSize: 13 },
   timeText: { marginTop: 6, fontSize: 10, color: '#666' },
   timeTextClient: { marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.7)' },
+  aiFeedbackRow: { flexDirection: 'row', gap: 8, marginTop: 6 },
+  aiFeedbackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#fff',
+  },
+  aiFeedbackBtnSelected: { opacity: 0.9 },
+  aiFeedbackBtnPositive: { borderColor: '#86EFAC', backgroundColor: '#ECFDF5' },
+  aiFeedbackBtnNegative: { borderColor: '#FDA4AF', backgroundColor: '#FFF1F2' },
+  aiFeedbackText: { fontSize: 11, color: '#6B7280', fontWeight: '600' },
+  aiFeedbackTextPositive: { color: '#166534' },
+  aiFeedbackTextNegative: { color: '#9F1239' },
 
   feedbackWrap: { paddingHorizontal: 12, marginBottom: 10, alignItems: 'center' },
   feedbackCard: {
@@ -1429,8 +1662,24 @@ const styles = StyleSheet.create({
     borderColor: '#DDD6FE',
   },
   exportText: { fontSize: 11, color: '#4C1D95', marginBottom: 6 },
-  exportBtn: { alignSelf: 'flex-start', backgroundColor: '#16A34A', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
-  exportBtnText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  exportBtn: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#16A34A',
+    borderWidth: 1,
+    borderColor: '#15803D',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    shadowColor: '#166534',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  exportBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
 
   inputWrap: { borderTopWidth: 1, borderTopColor: '#E5E7EB', padding: 10, backgroundColor: '#fff' },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

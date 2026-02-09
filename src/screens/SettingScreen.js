@@ -260,7 +260,7 @@ const COLORS = {
   primary: '#2C1E70',
   roleBG: '#319241',
   roleText: '#5B4500',
-  update: '#2C1E70',
+  update: '#2a8a4f',
 };
 
 const getStyles = (isTablet) =>

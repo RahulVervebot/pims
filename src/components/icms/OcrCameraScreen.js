@@ -1,4 +1,3 @@
-// src/screens/OcrScreen.js
 import React, { useRef, useState, useEffect } from 'react';
 // import API_ENDPOINTS from '../../../icms_config/api';
 import API_ENDPOINTS, { initICMSBase, setICMSBase } from '../../../icms_config/api';
@@ -21,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, CameraType } from 'react-native-camera-kit';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
-import SearchTableComponent from './SearchORCTable'; // renamed below file to same name you used
+import SearchTableComponent from './SearchORCTable';
 import SaveInvoiceModal from './SaveInvoiceModal';
 import OCRPreviewComponent from './OCRPreviewComponent';
 import reportbg from '../../assets/images/report-bg.png';
@@ -107,17 +106,15 @@ const OcrScreen = () => {
     snap: false,
     gallery: false,
   });
-
   useEffect(() => {
     (async () => {
-    const getAllAsynce = async () => {
-      initICMSBase();
- const token = await   AsyncStorage.getItem('access_token');
-  setAccessToken(token);
-    }
-  getAllAsynce();
+      const getAllAsynce = async () => {
+        initICMSBase();
+        const token = await AsyncStorage.getItem('access_token');
+        setAccessToken(token);
+      }
+      getAllAsynce();
     })();
-  
   }, [])
 
   const handleSearchVendor = debounce(async query => {
@@ -128,16 +125,16 @@ const OcrScreen = () => {
 
     try {
       console.log('Api callled', query);
-      console.log("API_ENDPOINTS.SEARCHVENDOR",API_ENDPOINTS.SEARCHVENDOR);
+      console.log("API_ENDPOINTS.SEARCHVENDOR", API_ENDPOINTS.SEARCHVENDOR);
 
-       const token = await   AsyncStorage.getItem('access_token');
-           const icms_store = await   AsyncStorage.getItem('icms_store');
-       console.log("AsyncStorage:",token);
+      const token = await AsyncStorage.getItem('access_token');
+      const icms_store = await AsyncStorage.getItem('icms_store');
+      console.log("AsyncStorage:", token);
       const body = {
-        "q" : query
+        "q": query
       }
-        const res = await fetch(API_ENDPOINTS.SEARCHVENDOR, {
-        method: 'POST',   
+      const res = await fetch(API_ENDPOINTS.SEARCHVENDOR, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'access_token': token,
@@ -147,9 +144,9 @@ const OcrScreen = () => {
         body: JSON.stringify(body),
       });
 
-      console.log('Vendor search result:', res)   
+      console.log('Vendor search result:', res)
       const data = await res.json().catch(() => ({}));
-      console.log("vendor data:",data);;
+      console.log("vendor data:", data);;
 
       if (Array.isArray(data.results)) {
         console.log('Vendor search results:', data.results);
@@ -161,7 +158,7 @@ const OcrScreen = () => {
     } catch (err) {
       console.error('Vendor search error:', err);
     }
-  }, );
+  },);
 
   const debouncedSearch = React.useMemo(
     () => debounce(handleSearchVendor, 300),
@@ -173,7 +170,7 @@ const OcrScreen = () => {
     setSelectedDatabaseName(vendor.databaseName);
     setSelectedVendorSlug(vendor.slug);
     setSelectedVendor(vendor);
-    console.log("vendor details: ",vendor);
+    console.log("vendor details: ", vendor);
     setSearchQuery(vendor.value);
     setSearchResults([]);
   };
@@ -284,7 +281,7 @@ const OcrScreen = () => {
         }));
         setSnappedImages(prev => [...prev, ...add]);
         setIsResponseImg(true);
-         setShowCamera(false);
+        setShowCamera(false);
       }
     } catch (error) {
       console.warn('Gallery picker error:', error);
@@ -332,8 +329,8 @@ const OcrScreen = () => {
 
       const newFilenames = [];
       const newImageURLs = [];
-        const token = await   AsyncStorage.getItem('access_token');
-          const icms_store = await   AsyncStorage.getItem('icms_store');
+      const token = await AsyncStorage.getItem('access_token');
+      const icms_store = await AsyncStorage.getItem('icms_store');
       // Upload each image
       for (let i = 0; i < snappedImages.length; i++) {
         const img = snappedImages[i];
@@ -352,7 +349,7 @@ const OcrScreen = () => {
             'Content-Type': 'multipart/form-data',
             store: `${icms_store}`,
             mode: 'MOBILE',
-          'access_token': token,
+            'access_token': token,
           }, // user-id is missing in the headers
           body: formData,
         });
@@ -377,19 +374,19 @@ const OcrScreen = () => {
       setUploadedFilenames(newFilenames);
       setUploadedImageURLs(newImageURLs);
 
-    
+
       const tempOcrs = [];
       for (let i = 0; i < newFilenames.length; i++) {
         const fname = newFilenames[i];
         const ocrResponse = await fetch(API_ENDPOINTS.OCR_RESPONSE, {
           method: 'POST',
-           headers: {
-          'Content-Type': 'application/json',
-          'access_token': token,
-          'mode': 'MOBILE',
-          'store': icms_store
-        },
-          
+          headers: {
+            'Content-Type': 'application/json',
+            'access_token': token,
+            'mode': 'MOBILE',
+            'store': icms_store
+          },
+
           body: JSON.stringify({
             data: { filename: fname, vendorName: selectedDatabaseName },
           }),
@@ -402,7 +399,7 @@ const OcrScreen = () => {
         const ocrJson = await ocrResponse.json();
         tempOcrs.push(ocrJson);
       }
-      console.log("tempOcrs:",tempOcrs);
+      console.log("tempOcrs:", tempOcrs);
       setOcrJsons(tempOcrs);
 
       await generateInvoice(tempOcrs);
@@ -424,7 +421,7 @@ const OcrScreen = () => {
       ocrdata: combinedBodies,
     };
     const token = await AsyncStorage.getItem('access_token');
-           const icms_store = await   AsyncStorage.getItem('icms_store');
+    const icms_store = await AsyncStorage.getItem('icms_store');
     const response = await fetch(API_ENDPOINTS.SETPRODUCTINTABLEFROMOCR, {
       method: 'POST',
       headers: {
@@ -441,7 +438,7 @@ const OcrScreen = () => {
       throw new Error(`Request failed: ${response.status} - ${t}`);
     }
     const responseData = await response.json();
-    console.log("responseData vendor:",responseData);
+    console.log("responseData vendor:", responseData);
     setTableData(responseData);
     setIsResponseImg(false);
   };
@@ -689,309 +686,309 @@ const OcrScreen = () => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-      {/* Controls Card */}
+        {/* Controls Card */}
 
-    <View style={styles.controlCard}>
-  {/* Vendor Selector */}
-  <View style={styles.searchWrap}>
-    <View style={styles.searchRow}>
-      <View style={styles.searchInputWrapper}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search Vendor..."
-          placeholderTextColor="#aaa"
-          value={searchQuery}
-          onChangeText={text => {
-            setSearchQuery(text);
-            debouncedSearch(text);
-          }}
-        />
-        {!!searchQuery && (
-          <TouchableOpacity
-            style={styles.clearSearchBtn}
-            onPress={handleClearSearch}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={styles.clearSearchText}>×</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
+        <View style={styles.controlCard}>
+          {/* Vendor Selector */}
+          <View style={styles.searchWrap}>
+            <View style={styles.searchRow}>
+              <View style={styles.searchInputWrapper}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search Vendor..."
+                  placeholderTextColor="#aaa"
+                  value={searchQuery}
+                  onChangeText={text => {
+                    setSearchQuery(text);
+                    debouncedSearch(text);
+                  }}
+                />
+                {!!searchQuery && (
+                  <TouchableOpacity
+                    style={styles.clearSearchBtn}
+                    onPress={handleClearSearch}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.clearSearchText}>×</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
 
-    {searchResults.length > 0 && (
-      <View style={styles.dropdownContainer}>
-        <ScrollView
-          style={styles.dropdown}
-          keyboardShouldPersistTaps="handled"
-          nestedScrollEnabled
-        >
-          {searchResults.map((vendor, index) => (
-            <TouchableOpacity
-              key={vendor.slug || index}
-              style={[
-                styles.dropdownItem,
-                index % 2 === 0
-                  ? styles.dropdownItemEven
-                  : styles.dropdownItemOdd,
-              ]}
-              onPress={() => handleSelectVendor(vendor)}
-            >
-              <Text style={styles.dropdownText}>{vendor.value}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-    )}
-
-  </View>
-
-  {/* Button Row */}
-  <View style={styles.btnRowInline}>
-    <ButtonWithLoader
-      label={newVendor ? 'Remove Vendor' : 'Add New Vendor'}
-      onPress={newVendor ? handleRemoveNewVendor : handleOpenNewVendorModal}
-      loading={false}
-      style={newVendor ? styles.btnDanger : styles.btnLight}
-      textStyle={newVendor ? null : styles.btnLightText}
-    />
-
-    <ButtonWithLoader
-      label={showCamera ? 'Camera Active' : 'Select Invoice'}
-      onPress={handleOpenCamera}
-      loading={buttonLoading.selectInvoice}
-      style={styles.btnLight}
-      textStyle={styles.btnLightText}
-    />
-
-    <ButtonWithLoader
-      label="Upload Invoice"
-      onPress={handleUploadPress}
-      loading={isGenerate || buttonLoading.generate}
-      style={styles.btnLight}
-      textStyle={styles.btnLightText}
-      // disabled={!snappedImages.length || !selectedValue}
-    />
-    
-    {hasTableData && (
-      <>
-        <ButtonWithLoader
-          label="Save"
-          onPress={() => setSaveInvoiceVisible(s => !s)}
-          style={styles.btnPrimary}
-          loading={false}
-        />
-        <ButtonWithLoader
-          label="Clear"
-          onPress={handleClearAll}
-          loading={buttonLoading.clear}
-          style={styles.btnDanger}
-        />
-      </>
-    )}
-  </View>
-</View>
-
-
-      {/* Snapped / Selected Images Row OR OCR Preview */}
-
-      {snappedImages.length > 0 ? (
-        <ScrollView
-          horizontal
-          style={styles.imageRow}
-          showsHorizontalScrollIndicator={false}
-        >
-          {snappedImages.map((item, index) => (
-            <View key={`${item.uri}-${index}`} style={styles.thumbWrap}>
-              <View style={styles.thumbActions}>
-                <TouchableOpacity
-                  style={styles.thumbClose}
-                  onPress={() => removeSnappedImage(index)}
-                  hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            {searchResults.length > 0 && (
+              <View style={styles.dropdownContainer}>
+                <ScrollView
+                  style={styles.dropdown}
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled
                 >
-                  <Text style={styles.thumbCloseText}>x</Text>
+                  {searchResults.map((vendor, index) => (
+                    <TouchableOpacity
+                      key={vendor.slug || index}
+                      style={[
+                        styles.dropdownItem,
+                        index % 2 === 0
+                          ? styles.dropdownItemEven
+                          : styles.dropdownItemOdd,
+                      ]}
+                      onPress={() => handleSelectVendor(vendor)}
+                    >
+                      <Text style={styles.dropdownText}>{vendor.value}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+          </View>
+
+          {/* Button Row */}
+          <View style={styles.btnRowInline}>
+            <ButtonWithLoader
+              label={newVendor ? 'Remove Vendor' : 'Add New Vendor'}
+              onPress={newVendor ? handleRemoveNewVendor : handleOpenNewVendorModal}
+              loading={false}
+              style={newVendor ? styles.btnDanger : styles.btnLight}
+              textStyle={newVendor ? null : styles.btnLightText}
+            />
+
+            <ButtonWithLoader
+              label={showCamera ? 'Camera Active' : 'Upload Invoice'}
+              onPress={handleOpenCamera}
+              loading={buttonLoading.selectInvoice}
+              style={styles.btnLightselectInvoice}
+              textStyle={styles.btnLightText}
+            />
+
+            <ButtonWithLoader
+              label="Generate Invoice"
+              onPress={handleUploadPress}
+              loading={isGenerate || buttonLoading.generate}
+              style={styles.btnLight}
+              textStyle={styles.btnLightText}
+            // disabled={!snappedImages.length || !selectedValue}
+            />
+
+            {hasTableData && (
+              <>
+                <ButtonWithLoader
+                  label="Save"
+                  onPress={() => setSaveInvoiceVisible(s => !s)}
+                  style={styles.btnPrimary}
+                  loading={false}
+                />
+                <ButtonWithLoader
+                  label="Clear"
+                  onPress={handleClearAll}
+                  loading={buttonLoading.clear}
+                  style={styles.btnDanger}
+                />
+              </>
+            )}
+          </View>
+        </View>
+
+
+        {/* Snapped / Selected Images Row OR OCR Preview */}
+
+        {snappedImages.length > 0 ? (
+          <ScrollView
+            horizontal
+            style={styles.imageRow}
+            showsHorizontalScrollIndicator={false}
+          >
+            {snappedImages.map((item, index) => (
+              <View key={`${item.uri}-${index}`} style={styles.thumbWrap}>
+                <View style={styles.thumbActions}>
+                  <TouchableOpacity
+                    style={styles.thumbClose}
+                    onPress={() => removeSnappedImage(index)}
+                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                  >
+                    <Text style={styles.thumbCloseText}>x</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity onPress={() => openModal(item.uri)}>
+                  <Image source={{ uri: item.uri }} style={styles.thumb} />
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => openModal(item.uri)}>
-                <Image source={{ uri: item.uri }} style={styles.thumb} />
-              </TouchableOpacity>
-            </View>
-          ))}
-        </ScrollView>
-      ) : hasTableData && uploadedFilenames.length > 0 && uploadedImageURLs.length > 0 ? (
-        <ScrollView
-          horizontal
-          style={styles.imageRow}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.previewScroll}
-        >
-          <OCRPreviewComponent
-            filenames={uploadedFilenames}
-            vendorName={selectedDatabaseName}
-            imageURIs={uploadedImageURLs}
-            tableData={tableData}
-            ocrurl={ocrurl}
-          />
-        </ScrollView>
-      ) : null}
+            ))}
+          </ScrollView>
+        ) : hasTableData && uploadedFilenames.length > 0 && uploadedImageURLs.length > 0 ? (
+          <ScrollView
+            horizontal
+            style={styles.imageRow}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.previewScroll}
+          >
+            <OCRPreviewComponent
+              filenames={uploadedFilenames}
+              vendorName={selectedDatabaseName}
+              imageURIs={uploadedImageURLs}
+              tableData={tableData}
+              ocrurl={ocrurl}
+            />
+          </ScrollView>
+        ) : null}
 
-      {/* Full Image View */}
-      <Modal visible={modalVisible} transparent animationType="fade">
-        <View style={styles.modalBg}>
-          <TouchableOpacity
-            style={styles.modalCloseArea}
-            onPress={closeModal}
-          />
-          <Image
-            source={{ uri: selectedImage }}
-            style={styles.fullImage}
-            resizeMode="contain"
-          />
-        </View>
-      </Modal>
+        {/* Full Image View */}
+        <Modal visible={modalVisible} transparent animationType="fade">
+          <View style={styles.modalBg}>
+            <TouchableOpacity
+              style={styles.modalCloseArea}
+              onPress={closeModal}
+            />
+            <Image
+              source={{ uri: selectedImage }}
+              style={styles.fullImage}
+              resizeMode="contain"
+            />
+          </View>
+        </Modal>
 
-      {/* New Vendor Modal */}
-      <Modal visible={newVendorModalVisible} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <TouchableOpacity
-            style={styles.modalBackdropTouch}
-            onPress={() => setNewVendorModalVisible(false)}
-          />
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add New Vendor</Text>
-              <TouchableOpacity onPress={() => setNewVendorModalVisible(false)}>
-                <Text style={styles.clearLink}>Close</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.modalBody}>
-              <TextInput
-                style={styles.modalInput}
-                value={newVendorInput}
-                onChangeText={setNewVendorInput}
-                placeholder="Enter vendor name"
-                placeholderTextColor="#aaa"
-              />
-              <View style={styles.modalActionRow}>
-                <TouchableOpacity
-                  style={[styles.btn, styles.btnPrimary, styles.modalActionBtn]}
-                  onPress={handleSaveNewVendor}
-                >
-                  <Text style={styles.btnText}>Save</Text>
+        {/* New Vendor Modal */}
+        <Modal visible={newVendorModalVisible} transparent animationType="fade">
+          <View style={styles.modalBackdrop}>
+            <TouchableOpacity
+              style={styles.modalBackdropTouch}
+              onPress={() => setNewVendorModalVisible(false)}
+            />
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add New Vendor</Text>
+                <TouchableOpacity onPress={() => setNewVendorModalVisible(false)}>
+                  <Text style={styles.clearLink}>Close</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.btn, styles.btnDanger, styles.modalActionBtn]}
-                  onPress={() => setNewVendorModalVisible(false)}
-                >
-                  <Text style={styles.btnText}>Cancel</Text>
-                </TouchableOpacity>
+              </View>
+              <View style={styles.modalBody}>
+                <TextInput
+                  style={styles.modalInput}
+                  value={newVendorInput}
+                  onChangeText={setNewVendorInput}
+                  placeholder="Enter vendor name"
+                  placeholderTextColor="#aaa"
+                />
+                <View style={styles.modalActionRow}>
+                  <TouchableOpacity
+                    style={[styles.btn, styles.btnPrimary, styles.modalActionBtn]}
+                    onPress={handleSaveNewVendor}
+                  >
+                    <Text style={styles.btnText}>Save</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.btn, styles.btnDanger, styles.modalActionBtn]}
+                    onPress={() => setNewVendorModalVisible(false)}
+                  >
+                    <Text style={styles.btnText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Save Invoice Number Modal */}
-      <Modal visible={saveInvoiceNoVisible} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <TouchableOpacity
-            style={styles.modalBackdropTouch}
-            onPress={() => {
-              setShowInvoiceDatePicker(false);
-              setSaveInvoiceNoVisible(false);
-            }}
-          />
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Enter Invoice Number</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowInvoiceDatePicker(false);
-                  setSaveInvoiceNoVisible(false);
-                }}
-              >
-                <Text style={styles.clearLink}>Close</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.modalBody}>
-              <TextInput
-                style={styles.modalInput}
-                value={saveInvoiceNo}
-                onChangeText={setSaveInvoiceNo}
-                placeholder="Enter invoice number"
-                placeholderTextColor="#aaa"
-              />
-              <Text style={styles.modalLabel}>Invoice Date</Text>
-              <TouchableOpacity
-                style={styles.modalInput}
-                onPress={() => setShowInvoiceDatePicker(prev => !prev)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.modalDateText}>
-                  {invoiceDate.toISOString().split('T')[0]}
-                </Text>
-              </TouchableOpacity>
-              {Platform.OS === 'ios' && showInvoiceDatePicker && (
-                <DateTimePicker
-                  value={invoiceDate}
-                  mode="date"
-                  display="spinner"
-                  onChange={(_e, d) => d && setInvoiceDate(d)}
-                />
-              )}
-              <View style={styles.modalActionRow}>
+        {/* Save Invoice Number Modal */}
+        <Modal visible={saveInvoiceNoVisible} transparent animationType="fade">
+          <View style={styles.modalBackdrop}>
+            <TouchableOpacity
+              style={styles.modalBackdropTouch}
+              onPress={() => {
+                setShowInvoiceDatePicker(false);
+                setSaveInvoiceNoVisible(false);
+              }}
+            />
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Enter Invoice Number</Text>
                 <TouchableOpacity
-                  style={[styles.btn, styles.btnLight, styles.modalActionBtn]}
-                  onPress={handleConfirmUpload}
-                >
-                  <Text style={[styles.btnText, styles.btnLightText]}>Continue</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.btn, styles.btnDanger, styles.modalActionBtn]}
                   onPress={() => {
                     setShowInvoiceDatePicker(false);
                     setSaveInvoiceNoVisible(false);
                   }}
                 >
-                  <Text style={styles.btnText}>Cancel</Text>
+                  <Text style={styles.clearLink}>Close</Text>
                 </TouchableOpacity>
+              </View>
+              <View style={styles.modalBody}>
+                <TextInput
+                  style={styles.modalInput}
+                  value={saveInvoiceNo}
+                  onChangeText={setSaveInvoiceNo}
+                  placeholder="Enter invoice number"
+                  placeholderTextColor="#aaa"
+                />
+                <Text style={styles.modalLabel}>Invoice Date</Text>
+                <TouchableOpacity
+                  style={styles.modalInput}
+                  onPress={() => setShowInvoiceDatePicker(prev => !prev)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.modalDateText}>
+                    {invoiceDate.toISOString().split('T')[0]}
+                  </Text>
+                </TouchableOpacity>
+                {Platform.OS === 'ios' && showInvoiceDatePicker && (
+                  <DateTimePicker
+                    value={invoiceDate}
+                    mode="date"
+                    display="spinner"
+                    onChange={(_e, d) => d && setInvoiceDate(d)}
+                  />
+                )}
+                <View style={styles.modalActionRow}>
+                  <TouchableOpacity
+                    style={[styles.btn, styles.btnLight, styles.modalActionBtn]}
+                    onPress={handleConfirmUpload}
+                  >
+                    <Text style={[styles.btnText, styles.btnLightText]}>Continue</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.btn, styles.btnDanger, styles.modalActionBtn]}
+                    onPress={() => {
+                      setShowInvoiceDatePicker(false);
+                      setSaveInvoiceNoVisible(false);
+                    }}
+                  >
+                    <Text style={styles.btnText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           </View>
-        </View>
-      </Modal>
-      {Platform.OS === 'android' && showInvoiceDatePicker && (
-        <DateTimePicker
-          value={invoiceDate}
-          mode="date"
-          display="default"
-          onChange={(_e, d) => {
-            setShowInvoiceDatePicker(false);
-            if (d) setInvoiceDate(d);
-          }}
-        />
-      )}
+        </Modal>
+        {Platform.OS === 'android' && showInvoiceDatePicker && (
+          <DateTimePicker
+            value={invoiceDate}
+            mode="date"
+            display="default"
+            onChange={(_e, d) => {
+              setShowInvoiceDatePicker(false);
+              if (d) setInvoiceDate(d);
+            }}
+          />
+        )}
 
-      {/* Table */}
-      <SearchTableComponent
-        tableData={tableData}
-        setTableData={setTableData}
-        onRemoveRow={handleRemoveItem}
-        onAddManual={() =>
-          setTableData(prev => [
-            ...prev,
-            {
-              itemNo: '',
-              description: '',
-              qty: '',
-              unitPrice: '',
-              extendedPrice: '',
-              barcode: '',
-              manuallyAdded: true,
-              condition: 'normal',
-            },
-          ])
-        }
-      />
+        {/* Table */}
+        <SearchTableComponent
+          tableData={tableData}
+          setTableData={setTableData}
+          onRemoveRow={handleRemoveItem}
+          onAddManual={() =>
+            setTableData(prev => [
+              ...prev,
+              {
+                itemNo: '',
+                description: '',
+                qty: '',
+                unitPrice: '',
+                extendedPrice: '',
+                barcode: '',
+                manuallyAdded: true,
+                condition: 'normal',
+              },
+            ])
+          }
+        />
       </ScrollView>
 
       {/* Camera Fullscreen */}
@@ -1036,12 +1033,12 @@ const OcrScreen = () => {
       {tableData.length > 0 && (
         <SaveInvoiceModal
           isVisible={saveInvoiceVisible}
-          onClose={() => {setSaveInvoiceVisible(false);}}
-          ImageURL= {uploadedImageURLs}
+          onClose={() => { setSaveInvoiceVisible(false); }}
+          ImageURL={uploadedImageURLs}
           vendorName={selectedVendorSlug}
           tableData={tableData}
           cleardata={clearAll}
-         selectedVendor={selectedVendor}
+          selectedVendor={selectedVendor}
         />
       )}
     </ImageBackground>
@@ -1078,7 +1075,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
- btn: {
+  btn: {
     flexGrow: 1,
     paddingVertical: 12,
     borderRadius: 10,
@@ -1110,6 +1107,11 @@ const styles = StyleSheet.create({
   btnLight: {
     backgroundColor: GREEN_LIGHT,
   },
+   btnLightselectInvoice: {
+    backgroundColor: '#f3f3f3',
+  },
+
+  
   btnLightText: {
     color: GREEN_DARK,
   },
@@ -1428,8 +1430,8 @@ const styles = StyleSheet.create({
     elevation: 5,
     maxHeight: 220,
     zIndex: 100,
-   marginLeft:10,
-   borderRadius:10
+    marginLeft: 10,
+    borderRadius: 10
   },
   dropdown: {
     paddingVertical: 4,
@@ -1448,4 +1450,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333',
   },
+
 });

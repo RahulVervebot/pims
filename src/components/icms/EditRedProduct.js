@@ -114,7 +114,7 @@ function EditRedProduct({ visible, item, onClose, onSave }) {
           'Content-Type': 'application/json',
           access_token: token ?? '',
           mode: 'MOBILE',
-          store: 'deepanshu_test' ?? '',
+          store: icms_store ?? '',
         },
         body: JSON.stringify(buildUpdatePayload(updatedItem)),
       });

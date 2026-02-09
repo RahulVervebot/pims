@@ -15,7 +15,7 @@ import CustomHeader from "../components/CustomHeader";
 import ProductSearch from "../components/ProductSearch";
 import ProductList from "../components/ProductList";
 import { getTopCategories, looksLikeSvg, capitalizeWords } from "../functions/product-function";
-import MoreCategoriesGrid from "../components/MoreCategoriesGrid";
+import CategoriesRow from "../components/CategoriesRow";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CartContext } from "../context/CartContext";
 import { PrintContext } from "../context/PrintContext";
@@ -135,7 +135,7 @@ useEffect(() => {
 
   const currentTab = useMemo(() => tabs.find((t) => t.value === activeTab), [tabs, activeTab]);
 
-  // Header background: use topbanner image if present, else color
+// Header background: use topbanner image if present, else color
 const currentBackground = useMemo(() => {
   if (currentTab?.topbanner) {
     return { type: 'image', value: `data:image/png;base64,${currentTab.topbanner}` };
@@ -157,25 +157,6 @@ const currentBackground = useMemo(() => {
       setHomeRefreshing(false);
     }
   }, []);
-
-  // Full-screen loader video
-  // if (showScreen) {
-  //   return (
-  //     <View style={styles.loaderWrap}>
-  //       <StatusBar backgroundColor="black" barStyle="light-content" />
-  //       <Video
-  //         source={require("../assets/images/Loader.mp4")}
-  //         style={styles.video}
-  //         resizeMode="cover"
-  //         repeat
-  //         muted
-  //         playWhenInactive
-  //         playInBackground={false}
-  //       />
-
-  //     </View>
-  //   );
-  // }
 
   return (
     <SafeAreaView
@@ -236,7 +217,7 @@ const currentBackground = useMemo(() => {
               <Text style={{ color: "#444" }}>No categories available.</Text>
             </View>
           )}
-          <MoreCategoriesGrid />
+          <CategoriesRow />
         </ScrollView>
 
         {/* ✅ Global floating cart overlay */}
@@ -288,10 +269,10 @@ const currentBackground = useMemo(() => {
             <TouchableOpacity
               onPress={() => navigation.navigate("PrintScreen")}
               style={{
-                alignSelf: "flex-end",
-                marginRight: 16,
+                alignSelf: "flex-start",
+                marginLeft: 16,
                 marginBottom: 12 + insets.bottom,
-                backgroundColor: "#2c1e70",
+                backgroundColor: "#16A34A",
                 paddingVertical: 12,
                 paddingHorizontal: 16,
                 borderRadius: 30,
@@ -354,6 +335,7 @@ const currentBackground = useMemo(() => {
       /> */}
     </SafeAreaView>
   );
+
 }
 
 const styles = StyleSheet.create({

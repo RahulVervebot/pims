@@ -11,22 +11,33 @@ import {
 } from 'react-native';
 
 import AppHeader from '../components/AppHeader';
+
 import reportbg from '../assets/images/report-bg.png';
+
 import DateRangePickerModal from '../components/DateRangePickerModal';
 
 // Reports container + tabs
 import ReportTabs from '../components/reports/ReportTabs';
+
 import PosPaymentCollectionTab from '../components/reports/tabs/PosPaymentCollectionTab';
+
 import CashInOutTab from '../components/reports/tabs/CashInOutTab';
+
 import RefundReportTab from '../components/reports/tabs/RefundReportTab';
+
 import TaxReportTab from '../components/reports/tabs/TaxReportTab';
+
 import DepartmentWiseReportTab from '../components/reports/tabs/DepartmentWiseReportTab';
 
 // Icons for bottom selector
 import TaxSVG from '../assets/icons/Tax.svg';
+
 import DepartmentSVG from '../assets/icons/Department-wise-report.svg';
+
 import CashinoutSVG from '../assets/icons/cash-In-out.svg';
+
 import PosPaymentCollectionSVG from '../assets/icons/Pos-Payment-Collection.svg';
+
 import RefundReportSVG from '../assets/icons/RefundReport.svg';
 
 // API functions
@@ -39,6 +50,7 @@ import {
 } from '../functions/reports/pos_reports';
 
 const PANEL_RADIUS = 28;
+
 const DEFAULT_REFUND = { total_refunds: 0, total_refunds_count: 0, refund_data: [] };
 
 export default function SaleSummaryReport() {
@@ -60,21 +72,18 @@ export default function SaleSummaryReport() {
   };
 
   const [pickerVisible, setPickerVisible] = useState(false);
-
   // Data
   const [paymentTypeReport, setPaymentTypeReport] = useState([]);
   const [cashInOutReport, setCashInOutReport] = useState({});
   const [refundReport, setRefundReport] = useState(DEFAULT_REFUND);
   const [taxReport, setTaxReport] = useState({});
   const [departmentReport, setDepartmentReport] = useState({});
-
   // Per-tab loading
   const [paymentLoading, setPaymentLoading] = useState(true);
   const [cashLoading, setCashLoading] = useState(true);
   const [refundLoading, setRefundLoading] = useState(true);
   const [taxLoading, setTaxLoading] = useState(true);
   const [deptLoading, setDeptLoading] = useState(true);
-
   // Date range (defaults to today)
   const [range, setRange] = useState(() => {
     const now = new Date();
@@ -82,28 +91,23 @@ export default function SaleSummaryReport() {
     const end = new Date(now); end.setHours(23, 59, 59, 999);
     return { start, end };
   });
-
   // UI sizing
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const styles = getStyles(isTablet);
-
   // Prevent race conditions
   const reqIdRef = useRef(0);
-
   // Sequential fetcher
   const handleSaleSummaryReport = useCallback(async (startDate, endDate) => {
     const id = ++reqIdRef.current;
     const s = fmtLocal(startDate);
     const e = fmtLocal(endDate);
-
     // reset loaders
     setPaymentLoading(true);
     setCashLoading(true);
     setRefundLoading(true);
     setTaxLoading(true);
     setDeptLoading(true);
-
     try {
       // 1) Payment Type
       const paymentreport = await SaleSummaryPaymentType(s, e);
@@ -156,25 +160,28 @@ export default function SaleSummaryReport() {
   return (
     <ImageBackground source={getImageSource(reportbg)} style={styles.screen} resizeMode="cover">
       <AppHeader Title="SALES SUMMARY REPORT" backgroundType="image" backgroundValue={reportbg} />
-
       {/* Date Selector Card */}
       <View style={styles.dateCard}>
-        <TouchableOpacity
-          onPress={() => setPickerVisible(true)}
-          style={styles.dateCardHeader}
-        >
-          <Text style={styles.dateCardHeaderText}>Select Date & Time</Text>
+        <TouchableOpacity onPress={() => setPickerVisible(true)} style={styles.dateCardHeader}>
+          <View>
+            <Text style={styles.dateCardHeaderText}>Select Date & Time</Text>
+            <Text style={styles.dateCardSubText}>Tap to change the reporting range</Text>
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => setPickerVisible(true)}>
           <View style={styles.datetimeselector}>
             <View style={styles.dateshow}>
               <Text style={styles.dateLabel}>From</Text>
-              <Text style={styles.dateBadge}>{fmtDateOnly(range.start)}</Text>
+              <View style={styles.dateBadge}>
+                <Text style={styles.dateBadgeText}>{fmtDateOnly(range.start)}</Text>
+              </View>
             </View>
             <View style={styles.dateshow}>
               <Text style={styles.dateLabel}>To</Text>
-              <Text style={styles.dateBadge}>{fmtDateOnly(range.end)}</Text>
+              <View style={styles.dateBadge}>
+                <Text style={styles.dateBadgeText}>{fmtDateOnly(range.end)}</Text>
+              </View>
             </View>
           </View>
         </TouchableOpacity>
@@ -220,6 +227,7 @@ export default function SaleSummaryReport() {
           onTabChange={(tab) => console.log('Active tab: ', tab)}
         />
       </View>
+
     </ImageBackground>
   );
 }
@@ -229,31 +237,55 @@ const getStyles = (isTablet) =>
     screen: { flex: 1 },
 
     dateCard: {
-      margin: 20,
+      marginHorizontal: 18,
+      marginTop: 18,
+      marginBottom: 8,
       backgroundColor: '#fff',
-      borderRadius: 8,
+      borderRadius: 14,
       borderWidth: 1,
-      borderColor: '#D9D9D9',
+      borderColor: '#E6E6E6',
+      padding: 14,
+      ...Platform.select({
+        android: { elevation: 2 },
+        ios: {
+          shadowColor: '#000',
+          shadowOpacity: 0.06,
+          shadowRadius: 6,
+          shadowOffset: { width: 0, height: 3 },
+        },
+      }),
     },
     dateCardHeader: {
-      padding: 12,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
       alignItems: 'center',
-      borderBottomColor: '#D9D9D9',
-      borderBottomWidth: 2,
+      paddingBottom: 10,
+      borderBottomColor: '#ECECEC',
+      borderBottomWidth: 1,
     },
-    dateCardHeaderText: { color: '#2e7d32', fontWeight: '700' },
-    datetimeselector: { flexDirection: 'row', marginTop: 12, alignSelf: 'center' },
-   dateshow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    dateLabel: { color: '#1f1f1f', fontWeight: '600' },
+    dateCardHeaderText: { color: '#1B5E20', fontWeight: '800', fontSize: 16, letterSpacing: 0.2 },
+    dateCardSubText: { color: '#6B7280', fontSize: 12, marginTop: 4 },
+    datetimeselector: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 14,
+      justifyContent: 'space-between',
+    },
+    dateshow: { flex: 1, gap: 6 },
+    dateLabel: { color: '#4B5563', fontWeight: '600', fontSize: 12 },
     dateBadge: {
-      padding: 10,
-      alignItems: 'center',
-      borderColor: '#D9D9D9',
-      borderWidth: 2,
-      marginVertical: 10,
-      marginRight: 5,
-      borderRadius: 8,
-      color: '#1f1f1f',
+      backgroundColor: '#F8FAFC',
+      borderColor: '#DDE3EA',
+      borderWidth: 1,
+      borderRadius: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+    },
+    dateBadgeText: {
+      color: '#111827',
+      fontWeight: '700',
+      fontSize: 14,
+      letterSpacing: 0.2,
     },
 
     // Panel

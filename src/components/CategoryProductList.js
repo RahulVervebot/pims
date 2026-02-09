@@ -25,8 +25,7 @@ export default function CategoryProductList({ id, category, backgroundUri, showF
   const navigation = useNavigation();
   const [products, setProducts] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
-    const [userrole, setUserRole] = useState('');
-   
+  const [userrole, setUserRole] = useState('');
   const { cart, addToCart, increaseQty, decreaseQty } = useContext(CartContext);
   const { print, addToPrint, increasePrintQty, decreasePrintQty, removeFromprint } = useContext(PrintContext);
   const sheetRef = useRef(null);
@@ -72,8 +71,8 @@ export default function CategoryProductList({ id, category, backgroundUri, showF
 const openDetails = (item) => sheetRef.current?.open(item);
 
 const renderProduct = ({ item }) => {
-  const inCart = cart.find((p) => p.product_id === item.product_id);
-  const inPrint = print.find((p) => p.product_id === item.product_id);
+const inCart = cart.find((p) => p.product_id === item.product_id);
+const inPrint = print.find((p) => p.product_id === item.product_id);
 
   return (
     <TouchableOpacity
@@ -120,17 +119,16 @@ const renderProduct = ({ item }) => {
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity onPress={() => addToPrint(item)}>
-                  <PrinterIcon width={30} height={30} fill="rgba(245, 114, 0, 1)" />
+                  <PrinterIcon width={30} height={30} fill="#16A34A" />
                 </TouchableOpacity>
               ))}
         </View>
       </View>
     </TouchableOpacity>
   );
-};
+}; 
 
-
-  const bgSource = backgroundUri ? { uri: backgroundUri } : fallbackBg;
+const bgSource = backgroundUri ? { uri: backgroundUri } : fallbackBg;
 const isGifBanner = useMemo(() => {
   if (!backgroundUri) return false;
   if (typeof backgroundUri === 'string') {

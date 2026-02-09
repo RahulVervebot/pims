@@ -757,7 +757,7 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
-                  style={[styles.btn, { backgroundColor: THEME.primary }]}
+                  style={[styles.btn, { backgroundColor: "#16A34A" }]}
                   onPress={() => addToPrint(product)}
                 >
                   <Text style={styles.btnText}>Add to Print</Text>

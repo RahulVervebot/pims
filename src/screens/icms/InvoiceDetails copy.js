@@ -14,7 +14,6 @@ import {
   
   ImageBackground
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import AppHeader from '../../components/AppHeader.js';
 import EditProduct from '../../components/icms/EditProduct.js';
 import reportbg from '../../assets/images/report-bg.png';
@@ -22,31 +21,29 @@ import InvoiceRow from '../../components/icms/InvoiceRow.js';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import LinkProductModal from '../../components/icms/LinkProduct.js';
 import { transparent } from 'react-native-paper/lib/typescript/styles/themes/v2/colors.js';
-import API_ENDPOINTS, { initICMSBase } from '../../../icms_config/api';
+
+// Enable Layout Animation for Android
+
 if (
   Platform.OS === 'android' &&
   UIManager.setLayoutAnimationEnabledExperimental
 ) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-
-const getImageSource = val => (typeof val === 'number' ? val : { uri: val });
-
+ const getImageSource = val => (typeof val === 'number' ? val : { uri: val });
+ 
 export default function InvoiceDetails() {
   const itemsRef = useRef([]);
+
   const [linkModalVisible, setLinkModalVisible] = useState(false);
   const [linkingItem, setLinkingItem] = useState(null);
+
   const [expandedId, setExpandedId] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [InvoiceDetails, setInvoiceDetails] = useState(null);
   const [query, setQuery] = useState('');
-  const [transferLoading, setTransferLoading] = useState(false);
-  const [transferMessage, setTransferMessage] = useState('');
-  const [storedVendor, setStoredVendor] = useState(null);
-  const [invoiceList, setInvoiceList] = useState([]);
-  const [summaryCollapsed, setSummaryCollapsed] = useState(false);
   const navigation = useNavigation();
   const route = useRoute();
   const { Invoice,vendorDatabaseName } = route.params;
@@ -57,24 +54,8 @@ export default function InvoiceDetails() {
       ? Invoice.InvoiceData
       : [];
   }, [Invoice]);
-
-  useEffect(() => {
-    const loadVendor = async () => {
-      try {
-        const value = await AsyncStorage.getItem('vendor');
-        if (value) setStoredVendor(JSON.parse(value));
-      } catch {
-        setStoredVendor(null);
-      }
-    };
-    loadVendor();
-  }, []);
-
-
-  
   console.log("Invoice:",Invoice);
   console.log("invoiceName:",vendorDatabaseName);
-
   const day = Invoice?.SavedDate;
   const InvNumber = Invoice?.SavedInvoiceNo;
   const vendorName = Invoice?.InvoiceName;
@@ -138,19 +119,6 @@ export default function InvoiceDetails() {
       return newSet;
     });
   };
-
-  const handleToggleSelect = id => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
   const handleBulkUpdate = () => {
     const selectedItems = itemsRef.current.filter(item =>
       selectedIds.has(item.ProductId),
@@ -177,73 +145,9 @@ export default function InvoiceDetails() {
     setSelectedIds(new Set()); // clear selection
     alert(`Updated ${selectedItems.length} items successfully ✅`);
   };
-
-  const handleLinkingRemove = async () => {
-    const selectedItems = itemsRef.current.filter(item =>
-      selectedIds.has(item.ProductId),
-    );
-    if (!vendorDatabaseName) {
-      alert('Vendor database name missing.');
-      return;
-    }
-    if (selectedItems.length === 0) {
-      alert('Please select at least one row.');
-      return;
-    }
-    try {
-      setTransferLoading(true);
-      setTransferMessage('');
-      await initICMSBase();
-      const token = await AsyncStorage.getItem('access_token');
-      const icms_store = await AsyncStorage.getItem('icms_store');
-     const userEmail = await AsyncStorage.getItem('userEmail');
-     const storeurl = await AsyncStorage.getItem('storeurl');
-     
-      console.log("token:",token,storeurl);
-      const res = await fetch(API_ENDPOINTS.REMOVE_LINKING, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          access_token: token ?? '',
-          pos_access_token: token ?? '',
-          pos_api: `${storeurl}/api/v1`,
-          mode: 'MOBILE',
-          store: icms_store,
-          // vendordetails: storedVendor ? JSON.stringify(storedVendor) : '',
-        },
-        body: JSON.stringify({
-          invoiceName: vendorName,
-          invoice: vendorDatabaseName,
-          invoiceNo:InvNumber,
-          tableData: selectedItems,
-          email: userEmail,
-          invoiceList: [],
-        }),
-      });
-       const bodyres = JSON.stringify({
-           invoiceName: vendorName,
-          invoice: vendorDatabaseName,
-          invoiceNo: InvNumber,
-          tableData: selectedItems,
-          email: userEmail,
-           invoiceList: [],
-        })
-      const json = await res.json().catch(() => ({}));
-      
-       console.log("items link",bodyres);
-           console.log("resposne link",json);
-      if (!res.ok) {
-        const msg = json?.message || json?.error?.message || 'Failed to link items';
-        throw new Error(msg);
-      }
-      setTransferMessage(json?.message || '');
-      setSelectedIds(new Set());
-    } catch (err) {
-      setTransferMessage(err?.message || 'Failed to link items');
-    } finally {
-      setTransferLoading(false);
-    }
-  };
+  const fetchInvoice = (invoice)=>{
+    
+  }
 
   const handleSave = useCallback(
     (updatedItem, commit = true) => {
@@ -273,24 +177,21 @@ export default function InvoiceDetails() {
   const renderHeader = useCallback(
     () => (
       <View style={styles.headerRow}>
-        {['', 'Barcode', 'P. Info', 'QTY', 'Case Cost'].map(
+        {['Barcode', 'P. Info', 'QTY', 'Case Cost', 'Ext. Price'].map(
           (title, idx) => (
             <Text
               key={idx}
               style={[
                 styles.headerText,
                 idx === 0
-                  ? { width: 28 }
-                  : idx === 1
                   ? { flex: 2 }
-                  : idx === 2
+                  : idx === 1
                   ? { flex: 2.5 }
-                  : idx === 3
+                  : idx === 2
                   ? { flex: 0.7 }
-                  : idx === 4
-                  ? { flex: 0.8 }
-                  : undefined,
-                idx === 0 && { color: '#DC2626', textAlign: 'center' },
+                  : idx === 3
+                  ? { flex: 1 }
+                  : { flex: 0.8 },
               ]}
             >
               {title}
@@ -310,14 +211,19 @@ export default function InvoiceDetails() {
         isExpanded={expandedId === item.ProductId}
         onToggle={() => toggleExpand(item.ProductId)}
         onLongPress={handleLongPress}
-        onToggleSelect={handleToggleSelect}
         selectedIds={selectedIds}
         onEdit={openModal}
         onLinkProduct={openLinkProduct} 
       />
     ),
-    [expandedId, toggleExpand, handleLongPress, handleToggleSelect, selectedIds],
+    [expandedId, toggleExpand, handleLongPress, selectedIds],
   );
+
+  // const FloatingButton = ({ onPress, title }) => (
+  //   <TouchableOpacity style={styles.fab} onPress={onPress}>
+  //     <Text style={styles.fabText}>{title}</Text>
+  //   </TouchableOpacity>
+  // );
 
   return (
     <ImageBackground
@@ -332,50 +238,48 @@ export default function InvoiceDetails() {
       ></AppHeader> 
     <View style={{ flex: 1, backgroundColor: '#F5F6FA'}}>
       {/* Summary Bar */}
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={() => setSummaryCollapsed((prev) => !prev)}
-        style={styles.summaryBar}
-      >
-        <View style={styles.summaryHeader}>
-          <View>
-            <Text style={styles.summaryTitle}>Invoice Summary</Text>
-            <Text style={styles.summarySub} numberOfLines={1}>
-              {vendorName || '-'} • {InvNumber || '-'}
-            </Text>
-          </View>
-          <View style={styles.summaryToggle}>
-            <Text style={styles.summaryToggleText}>{summaryCollapsed ? 'Show' : 'Hide'}</Text>
-          </View>
+      <View style={styles.summaryBar}>
+        <View style={styles.summaryCol}>
+          <Text style={styles.summaryText}>
+            INV No
+          </Text>
+          <Text style={styles.summaryValue} numberOfLines={1}>
+            {InvNumber}
+          </Text>
+          <Text style={styles.summaryText}>
+            V. Name
+          </Text>
+          <Text style={styles.summaryValue} numberOfLines={1}>
+            {vendorName}
+          </Text>
+          <Text style={styles.summaryText}>
+            S. Date
+          </Text>
+          <Text style={styles.summaryValue} numberOfLines={1}>
+            {day}
+          </Text>
         </View>
-
-        {!summaryCollapsed && (
-          <View style={styles.summaryBody}>
-            <View style={styles.summaryCol}>
-              <Text style={styles.summaryText}>INV No</Text>
-              <Text style={styles.summaryValue} numberOfLines={1}>
-                {InvNumber}
-              </Text>
-              <Text style={styles.summaryText}>V. Name</Text>
-              <Text style={styles.summaryValue} numberOfLines={1}>
-                {vendorName}
-              </Text>
-              <Text style={styles.summaryText}>S. Date</Text>
-              <Text style={styles.summaryValue} numberOfLines={1}>
-                {day}
-              </Text>
-            </View>
-            <View style={[styles.summaryCol, styles.summaryColRight]}>
-              <Text style={styles.summaryText}>No. Units</Text>
-              <Text style={styles.summaryValue}>{totalPieces}</Text>
-              <Text style={styles.summaryText}>E. Price</Text>
-              <Text style={styles.summaryValue}>${totalExtendedPrice.toFixed(2)}</Text>
-              <Text style={styles.summaryText}>C. Cost</Text>
-              <Text style={styles.summaryValue}>${totalUnitPrice.toFixed(2)}</Text>
-            </View>
-          </View>
-        )}
-      </TouchableOpacity>
+        <View
+          style={[styles.summaryCol, styles.summaryColRight]}
+        >
+          <Text style={styles.summaryText}>
+            No. Units
+          </Text>
+          <Text style={styles.summaryValue}>{totalPieces}</Text>
+          <Text style={styles.summaryText}>
+            E. Price
+          </Text>
+          <Text style={styles.summaryValue}>
+            ${totalExtendedPrice.toFixed(2)}
+          </Text>
+          <Text style={styles.summaryText}>
+            C. Cost
+          </Text>
+          <Text style={styles.summaryValue}>
+            ${totalUnitPrice.toFixed(2)}
+          </Text>
+        </View>
+      </View>
 
       <View style={styles.searchWrap}>
         <TextInput
@@ -401,30 +305,12 @@ export default function InvoiceDetails() {
         </View>
       ) : (
         <View style={{ flex: 1, paddingHorizontal: 12, paddingTop: 8 }}>
-          {selectedIds.size > 0 && (
-            <View style={styles.transferBar}>
-              <Text style={styles.transferText}>{selectedIds.size} selected</Text>
-              <TouchableOpacity
-                style={[styles.transferBtn, transferLoading && styles.transferBtnDisabled]}
-                onPress={handleLinkingRemove}
-                disabled={transferLoading}
-              >
-                <Text style={styles.transferBtnText}>
-                  {transferLoading ? 'Removing...' : 'Remove Selected Linking'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          {!!transferMessage && (
-            <Text style={styles.transferMessage}>{transferMessage}</Text>
-          )}
           <FlatList
             data={filteredItems}
             keyExtractor={item => item.ProductId.toString()}
             ListHeaderComponent={renderHeader}
             stickyHeaderIndices={[0]}
             renderItem={renderItem}
-            extraData={selectedIds}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 20 }}
             initialNumToRender={6}
@@ -453,10 +339,13 @@ export default function InvoiceDetails() {
             />
           )}
 
+          {/* <FloatingButton
+            onPress={() => alert('Floating button pressed!')}
+            title="+"
+          /> */}
         </View>
       )}
     </View>
-
     </ImageBackground>
   );
 }
@@ -473,7 +362,7 @@ const styles = StyleSheet.create({
   headerText: {
     fontWeight: 'bold',
     fontSize: 12.6,
-    textAlign: 'left',
+    textAlign: 'center',
     color: '#1f1f1f',
   },
   card: {
@@ -560,27 +449,19 @@ const styles = StyleSheet.create({
   summaryBar: {
     margin: 8,
     padding: 14,
-    backgroundColor: '#ECFDF5',
-    borderRadius: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#BBF7D0',
+    borderColor: '#e4e7ef',
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  summaryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  summaryTitle: { fontSize: 15, fontWeight: '800', color: '#14532D' },
-  summarySub: { fontSize: 12, color: '#166534', marginTop: 2 },
-  summaryToggle: {
-    backgroundColor: '#16A34A',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  summaryToggleText: { color: '#fff', fontWeight: '700', fontSize: 11 },
-  summaryBody: { flexDirection: 'row', justifyContent: 'space-between' },
   summaryCol: {
     flex: 1,
     gap: 4,
@@ -590,7 +471,7 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     fontSize: 12,
-    color: '#166534',
+    color: '#6b7280',
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
@@ -598,7 +479,7 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0F172A',
+    color: '#111827',
   },
   searchWrap: {
     marginHorizontal: 8,
@@ -615,27 +496,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#1f1f1f',
   },
-  transferBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 8,
-  },
-  transferText: { fontSize: 12, fontWeight: '700', color: '#166534' },
-  transferBtn: {
-    backgroundColor: '#16A34A',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-  },
-  transferBtnDisabled: { opacity: 0.6 },
-  transferBtnText: { color: '#fff', fontWeight: '800', fontSize: 12 },
-  transferMessage: { fontSize: 12, color: '#111', marginBottom: 6 },
   emptyText: { fontSize: 16, color: '#666' },
 });

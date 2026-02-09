@@ -187,22 +187,26 @@ export default function TopSellingCustomerReport() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.dateCard}>
-          <TouchableOpacity
-            onPress={() => setPickerVisible(true)}
-            style={styles.dateCardHeader}
-          >
-            <Text style={styles.dateCardHeaderText}>Select Date & Time</Text>
+          <TouchableOpacity onPress={() => setPickerVisible(true)} style={styles.dateCardHeader}>
+            <View>
+              <Text style={styles.dateCardHeaderText}>Select Date & Time</Text>
+              <Text style={styles.dateCardSubText}>Tap to change the reporting range</Text>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => setPickerVisible(true)}>
             <View style={styles.datetimeselector}>
               <View style={styles.dateshow}>
                 <Text style={styles.dateLabel}>From</Text>
-                <Text style={styles.dateBadge}>{fmtDateOnly(range.start)}</Text>
+                <View style={styles.dateBadge}>
+                  <Text style={styles.dateBadgeText}>{fmtDateOnly(range.start)}</Text>
+                </View>
               </View>
               <View style={styles.dateshow}>
                 <Text style={styles.dateLabel}>To</Text>
-                <Text style={styles.dateBadge}>{fmtDateOnly(range.end)}</Text>
+                <View style={styles.dateBadge}>
+                  <Text style={styles.dateBadgeText}>{fmtDateOnly(range.end)}</Text>
+                </View>
               </View>
             </View>
           </TouchableOpacity>
@@ -308,31 +312,55 @@ const getStyles = (isTablet) =>
     screen: { flex: 1 },
 
     dateCard: {
-      margin: 20,
+      marginHorizontal: 18,
+      marginTop: 18,
+      marginBottom: 8,
       backgroundColor: '#fff',
-      borderRadius: 8,
+      borderRadius: 14,
       borderWidth: 1,
-      borderColor: '#D9D9D9',
+      borderColor: '#E6E6E6',
+      padding: 14,
+      ...Platform.select({
+        android: { elevation: 2 },
+        ios: {
+          shadowColor: '#000',
+          shadowOpacity: 0.06,
+          shadowRadius: 6,
+          shadowOffset: { width: 0, height: 3 },
+        },
+      }),
     },
     dateCardHeader: {
-      padding: 12,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
       alignItems: 'center',
-      borderBottomColor: '#D9D9D9',
-      borderBottomWidth: 2,
+      paddingBottom: 10,
+      borderBottomColor: '#ECECEC',
+      borderBottomWidth: 1,
     },
-    dateCardHeaderText: { color: '#2e7d32', fontWeight: '700' },
-    datetimeselector: { flexDirection: 'row', marginTop: 12, alignSelf: 'center', gap: 16 },
-    dateshow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    dateLabel: { color: '#1f1f1f', fontWeight: '600' },
+    dateCardHeaderText: { color: '#1B5E20', fontWeight: '800', fontSize: 16, letterSpacing: 0.2 },
+    dateCardSubText: { color: '#6B7280', fontSize: 12, marginTop: 4 },
+    datetimeselector: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 14,
+      justifyContent: 'space-between',
+    },
+    dateshow: { flex: 1, gap: 6 },
+    dateLabel: { color: '#4B5563', fontWeight: '600', fontSize: 12 },
     dateBadge: {
-      padding: 10,
-      alignItems: 'center',
-      borderColor: '#D9D9D9',
-      borderWidth: 2,
-      marginVertical: 10,
-      marginRight: 5,
-      borderRadius: 8,
-      color: '#1f1f1f',
+      backgroundColor: '#F8FAFC',
+      borderColor: '#DDE3EA',
+      borderWidth: 1,
+      borderRadius: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+    },
+    dateBadgeText: {
+      color: '#111827',
+      fontWeight: '700',
+      fontSize: 14,
+      letterSpacing: 0.2,
     },
 
     filterCard: {

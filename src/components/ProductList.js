@@ -25,14 +25,12 @@ export default function ProductList({id, category, backgroundUri, showFloatingCa
   const navigation = useNavigation();
   const [products, setProducts] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
-    const [userrole, setUserRole] = useState('');
+  const [userrole, setUserRole] = useState('');
   const { cart, addToCart, increaseQty, decreaseQty } = useContext(CartContext);
   const { print, addToPrint, increasePrintQty, decreasePrintQty, removeFromprint } = useContext(PrintContext);
   const sheetRef = useRef(null);
-
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
-
   // --- Responsive layout math ---
   const COLS = isTablet ? 5 : 3;                   // <- requirement
   const GAP = isTablet ? 14 : 10;                  // space between cards
@@ -124,7 +122,7 @@ const isGifBanner = useMemo(() => {
           </View>
         ) : (
           <TouchableOpacity onPress={() => addToCart(item)}>
-            <CartIcon width={30} height={30} fill="rgba(245, 114, 0, 1)" />
+            <CartIcon width={30} height={30} fill="#16A34A" />
           </TouchableOpacity>
         ))
       : (inPrint ? (
@@ -133,7 +131,7 @@ const isGifBanner = useMemo(() => {
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.cartprint} onPress={() => addToPrint(item)}>
-            <PrinterIcon width={30} height={30} fill="rgba(245, 114, 0, 1)" />
+            <PrinterIcon width={30} height={30} fill="#16A34A" />
           </TouchableOpacity>
         ))
     }
@@ -211,7 +209,6 @@ const isGifBanner = useMemo(() => {
       />
     </View>
   );
-
 }
 
 const styles = StyleSheet.create({
@@ -244,7 +241,6 @@ const styles = StyleSheet.create({
   productName: { fontWeight: 'bold', fontSize: 14, marginTop: 2, color: '#000' },
   metaText: { color: '#555',fontSize: 12, textAlign:"left", fontWeight:'bold' },
   price: { color: 'green', fontSize: 14, fontWeight: '600', marginTop: 4 },
-
   cartBtn: {
     backgroundColor: 'rgba(245, 114, 0, 1)',
     paddingVertical: 10,

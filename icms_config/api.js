@@ -24,6 +24,8 @@ const PATHS = {
   ROWINOVICE: '/api/storeRawInvoice',
   GET_ROWINOVICE: '/api/get_storeRawInvoice',
   UPDATE_ROWINOVICE: '/api/update_invoice_status',
+ linkingcollectiontransfer: '/api/linkingcollectiontransfer',
+ REMOVE_LINKING: '/api/invoice/removeLinking',
  
 };
 

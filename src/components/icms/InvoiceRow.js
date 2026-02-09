@@ -1,11 +1,10 @@
-import React, { memo } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Platform } from 'react-native';
 
-const InvoiceRow = memo(
-  ({ item, index, isExpanded, onToggle, onLongPress, selectedIds, onEdit, onLinkProduct }) => {
+const InvoiceRow = ({ item, index, isExpanded, onToggle, onLongPress, selectedIds, onToggleSelect, onEdit, onLinkProduct }) => {
     const { width, fontScale } = useWindowDimensions();
     const isTablet = width >= 768;
-console.log("item:",item);
+
     if (!item) return null;
 
     let Invqty;
@@ -22,57 +21,69 @@ console.log("item:",item);
     const valueSize = Math.max(12, base / fontScale);
     const cellSize = Math.max(12, base / fontScale);
 
+    const isSelected = selectedIds.has(item.ProductId);
+    const barcodeValue = String(item.barcode ?? '').trim();
+    const hasBarcode = barcodeValue.length > 0;
+    const sourceValue = String(item.source ?? '').trim().toLowerCase();
+    const isCentral = sourceValue === 'centralizeddb';
+    const isEven = typeof index === 'number' ? index % 2 === 0 : true;
+    const baseBg = !hasBarcode
+      ? '#ff0000'
+      : isCentral
+      ? '#FFECEC'
+      : isEven
+      ? '#FAFAFA'
+      : '#FFFFFF';
+    const rowBg = isSelected ? '#DFF7E0' : baseBg;
+    const textColor = '#21262E';
+
     return (
       <TouchableOpacity
         onPress={onToggle}
         onLongPress={() => onLongPress(item.ProductId)}
         style={[
           styles.card,
-          selectedIds.has(item.ProductId) && styles.selectedRowOuter,
+          { backgroundColor: rowBg },
+      
           Platform.select({
-            ios: styles.shadowIOS,
-            android: styles.shadowAndroid,
+          ios: styles.shadowIOS,
+          android: styles.shadowAndroid,
           }),
         ]}
         activeOpacity={0.75}
       >
         {/* Row cells */}
         <View
-          style={[
-            styles.row,
-            {
-              backgroundColor: selectedIds.has(item.ProductId)
-                ? '#DFF7E0'
-                : !item.barcode
-                ? '#FFECEC' // light red if no barcode
-                : index % 2 === 0
-                ? '#FAFAFA'
-                : '#FFFFFF',
-            },
-          ]}
+          style={[styles.row]}
         >
-          <Text style={[styles.cell, { flex: 2, fontSize: cellSize }]} numberOfLines={1}>
+          <TouchableOpacity
+            style={styles.checkboxWrap}
+            onPress={() => onToggleSelect && onToggleSelect(item.ProductId)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
+              {isSelected && <Text style={styles.checkboxTick}>✓</Text>}
+            </View>
+          </TouchableOpacity>
+
+          <Text style={[styles.cell, { flex: 2, fontSize: cellSize, color: textColor }]} numberOfLines={1}>
             {item.barcode}
           </Text>
 
           <Text
-            style={[styles.cell, { flex: 2.5, fontSize: cellSize }]}
+            style={[styles.cell, { flex: 2.5, fontSize: cellSize, color: textColor }]}
             numberOfLines={1}
             ellipsizeMode="tail"
           >
             {item.description}
           </Text>
 
-          <Text style={[styles.cell, { flex: 0.7, textAlign: 'center', fontSize: cellSize }]}>
+          <Text style={[styles.cell, { flex: 0.7, textAlign: 'left', fontSize: cellSize, color: textColor }]}>
             {item.pieces}
           </Text>
 
-          <Text style={[styles.cell, { flex: 0.8, textAlign: 'center', fontSize: cellSize }]}>
+          <Text style={[styles.cell, { flex: 0.8, textAlign: 'left', fontSize: cellSize, color: textColor }]}>
             {item.unitPrice}
-          </Text>
-
-          <Text style={[styles.cell, { flex: 1, textAlign: 'center', fontSize: cellSize }]}>
-            {item.extendedPrice}
           </Text>
         </View>
 
@@ -127,8 +138,7 @@ console.log("item:",item);
         )}
       </TouchableOpacity>
     );
-  },
-);
+};
 
 export default InvoiceRow;
 
@@ -152,7 +162,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingVertical: 10,
     paddingHorizontal: 10,
+    alignItems: 'center',
   },
+  checkboxWrap: { marginRight: 8 },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#94A3B8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  checkboxChecked: {
+    backgroundColor: '#16A34A',
+    borderColor: '#16A34A',
+  },
+  checkboxTick: { color: '#fff', fontSize: 12, fontWeight: '800' },
   cell: {
     fontSize: 12.6,
     color: '#21262E',

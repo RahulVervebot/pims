@@ -48,6 +48,7 @@ const SaveInvoiceModal = ({ isVisible, onClose,ImageURL, vendorName, tableData,c
         posName: row.posName || '',
         department: row.department || '',
         condition: row.condition || '',
+        source: row.source || ''
       }))
     const selectedDate = invoiceDate.toISOString().split('T')[0];
     const bodyPayload = {

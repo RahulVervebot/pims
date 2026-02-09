@@ -98,6 +98,7 @@ console.log("items:",items);
       topIcon: absoluteTopIcon,
       topBanner: absoluteTopBanner,
       topBannerBottom: absoluteTopBannerBtm,
+      totalAvailableInPOSProducts: c.totalAvailableInPOSProducts ?? null,
 
       // Legacy aliases (so existing UI e.g. Picker using _id / category still works)
       _id: String(c.id),
