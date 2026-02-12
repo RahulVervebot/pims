@@ -9,7 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
 
-const CustomHeader = ({ 
+const CustomHeader = ({
   Title, 
   backgroundType = "color", 
   backgroundValue = "#fff", 
@@ -54,7 +54,7 @@ const CustomHeader = ({
           {children}
         </ImageBackground>
       );
-    } 
+    }
     return (
       <View style={[styles.headerContainer, { backgroundColor: backgroundValue }, isCompact && styles.headerContainerCompact]}>
         {renderContent()}
@@ -65,8 +65,10 @@ const CustomHeader = ({
 
 const renderContent = () => {
   return (
+  
     <View style={[styles.content, isCompact && styles.contentCompact]}>
       {/* Left */}
+    
       <View style={[styles.logo, isCompact && styles.logoCompact]}>
         <TulsiWhiteLogo width={styles.rowIcon.width} height={styles.rowIcon.height} />
         <View style={styles.logoTextWrap}>
@@ -76,7 +78,6 @@ const renderContent = () => {
           </Text>
         </View>
       </View>
-
       {/* Center (absolute) */}
       <View style={styles.titleOverlay} pointerEvents="none">
         <Text
@@ -126,12 +127,12 @@ const getStyles = ({ isCompact, isTablet }) => {
     headerContainer: {
       paddingHorizontal: horizontalPadding,
       paddingVertical: verticalPadding,
-      paddingTop: isTablet ? 10 : isCompact ? 14 : 16,
+      paddingTop: isTablet ? 10 : isCompact ? 20 : 20,
     },
     headerContainerCompact: {
       paddingHorizontal: horizontalPadding,
       paddingVertical: verticalPadding,
-      paddingTop: isTablet ? 18 : isCompact ? 14 : 16,
+      paddingTop: isTablet ? 18 : isCompact ? 20 : 20,
     },
     content: {
       position: 'relative',
@@ -169,20 +170,20 @@ const getStyles = ({ isCompact, isTablet }) => {
     headerTitle: {
       fontSize: titleSize,
       fontWeight: '700',
-      color: '#000',
+      color: '#fff',
       paddingHorizontal: isTablet ? 140 : 90,
       textAlign: 'center',
     },
     headerUser: {
       fontSize: userSize,
       fontWeight: '400',
-      color: '#000',
+      color: '#fff',
       paddingHorizontal: 10,
     },
     headerName: {
       fontSize: nameSize,
       fontWeight: '700',
-      color: '#000',
+      color: '#fff',
       paddingHorizontal: 10,
       textTransform: 'capitalize',
     },

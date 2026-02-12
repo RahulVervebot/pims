@@ -47,9 +47,10 @@ import TopSellingCustomerReport from './src/screens/TopSellingCustomerReport.js'
 import SessionReports from './src/components/reports/SessionReports.js';
 import OrdersScreen from './src/components/orders/order.js';
 import MixMatchScreen from './src/screens/promotions/mixmatch.js';
-//icons 
+import QuantityDiscountScreen from './src/screens/promotions/QuantityDiscount';
+import SalePrintScreen from './src/screens/SalePrintScreen';
 import HomeIcon from './src/assets/icons/HomeIcon.svg';
-import ProductIcon from './src/assets/icons/Products.svg';
+import ProductIcon from './src/assets/icons/Icon-Product.svg';
 import ProductScreen from './src/screens/ProductScreen.js';
 import CartIcon from './src/assets/icons/inventory_1.svg';
 import POSIcon from './src/assets/icons/payment_2.svg';
@@ -98,18 +99,6 @@ function BottomTabs() {
       screenOptions={({ route }) => ({
          headerShown: false,
          tabBarShowLabel: false,
-        // Tab bar container
-        //        tabBarStyle: {
-        //   backgroundColor: '#fff',
-        //   height: BAR_HEIGHT,
-        //   paddingBottom: BAR_PAD_BOTTOM, 
-        //   borderTopWidth: 0,            
-        //   elevation: 10,
-        //   shadowColor: '#000',
-        //   shadowOpacity: 0.06,
-        //   shadowRadius: 6,
-        //   shadowOffset: { width: 0, height: -2 },
-        // },
    
         // Center the icon in each tab item
         tabBarItemStyle: {
@@ -232,7 +221,9 @@ export default function App() {
        <Stack.Screen name="SettingScreen" component={SettingScreen} />    
             <Stack.Screen name="CategoryListScreen" component={CategoryListScreen} />  
      <Stack.Screen name="PrintScreen" component={PrintScreen} /> 
+     <Stack.Screen name="SalePrintScreen" component={SalePrintScreen} />
     <Stack.Screen name="MixMatchScreen" component={MixMatchScreen} /> 
+    <Stack.Screen name="QuantityDiscountScreen" component={QuantityDiscountScreen} />
 
      
       <Stack.Screen name="SignupScreen" component={SignupScreen} />

@@ -253,7 +253,7 @@ export default function CategoryListScreen() {
                     alignSelf: "flex-end",
                     marginRight: 16,
                     marginBottom: 12 + insets.bottom,
-                    backgroundColor: "#2c1e70",
+                    backgroundColor: "#319241",
                     paddingVertical: 12,
                     paddingHorizontal: 16,
                     borderRadius: 30,
@@ -378,7 +378,7 @@ const COLORS = {
   stroke: 'rgba(0,0,0,0.08)',
   text: '#111827',
   sub: '#6B7280',
-  primary: '#2C1E70',
+  primary: '#319241',
 };
 
 const styles = StyleSheet.create({
@@ -481,5 +481,5 @@ const styles = StyleSheet.create({
   btnGhost: { marginTop: 8, paddingVertical: 10, paddingHorizontal: 14 },
   btnGhostText: { color: COLORS.sub, fontWeight: '700' },
   btnLight: { backgroundColor: '#E53935', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: COLORS.stroke },
-  btnLightText: { color: COLORS.text, fontWeight: '800' },
+  btnLightText: { color: '#fff', fontWeight: '800' },
 });

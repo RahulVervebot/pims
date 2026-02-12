@@ -48,20 +48,21 @@ export default function POSScreen() {
     setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const Row = ({ icon, label, isFirst, isLast, onPress, right }) => (
+  const Row = ({ icon, label, isFirst, isLast, onPress, right, isChild }) => (
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
       style={[
         styles.row,
         isFirst && styles.rowFirst,
+        isChild && styles.rowChild,
         !isLast && styles.rowDivider,
         { justifyContent: 'space-between' }, // inline only
       ]}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: isTablet ? 14 : 10 }}>
-        <Image source={icon} style={styles.rowIcon} resizeMode="contain" />
-        <Text style={styles.rowTitle}>{label}</Text>
+        <Image source={icon} style={[styles.rowIcon, isChild && styles.rowIconChild]} resizeMode="contain" />
+        <Text style={[styles.rowTitle, isChild && styles.rowTitleChild]}>{label}</Text>
       </View>
       {right}
     </TouchableOpacity>
@@ -85,12 +86,14 @@ export default function POSScreen() {
             <Row
               icon={TopSellingProducts}
               label="Mix Match"
+              isChild
               onPress={() => navigation.navigate('MixMatchScreen')}
               right={null}
             />
             <Row
               icon={TopSellingCategories}
               label="Quantity Discount"
+              isChild
               isLast
               onPress={() => navigation.navigate('QuantityDiscountScreen')}
               right={null}
@@ -110,12 +113,14 @@ export default function POSScreen() {
             <Row
               icon={TopCustumerList}
               label="Product Print"
+              isChild
               onPress={() => navigation.navigate('PrintScreen')}
               right={null}
             />
             <Row
               icon={TopCustumerList}
               label="Sale Print"
+              isChild
               isLast
               onPress={() => navigation.navigate('SalePrintScreen')}
               right={null}
@@ -135,12 +140,14 @@ export default function POSScreen() {
           <Row
               icon={TopSellingProducts}
               label="Create Product"
+              isChild
               right={null}
                 onPress={() => setShowProductCreate(true)}
             />
             <Row
               icon={TopSellingProducts}
               label="Create Category"
+              isChild
               right={null}
                 onPress={() => setShowCreate(true)}
             />
@@ -148,6 +155,7 @@ export default function POSScreen() {
             <Row
               icon={TopSellingCategories}
               label="Category List"
+              isChild
               isLast
               onPress={() => navigation.navigate('CategoryListScreen')}
               right={null}
@@ -243,6 +251,10 @@ const getStyles = (isTablet) =>
       paddingVertical: isTablet ? 16 : 12,
       gap: isTablet ? 14 : 10,
     },
+    rowChild: {
+      paddingVertical: isTablet ? 12 : 9,
+      paddingLeft: isTablet ? 16 : 12,
+    },
     rowFirst: {
       paddingTop: isTablet ? 16 : 8,
     },
@@ -254,11 +266,22 @@ const getStyles = (isTablet) =>
       width: isTablet ? 36 : 28,
       height: isTablet ? 36 : 28,
     },
+    rowIconChild: {
+      width: isTablet ? 30 : 22,
+      height: isTablet ? 30 : 22,
+      opacity: 0.9,
+    },
     rowTitle: {
       flexShrink: 1,
       fontSize: isTablet ? 20 : 16,
       fontWeight: '600',
       color: '#111',
       letterSpacing: 0.2,
+    },
+    rowTitleChild: {
+      fontSize: isTablet ? 17 : 13,
+      fontWeight: '500',
+      color: '#1f2937',
+      letterSpacing: 0.1,
     },
   });

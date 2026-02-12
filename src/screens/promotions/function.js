@@ -30,10 +30,13 @@ const buildpostHeaders = async () => {
   };
 };
 
-export async function getPromotionGroupsDetails() {
+export async function getPromotionGroupsDetails({ page = 1, limit = 10 } = {}) {
   const headers = await buildHeaders();
   const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/app/get_promotion_groups_details`, {
+  const params = new URLSearchParams();
+  params.set('page', String(page));
+  params.set('limit', String(limit));
+  const res = await fetch(`${baseUrl}/api/app/get_promotion_groups_details?${params.toString()}`, {
     method: 'GET',
     headers,
   });
@@ -45,7 +48,12 @@ console.log("resoonse:",res);
   }
 
   const json = await res.json().catch(() => ({}));
-  return Array.isArray(json?.data) ? json.data : [];
+  return {
+    data: Array.isArray(json?.data) ? json.data : [],
+    page: Number(json?.page ?? page) || page,
+    total_pages: Number(json?.total_pages ?? 1) || 1,
+    total_records: Number(json?.total_records ?? 0) || 0,
+  };
 }
 
 export async function createMixMatchPromotion(payload) {
@@ -129,4 +137,80 @@ export async function searchProductsByBarcode(text) {
 
   const json = await res.json().catch(() => ({}));
   return Array.isArray(json?.products) ? json.products : [];
+}
+
+export async function getQuantityDiscountPromotions({ page = 1, limit = 10, start_date, end_date }) {
+  const headers = await buildHeaders();
+  const baseUrl = await getBaseUrl();
+  const params = new URLSearchParams();
+  params.set('page', String(page));
+  params.set('limit', String(limit));
+  if (start_date) params.set('start_date', start_date);
+  if (end_date) params.set('end_date', end_date);
+
+  const res = await fetch(`${baseUrl}/api/app/get/quantity/discount/promotion?${params.toString()}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch quantity discounts (${res.status}): ${text || 'No details'}`);
+  }
+
+  const json = await res.json().catch(() => ({}));
+  return {
+    data: Array.isArray(json?.data) ? json.data : [],
+    page: Number(json?.page ?? page) || page,
+    total_pages: Number(json?.total_pages ?? 1) || 1,
+    total_records: Number(json?.total_records ?? 0) || 0,
+  };
+}
+
+export async function updateQuantityDiscountPromotion(payload) {
+  const headers = await buildpostHeaders();
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/app/update/quantity/discount/promotion`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(json?.message || json?.error || `Failed to update quantity discount (${res.status})`);
+  }
+  return json;
+}
+
+export async function createQuantityDiscountPromotion(payload) {
+  const headers = await buildpostHeaders();
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/app/create/quantity/discount/promotion`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(json?.message || json?.error || `Failed to create quantity discount (${res.status})`);
+  }
+  return json;
+}
+
+export async function deleteQuantityDiscountPromotion(productId) {
+  const headers = await buildpostHeaders();
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/app/delete/quantity/discount/promotion`, {
+    method: 'DELETE',
+    headers,
+    body: JSON.stringify({ product_id: productId }),
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(json?.message || json?.error || `Failed to delete quantity discount (${res.status})`);
+  }
+  return json;
 }

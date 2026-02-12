@@ -7,9 +7,8 @@ import AppHeader from '../../components/AppHeader';
 import reportbg from '../../assets/images/report-bg.png';
 import { searchVendors } from '../../components/icms/vendorApi';
 
-
-
 const getImageSource = val => (typeof val === 'number' ? val : { uri: val });
+
 function buildFetchInvoiceUrl(vendor) {
   const base = new URL(API_ENDPOINTS.FETCH_INVOICE);
   if (vendor?.value) base.searchParams.set('value', vendor.value);
@@ -68,8 +67,8 @@ export default function InvoiceList() {
   const [vendorQuery, setVendorQuery] = useState('');
   const [vendorResults, setVendorResults] = useState([]);
   const [selectedVendor, setSelectedVendor] = useState(null);
-const [vendorSearching, setVendorSearching] = useState(false);
-const [vendorSearchError, setVendorSearchError] = useState('');
+  const [vendorSearching, setVendorSearching] = useState(false);
+  const [vendorSearchError, setVendorSearchError] = useState('');
   // invoices state
   const [loading, setLoading] = useState(false);
   const [allInvoices, setAllInvoices] = useState([]);
@@ -127,7 +126,7 @@ const [vendorSearchError, setVendorSearchError] = useState('');
   const debouncedVendorSearch = useMemo(() => debounce(runVendorSearch, 300), []);
 
   // click "Search" (explicit API call) OR use suggestions
-const onPressSearchVendor = async () => {
+  const onPressSearchVendor = async () => {
   setVendorSearchError('');
   setVendorSearching(true);
   try {
@@ -426,4 +425,4 @@ const styles = StyleSheet.create({
   helperText: { textAlign: 'center', color: '#666' },
   emptyText: { textAlign: 'center', color: '#666', marginTop: 20 },
 
-}); 
+});

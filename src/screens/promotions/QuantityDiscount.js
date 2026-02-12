@@ -8,52 +8,35 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
-  Switch,
   Alert,
   ImageBackground,
   Platform,
   Modal,
 } from 'react-native';
 import RBSheet from 'react-native-raw-bottom-sheet';
-import { Picker } from '@react-native-picker/picker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Camera, CameraType } from 'react-native-camera-kit';
 import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import {
-  createMixMatchPromotion,
-  getPromotionGroupsDetails,
-  updateMixMatchPromotion,
-  deleteMixMatchPromotion,
-  getDaysList,
+  getQuantityDiscountPromotions,
+  createQuantityDiscountPromotion,
+  updateQuantityDiscountPromotion,
+  deleteQuantityDiscountPromotion,
   searchProductsByBarcode,
 } from './function';
 import AppHeader from '../../components/AppHeader';
 import reportbg from '../../assets/images/report-bg.png';
 
 const DEFAULT_FORM = {
-  name: '',
-  product_ids: '',
-  no_of_products_to_buy: '1',
-  no_of_free_products: '1',
-  discount_product_ids: '',
-  is_add_discount_on_product: false,
-  sale_price: '',
-  status: true,
+  product_id: null,
+  no_of_product_to_buy: '1',
+  discount_amount: '1',
   start_date: '',
   end_date: '',
-  days_of_week_ids: [],
-  applicable_for_single_unit: true,
-  offer_type: 'free_product',
 };
 
-const OFFER_TYPES = [
-  { label: 'Free Product', value: 'free_product' },
-  { label: 'Quantity Based Offer', value: 'quantity_based_offer' },
-];
-
-
-export default function MixMatchScreen() {
+export default function QuantityDiscountScreen() {
   const sheetRef = useRef(null);
   const onEndReachedCalledDuringMomentum = useRef(false);
   const [loading, setLoading] = useState(true);
@@ -64,69 +47,23 @@ export default function MixMatchScreen() {
   const [totalPages, setTotalPages] = useState(1);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [editingId, setEditingId] = useState(null);
-  const [daysList, setDaysList] = useState([]);
-  const [selectedDays, setSelectedDays] = useState([]);
-  const [dayPickerValue, setDayPickerValue] = useState('');
+
+  const [query, setQuery] = useState('');
+  const [filterStart, setFilterStart] = useState('');
+  const [filterEnd, setFilterEnd] = useState('');
+  const [showFilterStartPicker, setShowFilterStartPicker] = useState(false);
+  const [showFilterEndPicker, setShowFilterEndPicker] = useState(false);
 
   const [productQuery, setProductQuery] = useState('');
   const [productResults, setProductResults] = useState([]);
-  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [productDropdownVisible, setProductDropdownVisible] = useState(false);
   const productDebounceRef = useRef(null);
 
-  const [discountQuery, setDiscountQuery] = useState('');
-  const [discountResults, setDiscountResults] = useState([]);
-  const [selectedDiscountProducts, setSelectedDiscountProducts] = useState([]);
-  const [discountDropdownVisible, setDiscountDropdownVisible] = useState(false);
-  const discountDebounceRef = useRef(null);
   const [scannerVisible, setScannerVisible] = useState(false);
-  const [scanTarget, setScanTarget] = useState('product');
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-
-  const normalizeDayIds = (list) => {
-    const raw = Array.isArray(list)
-      ? list
-      : typeof list === 'string'
-        ? list.split(/[,\s]+/).filter(Boolean)
-        : [];
-    const expanded = raw.flatMap((entry) => {
-      if (typeof entry === 'string' && entry.includes(',')) {
-        return entry.split(',').map((v) => v.trim()).filter(Boolean);
-      }
-      return [entry];
-    });
-    return expanded
-      .map((entry) => {
-        if (entry && typeof entry === 'object') {
-          return Number(entry.id ?? entry.value ?? entry.day_id);
-        }
-        return Number(entry);
-      })
-      .filter((id) => Number.isFinite(id) && id > 0);
-  };
-
-  const getDayNames = (ids) => {
-    if (!Array.isArray(ids)) return [];
-    if (!daysList.length) return [];
-    const directNames = ids
-      .map((entry) => {
-        if (entry && typeof entry === 'object') {
-          return entry.name || entry.day_name || null;
-        }
-        if (typeof entry === 'string' && Number.isNaN(Number(entry))) {
-          return entry;
-        }
-        return null;
-      })
-      .filter(Boolean);
-    if (directNames.length) return directNames;
-    const normalized = normalizeDayIds(ids);
-    return normalized
-      .map((id) => daysList.find((d) => Number(d.id) === id)?.name)
-      .filter(Boolean);
-  };
 
   const formatDateOnly = (value) => {
     if (!value) return '';
@@ -178,44 +115,22 @@ export default function MixMatchScreen() {
     setFilterEnd(`${yyyy}-${mm}-${dd}`);
   };
 
-  const normalizeProductEntry = (entry) => {
-    if (entry && typeof entry === 'object') {
-      const id = Number(entry.id ?? entry.product_id ?? entry._id);
-      const barcode = entry.barcode || '';
-      const name =
-        entry.product_name ||
-        entry.productName ||
-        entry.name ||
-        (barcode ? `Barcode: ${barcode}` : `ID: ${id || '-'}`);
-      return Number.isFinite(id) ? { id, name, barcode } : null;
-    }
-    const id = Number(entry);
-    if (!Number.isFinite(id)) return null;
-    return { id, name: `ID: ${id}`, barcode: '' };
-  };
-  const [query, setQuery] = useState('');
-  const [filterStart, setFilterStart] = useState('');
-  const [filterEnd, setFilterEnd] = useState('');
-  const [showFilterStartPicker, setShowFilterStartPicker] = useState(false);
-  const [showFilterEndPicker, setShowFilterEndPicker] = useState(false);
+  const updateForm = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const loadPromotions = async ({ nextPage = 1, append = false } = {}) => {
     try {
       if (append) setLoadingMore(true);
       else setLoading(true);
-      const [promoRes, days] = await Promise.all([
-        getPromotionGroupsDetails({ page: nextPage, limit: 10 }),
-        getDaysList(),
-      ]);
-      console.log('mix match promotions response:', promoRes);
-      const nextRows = Array.isArray(promoRes?.data) ? promoRes.data : [];
+      const res = await getQuantityDiscountPromotions({
+        page: nextPage,
+        limit: 10,
+        start_date: filterStart || undefined,
+        end_date: filterEnd || undefined,
+      });
+      const nextRows = Array.isArray(res?.data) ? res.data : [];
       setRows((prev) => (append ? [...prev, ...nextRows] : nextRows));
-      setPage(Number(promoRes?.page ?? nextPage) || nextPage);
-      setTotalPages(Number(promoRes?.total_pages ?? 1) || 1);
-      setDaysList(Array.isArray(days) ? days : []);
-      if (Array.isArray(promoRes?.data)) {
-        console.log('mix match days_of_week_ids (load):', promoRes.data.map((d) => d?.days_of_week_ids));
-      }
+      setPage(Number(res?.page ?? nextPage) || nextPage);
+      setTotalPages(Number(res?.total_pages ?? 1) || 1);
     } catch (e) {
       Alert.alert('Error', e?.message || 'Failed to load promotions.');
     } finally {
@@ -225,8 +140,9 @@ export default function MixMatchScreen() {
   };
 
   useEffect(() => {
+    setPage(1);
     loadPromotions({ nextPage: 1, append: false });
-  }, []);
+  }, [filterStart, filterEnd]);
 
   useEffect(() => {
     (async () => {
@@ -240,71 +156,45 @@ export default function MixMatchScreen() {
     })();
   }, []);
 
-  const updateForm = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
-
   const handleOpen = () => {
     setForm(DEFAULT_FORM);
     setEditingId(null);
-    setSelectedDays([]);
-    setSelectedProducts([]);
-    setSelectedDiscountProducts([]);
+    setSelectedProduct(null);
     setProductQuery('');
-    setDiscountQuery('');
     setProductResults([]);
-    setDiscountResults([]);
     setProductDropdownVisible(false);
-    setDiscountDropdownVisible(false);
-    setDayPickerValue('');
     sheetRef.current?.open();
   };
 
-  const handleCreate = async () => {
-    if (!form.name.trim()) {
-      return Alert.alert('Missing info', 'Please enter promotion name.');
+  const handleCreateOrUpdate = async () => {
+    if (!selectedProduct?.id && !form.product_id) {
+      return Alert.alert('Missing info', 'Please select a product.');
     }
-    if (!selectedProducts.length) {
-      return Alert.alert('Missing info', 'Please select at least one product.');
-    }
-    const dayIds = normalizeDayIds(
-      selectedDays.length ? selectedDays : form.days_of_week_ids
-    );
-    console.log("dayIds:",dayIds);
     const payload = {
-      name: form.name.trim(),
-      product_ids: selectedProducts.map((p) => Number(p.id)),
-      no_of_products_to_buy: Number(form.no_of_products_to_buy || 0),
-      no_of_free_products: Number(form.no_of_free_products || 0),
-      discount_product_ids: selectedDiscountProducts.map((p) => Number(p.id)),
-      is_add_discount_on_product: !!form.is_add_discount_on_product,
-      sale_price: Number(form.sale_price || 0),
-      status: !!form.status,
+      product_id: Number(selectedProduct?.id ?? form.product_id),
+      no_of_product_to_buy: Number(form.no_of_product_to_buy || 0),
+      discount_amount: Number(form.discount_amount || 0),
       start_date: form.start_date || null,
       end_date: form.end_date || null,
-      days_of_week_ids: dayIds,
-      applicable_for_single_unit: !!form.applicable_for_single_unit,
-      offer_type: form.offer_type || 'free_product',
     };
-    console.log('mix match days selected:', selectedDays, 'normalized:', normalizeDayIds(selectedDays));
-    console.log("mix matched payload:",payload);
     try {
       setSubmitting(true);
       const res = editingId
-        ? await updateMixMatchPromotion({ group_id: editingId, ...payload })
-        : await createMixMatchPromotion(payload);
-        console.log("response:",res);
-      const message = res?.result?.message || 'Discount product group created successfully';
+        ? await updateQuantityDiscountPromotion(payload)
+        : await createQuantityDiscountPromotion(payload);
+      const message = res?.message || res?.result?.message || 'Quantity discount saved successfully';
       Alert.alert('Success', message);
       sheetRef.current?.close();
       loadPromotions();
     } catch (e) {
-      Alert.alert('Error', e?.message || 'Failed to create promotion.');
+      Alert.alert('Error', e?.message || 'Failed to save promotion.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDelete = async (groupId) => {
-    if (!groupId) return;
+  const handleDelete = async (productId) => {
+    if (!productId) return;
     Alert.alert('Delete Promotion', 'Are you sure you want to delete this promotion?', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -313,9 +203,8 @@ export default function MixMatchScreen() {
         onPress: async () => {
           try {
             setSubmitting(true);
-            const res = await deleteMixMatchPromotion(groupId);
-            console.log("delete res:",res)
-            const message = res?.result?.message || 'Promotion deleted successfully';
+            const res = await deleteQuantityDiscountPromotion(productId);
+            const message = res?.message || res?.result?.message || 'Promotion deleted successfully';
             Alert.alert('Success', message);
             loadPromotions();
           } catch (e) {
@@ -327,105 +216,6 @@ export default function MixMatchScreen() {
       },
     ]);
   };
-
-  const renderItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.card}
-      activeOpacity={0.85}
-      onPress={() => {
-        const groupId = item?.group_id ?? item?.id ?? null;
-        setEditingId(groupId);
-        setForm({
-          name: item?.name || '',
-          product_ids: '',
-          no_of_products_to_buy: String(item?.no_of_products_to_buy ?? 1),
-          no_of_free_products: String(item?.no_of_free_products ?? 1),
-          discount_product_ids: '',
-          is_add_discount_on_product: false,
-          sale_price: String(item?.sale_price ?? ''),
-          status: !!item?.status,
-          start_date: item?.start_date || '',
-          end_date: item?.end_date || '',
-          days_of_week_ids: Array.isArray(item?.days_of_week_ids) ? item.days_of_week_ids : [],
-          applicable_for_single_unit: !!item?.applicable_for_single_unit,
-          offer_type: item?.offer_type || 'free_product',
-        });
-        const daysFromItem = normalizeDayIds(item?.days_of_week_ids);
-        console.log('mix match edit days from item:', item?.days_of_week_ids, 'normalized:', daysFromItem);
-        setSelectedDays(daysFromItem);
-        setDayPickerValue('');
-        setSelectedProducts(
-          Array.isArray(item?.product_ids)
-            ? item.product_ids
-                .map(normalizeProductEntry)
-                .filter(Boolean)
-            : []
-        );
-        setSelectedDiscountProducts([]);
-        setProductQuery('');
-        setDiscountQuery('');
-        setProductResults([]);
-        setDiscountResults([]);
-        setProductDropdownVisible(false);
-        setDiscountDropdownVisible(false);
-        sheetRef.current?.open();
-      }}
-    >
-   
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle}>{item?.name || '-'}</Text>
-        <View style={styles.cardHeaderActions}>
-          <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={() => handleDelete(item?.group_id ?? item?.id)}
-          >
-            <Icon name="delete" size={16} color="#B91C1C" />
-          </TouchableOpacity>
-          <View style={[styles.badge, item?.status ? styles.badgeOn : styles.badgeOff]}>
-            <Text style={styles.badgeText}>{item?.status ? 'Active' : 'Inactive'}</Text>
-          </View>
-        </View>
-      </View>
-      <View style={styles.detailGrid}>
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Offer</Text>
-          <Text style={styles.detailValue}>{item?.offer_type || '-'}</Text>
-        </View>
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Buy</Text>
-          <Text style={styles.detailValue}>{item?.no_of_products_to_buy ?? '-'}</Text>
-        </View>
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Free</Text>
-          <Text style={styles.detailValue}>{item?.no_of_free_products ?? '-'}</Text>
-        </View>
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Price</Text>
-          <Text style={styles.detailValue}>{item?.sale_price ?? 0}</Text>
-        </View>
-      </View>
-      <View style={styles.detailRow}>
-        <Text style={styles.detailLabel}>Single Unit</Text>
-        <Text style={styles.detailValue}>{item?.applicable_for_single_unit ? 'Yes' : 'No'}</Text>
-      </View>
-      <View style={styles.detailRow}>
-        <Text style={styles.detailLabel}>Days</Text>
-        <Text style={styles.detailValue}>
-          {daysList.length
-            ? (getDayNames(item?.days_of_week_ids).join(', ') || normalizeDayIds(item?.days_of_week_ids).join(', ') || '-')
-            : (normalizeDayIds(item?.days_of_week_ids).join(', ') || '-')}
-        </Text>
-      </View>
-      <View style={styles.detailRow}>
-        <Text style={styles.detailLabel}>Start</Text>
-        <Text style={styles.detailValue}>{item?.start_date || '-'}</Text>
-      </View>
-      <View style={styles.detailRow}>
-        <Text style={styles.detailLabel}>End</Text>
-        <Text style={styles.detailValue}>{item?.end_date || '-'}</Text>
-      </View>
-    </TouchableOpacity>
-  );
 
   const handleSearchProducts = (text) => {
     setProductQuery(text);
@@ -454,46 +244,11 @@ export default function MixMatchScreen() {
     }, 300);
   };
 
-  const handleSearchDiscountProducts = (text) => {
-    setDiscountQuery(text);
-    if (discountDebounceRef.current) clearTimeout(discountDebounceRef.current);
-    if (text.trim().length < 3) {
-      setDiscountResults([]);
-      setDiscountDropdownVisible(false);
-      return;
-    }
-    discountDebounceRef.current = setTimeout(async () => {
-      try {
-        const results = await searchProductsByBarcode(text.trim());
-        const normalized = Array.isArray(results)
-          ? results.map((p) => ({
-              id: Number(p.id ?? p.product_id ?? p._id),
-              name: p.productName ?? p.name ?? p.product_name ?? 'Product',
-              barcode: p.barcode,
-            }))
-          : [];
-        setDiscountResults(normalized.filter((p) => Number.isFinite(p.id)));
-        setDiscountDropdownVisible(true);
-      } catch (e) {
-        setDiscountResults([]);
-        setDiscountDropdownVisible(false);
-      }
-    }, 300);
-  };
-
-  const addProduct = (item, setList) => {
-    setList((prev) => {
-      if (prev.some((p) => p.id === item.id)) return prev;
-      return [...prev, item];
-    });
-  };
-
-  const handleScanBarcode = (target) => {
+  const handleScanBarcode = () => {
     if (!hasCameraPermission) {
       Alert.alert('Camera Permission', 'Enable camera access in settings to scan.');
       return;
     }
-    setScanTarget(target);
     setScannerVisible(true);
   };
 
@@ -501,13 +256,8 @@ export default function MixMatchScreen() {
     const value = event?.nativeEvent?.codeStringValue;
     if (!value) return;
     setScannerVisible(false);
-    if (scanTarget === 'discount') {
-      setDiscountQuery(value);
-      handleSearchDiscountProducts(value);
-    } else {
-      setProductQuery(value);
-      handleSearchProducts(value);
-    }
+    setProductQuery(value);
+    handleSearchProducts(value);
   };
 
   const filteredRows = useMemo(() => {
@@ -515,7 +265,7 @@ export default function MixMatchScreen() {
     const startFilter = filterStart.trim();
     const endFilter = filterEnd.trim();
     return rows.filter((item) => {
-      const nameMatch = !q || String(item?.name || '').toLowerCase().includes(q);
+      const nameMatch = !q || String(item?.product_name || '').toLowerCase().includes(q);
       if (!nameMatch) return false;
 
       const startVal = formatDateOnly(item?.start_date || '');
@@ -540,15 +290,74 @@ export default function MixMatchScreen() {
     loadPromotions({ nextPage: next, append: true });
   };
 
+  const renderItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.85}
+      onPress={() => {
+        setEditingId(item?.id ?? null);
+        setForm({
+          product_id: item?.product_id ?? null,
+          no_of_product_to_buy: String(item?.number_of_product_to_buy ?? 1),
+          discount_amount: String(item?.discount_amount ?? 0),
+          start_date: item?.start_date || '',
+          end_date: item?.end_date || '',
+        });
+        setSelectedProduct({
+          id: Number(item?.product_id),
+          name: item?.product_name || 'Product',
+          barcode: item?.barcode || '',
+        });
+        setProductQuery('');
+        setProductResults([]);
+        setProductDropdownVisible(false);
+        sheetRef.current?.open();
+      }}
+    >
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>{item?.product_name || '-'}</Text>
+        <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item?.product_id)}>
+          <Icon name="delete" size={16} color="#B91C1C" />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>Barcode</Text>
+        <Text style={styles.detailValue}>{item?.barcode || '-'}</Text>
+      </View>
+      <View style={styles.detailGrid}>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Price</Text>
+          <Text style={styles.detailValue}>{item?.actual_product_price ?? '-'}</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Buy Qty</Text>
+          <Text style={styles.detailValue}>{item?.number_of_product_to_buy ?? '-'}</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Discount</Text>
+          <Text style={styles.detailValue}>{item?.discount_amount ?? '-'}</Text>
+        </View>
+      </View>
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>Start</Text>
+        <Text style={styles.detailValue}>{item?.start_date || '-'}</Text>
+      </View>
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>End</Text>
+        <Text style={styles.detailValue}>{item?.end_date || '-'}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
     <ImageBackground source={reportbg} style={styles.screen} resizeMode="cover">
-      <AppHeader Title="MIX MATCH PROMOTIONS" backgroundType="image" backgroundValue={reportbg} />
+      <AppHeader Title="QUANTITY DISCOUNT" backgroundType="image" backgroundValue={reportbg} />
 
       <View style={styles.panelInner}>
         <View style={styles.searchCard}>
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by name"
+            placeholder="Search by product name"
             placeholderTextColor="#9CA3AF"
             value={query}
             onChangeText={setQuery}
@@ -602,6 +411,7 @@ export default function MixMatchScreen() {
             onChange={handleFilterEndDateChange}
           />
         )}
+
         {loading ? (
           <View style={styles.center}>
             <ActivityIndicator size="large" />
@@ -610,7 +420,7 @@ export default function MixMatchScreen() {
         ) : (
           <FlatList
             data={filteredRows}
-            keyExtractor={(item) => String(item?.group_id ?? item?.id ?? Math.random())}
+            keyExtractor={(item) => String(item?.id ?? item?.product_id ?? Math.random())}
             renderItem={renderItem}
             contentContainerStyle={{ paddingBottom: 90 }}
             onEndReached={() => {
@@ -646,29 +456,21 @@ export default function MixMatchScreen() {
       </View>
 
       <TouchableOpacity style={styles.createBtn} onPress={handleOpen}>
-        <Text style={styles.createBtnText}>Create Mix Match</Text>
+        <Text style={styles.createBtnText}>Create Quantity Discount</Text>
       </TouchableOpacity>
 
       <RBSheet
         ref={sheetRef}
-        height={640}
+        height={520}
         openDuration={220}
         closeOnDragDown
         customStyles={{ container: styles.sheet, draggableIcon: { backgroundColor: '#ccc', width: 60 } }}
       >
         <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-          <Text style={styles.sheetTitle}>{editingId ? 'Update Mix Match' : 'Create Mix Match'}</Text>
-
-          <TextInput
-            style={styles.input}
-            placeholder="Name"
-            placeholderTextColor="#9CA3AF"
-            value={form.name}
-            onChangeText={(v) => updateForm('name', v)}
-          />
+          <Text style={styles.sheetTitle}>{editingId ? 'Update Quantity Discount' : 'Create Quantity Discount'}</Text>
 
           <View style={styles.searchBox}>
-            <View style={styles.searchRow}>
+            <View style={styles.searchRowInline}>
               <TextInput
                 style={[styles.input, styles.inputFlex]}
                 placeholder="Search product by barcode (min 3 chars)"
@@ -676,10 +478,7 @@ export default function MixMatchScreen() {
                 value={productQuery}
                 onChangeText={handleSearchProducts}
               />
-              <TouchableOpacity
-                style={styles.scanBtn}
-                onPress={() => handleScanBarcode('product')}
-              >
+              <TouchableOpacity style={styles.scanBtn} onPress={handleScanBarcode}>
                 <Icon name="qr-code-scanner" size={20} color="#111" />
               </TouchableOpacity>
             </View>
@@ -691,7 +490,8 @@ export default function MixMatchScreen() {
                       key={String(p.id)}
                       style={styles.dropdownItem}
                       onPress={() => {
-                        addProduct(p, setSelectedProducts);
+                        setSelectedProduct(p);
+                        updateForm('product_id', p.id);
                         setProductDropdownVisible(false);
                         setProductResults([]);
                         setProductQuery('');
@@ -704,18 +504,19 @@ export default function MixMatchScreen() {
                 </ScrollView>
               </View>
             )}
-            {!!selectedProducts.length && (
+            {selectedProduct && (
               <View style={styles.selectedWrap}>
-                {selectedProducts.map((p) => (
-                  <View key={`prod-${p.id}`} style={styles.chip}>
-                    <Text style={styles.chipText}>{p.name}</Text>
-                    <TouchableOpacity
-                      onPress={() => setSelectedProducts((prev) => prev.filter((x) => x.id !== p.id))}
-                    >
-                      <Text style={styles.chipRemove}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
+                <View style={styles.chip}>
+                  <Text style={styles.chipText}>{selectedProduct.name}</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSelectedProduct(null);
+                      updateForm('product_id', null);
+                    }}
+                  >
+                    <Text style={styles.chipRemove}>×</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
           </View>
@@ -726,93 +527,18 @@ export default function MixMatchScreen() {
               placeholder="Buy Qty"
               placeholderTextColor="#9CA3AF"
               keyboardType="number-pad"
-              value={form.no_of_products_to_buy}
-              onChangeText={(v) => updateForm('no_of_products_to_buy', v)}
+              value={form.no_of_product_to_buy}
+              onChangeText={(v) => updateForm('no_of_product_to_buy', v)}
             />
             <TextInput
               style={[styles.input, styles.inputHalf]}
-              placeholder="Free Qty"
+              placeholder="Discount Amount"
               placeholderTextColor="#9CA3AF"
-              keyboardType="number-pad"
-              value={form.no_of_free_products}
-              onChangeText={(v) => updateForm('no_of_free_products', v)}
+              keyboardType="decimal-pad"
+              value={form.discount_amount}
+              onChangeText={(v) => updateForm('discount_amount', v)}
             />
           </View>
-
-          <View style={styles.searchBox}>
-            <View style={styles.searchRow}>
-              <TextInput
-                style={[styles.input, styles.inputFlex]}
-                placeholder="Search discount product by barcode (min 3 chars)"
-                placeholderTextColor="#9CA3AF"
-                value={discountQuery}
-                onChangeText={handleSearchDiscountProducts}
-              />
-              <TouchableOpacity
-                style={styles.scanBtn}
-                onPress={() => handleScanBarcode('discount')}
-              >
-                <Icon name="qr-code-scanner" size={20} color="#111" />
-              </TouchableOpacity>
-            </View>
-            {discountDropdownVisible && discountResults.length > 0 && (
-              <View style={styles.dropdown}>
-                <ScrollView style={{ maxHeight: 180 }}>
-                  {discountResults.map((p) => (
-                    <TouchableOpacity
-                      key={String(p.id)}
-                      style={styles.dropdownItem}
-                      onPress={() => {
-                        addProduct(p, setSelectedDiscountProducts);
-                        setDiscountDropdownVisible(false);
-                        setDiscountResults([]);
-                        setDiscountQuery('');
-                      }}
-                    >
-                      <Text style={styles.dropdownTitle}>{p.name}</Text>
-                      <Text style={styles.dropdownMeta}>Barcode: {p.barcode || '-'}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-            {!!selectedDiscountProducts.length && (
-              <View style={styles.selectedWrap}>
-                {selectedDiscountProducts.map((p) => (
-                  <View key={`disc-${p.id}`} style={styles.chip}>
-                    <Text style={styles.chipText}>{p.name}</Text>
-                    <TouchableOpacity
-                      onPress={() => setSelectedDiscountProducts((prev) => prev.filter((x) => x.id !== p.id))}
-                    >
-                      <Text style={styles.chipRemove}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-
-          <View style={styles.pickerWrap}>
-            <Picker
-              selectedValue={form.offer_type}
-              onValueChange={(v) => updateForm('offer_type', v)}
-              style={{ color: '#111' }}
-              dropdownIconColor="#333"
-            >
-              {OFFER_TYPES.map((t) => (
-                <Picker.Item key={t.value} label={t.label} value={t.value} />
-              ))}
-            </Picker>
-          </View>
-
-          <TextInput
-            style={styles.input}
-            placeholder="Sale Price"
-            placeholderTextColor="#9CA3AF"
-            keyboardType="decimal-pad"
-            value={form.sale_price}
-            onChangeText={(v) => updateForm('sale_price', v)}
-          />
 
           <TouchableOpacity
             style={styles.dateInput}
@@ -852,72 +578,13 @@ export default function MixMatchScreen() {
             />
           )}
 
-          <View style={styles.pickerWrap}>
-            <Picker
-              selectedValue={dayPickerValue}
-              onValueChange={(val) => {
-                setDayPickerValue(val);
-                const dayId = Number(val?.id ?? val?.value ?? val);
-                if (!Number.isFinite(dayId) || dayId <= 0) return;
-                setSelectedDays((prev) => {
-                  const next = prev.includes(dayId)
-                    ? prev.filter((id) => id !== dayId)
-                    : [...prev, dayId];
-                  console.log('mix match day toggle:', dayId, 'next:', next);
-                  return next;
-                });
-              }}
-              style={{ color: '#111' }}
-              dropdownIconColor="#333"
-            >
-              <Picker.Item label="Select Day" value="" />
-              {daysList.map((d) => (
-                <Picker.Item key={String(d.id)} label={String(d.name)} value={d.id} />
-              ))}
-            </Picker>
-          </View>
-          {!!selectedDays.length && (
-            <View style={styles.selectedWrap}>
-              {selectedDays.map((id) => {
-                const dayName = daysList.find((d) => d.id === id)?.name || `ID: ${id}`;
-                return (
-                  <View key={`day-${id}`} style={styles.chip}>
-                    <Text style={styles.chipText}>{dayName}</Text>
-                    <TouchableOpacity onPress={() => setSelectedDays((prev) => prev.filter((x) => x !== id))}>
-                      <Text style={styles.chipRemove}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Discount on Product</Text>
-            <Switch
-              value={form.is_add_discount_on_product}
-              onValueChange={(v) => updateForm('is_add_discount_on_product', v)}
-            />
-          </View>
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Applicable for Single Unit</Text>
-            <Switch
-              value={form.applicable_for_single_unit}
-              onValueChange={(v) => updateForm('applicable_for_single_unit', v)}
-            />
-          </View>
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Status</Text>
-            <Switch value={form.status} onValueChange={(v) => updateForm('status', v)} />
-          </View>
-
           <TouchableOpacity
             style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
-            onPress={handleCreate}
+            onPress={handleCreateOrUpdate}
             disabled={submitting}
           >
             <Text style={styles.submitBtnText}>
-              {submitting ? 'Saving…' : editingId ? 'Update Mix Match' : 'Create Mix Match'}
+              {submitting ? 'Saving…' : editingId ? 'Update Quantity Discount' : 'Create Quantity Discount'}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -926,12 +593,7 @@ export default function MixMatchScreen() {
       <Modal visible={scannerVisible} animationType="slide">
         {hasCameraPermission ? (
           <View style={{ flex: 1 }}>
-            <Camera
-              style={{ flex: 1 }}
-              cameraType={CameraType.Back}
-              scanBarcode
-              onReadCode={onReadCode}
-            />
+            <Camera style={{ flex: 1 }} cameraType={CameraType.Back} scanBarcode onReadCode={onReadCode} />
             <View style={styles.scannerControls}>
               <TouchableOpacity style={styles.scannerBtn} onPress={() => setScannerVisible(false)}>
                 <Text style={styles.scannerBtnText}>Close</Text>
@@ -1023,13 +685,8 @@ const styles = StyleSheet.create({
     }),
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
-  detailGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 10,
-  },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A', flex: 1, paddingRight: 8 },
+  detailGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   detailItem: {
     width: '48%',
     backgroundColor: '#FFFFFF',
@@ -1049,11 +706,6 @@ const styles = StyleSheet.create({
   },
   detailLabel: { fontSize: 11, color: '#6B7280', fontWeight: '600' },
   detailValue: { fontSize: 12, color: '#111827', fontWeight: '700' },
-  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
-  badgeOn: { backgroundColor: '#DCFCE7' },
-  badgeOff: { backgroundColor: '#FEE2E2' },
-  badgeText: { fontSize: 11, fontWeight: '700', color: '#111' },
-  cardHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   deleteBtn: {
     width: 28,
     height: 28,
@@ -1110,13 +762,6 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', gap: 10 },
   inputHalf: { flex: 1 },
-  pickerWrap: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
   dateInput: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -1129,13 +774,6 @@ const styles = StyleSheet.create({
   dateInputLabel: { fontSize: 11, color: '#6B7280', fontWeight: '600' },
   dateInputText: { marginTop: 4, fontSize: 13, color: '#111', fontWeight: '600' },
   dateInputPlaceholder: { marginTop: 4, fontSize: 13, color: '#9CA3AF' },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  switchLabel: { color: '#111', fontWeight: '600' },
   submitBtn: {
     backgroundColor: '#319241',
     paddingVertical: 12,
@@ -1144,8 +782,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   submitBtnText: { color: '#fff', fontWeight: '700' },
+
   searchBox: { position: 'relative', marginBottom: 10 },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  searchRowInline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   inputFlex: { flex: 1 },
   scanBtn: {
     borderWidth: 1,
@@ -1182,6 +821,7 @@ const styles = StyleSheet.create({
   },
   chipText: { fontSize: 11, fontWeight: '600', color: '#1E3A8A' },
   chipRemove: { fontSize: 12, fontWeight: '700', color: '#1E3A8A' },
+
   scannerControls: {
     position: 'absolute',
     bottom: 30,

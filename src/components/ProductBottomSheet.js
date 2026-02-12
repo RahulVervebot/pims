@@ -11,11 +11,13 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { Camera, CameraType } from 'react-native-camera-kit';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { getTopCategories, VendorList, TaxList, createCustomVariantProduct, updateCustomVariantProduct } from '../functions/product-function';
 import { CartContext } from '../context/CartContext';
 import { PrintContext } from '../context/PrintContext';
 import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createQuantityDiscountPromotion } from '../screens/promotions/function';
 
 const THEME = { primary: '#2C1E70', secondary: '#319241', price: '#27ae60' };
 
@@ -129,6 +131,14 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   const [editingVariantId, setEditingVariantId] = useState(null);
   const [editingVariantName, setEditingVariantName] = useState('');
   const [editingVariantPrice, setEditingVariantPrice] = useState('');
+  const [qdModalVisible, setQdModalVisible] = useState(false);
+  const [qdSubmitting, setQdSubmitting] = useState(false);
+  const [qdBuyQty, setQdBuyQty] = useState('1');
+  const [qdDiscount, setQdDiscount] = useState('1');
+  const [qdStartDate, setQdStartDate] = useState('');
+  const [qdEndDate, setQdEndDate] = useState('');
+  const [qdShowStartPicker, setQdShowStartPicker] = useState(false);
+  const [qdShowEndPicker, setQdShowEndPicker] = useState(false);
 
   // UI
   const [submitting, setSubmitting] = useState(false);
@@ -230,6 +240,7 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
         setImgMime('image/jpeg');
         setVariantsList(Array.isArray(p.variants) ? p.variants : []);
         setEditingVariantId(null);
+        setQdModalVisible(false);
       }
       sheetRef.current?.open();
     },
@@ -291,6 +302,71 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   const openVariantsModal = () => {
     setVariantsModalVisible(true);
     setEditingVariantId(null);
+  };
+
+  const formatDateOnly = (value) => {
+    if (!value) return '';
+    const datePart = String(value).split(' ')[0];
+    return datePart || '';
+  };
+
+  const toDate = (value) => {
+    const datePart = formatDateOnly(value);
+    if (!datePart) return new Date();
+    const [y, m, d] = datePart.split('-').map((n) => Number(n));
+    if (!y || !m || !d) return new Date();
+    return new Date(y, m - 1, d);
+  };
+
+  const handleQdStartDateChange = (_, date) => {
+    if (Platform.OS === 'android') setQdShowStartPicker(false);
+    if (!date) return;
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    setQdStartDate(`${yyyy}-${mm}-${dd} 00:00:00`);
+  };
+
+  const handleQdEndDateChange = (_, date) => {
+    if (Platform.OS === 'android') setQdShowEndPicker(false);
+    if (!date) return;
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    setQdEndDate(`${yyyy}-${mm}-${dd} 23:59:59`);
+  };
+
+  const openQdModal = () => {
+    setQdBuyQty('1');
+    setQdDiscount('1');
+    setQdStartDate('');
+    setQdEndDate('');
+    setQdModalVisible(true);
+  };
+
+  const handleCreateQuantityDiscount = async () => {
+    if (!product?.product_id && !id) {
+      Alert.alert('Missing product', 'Product ID not found.');
+      return;
+    }
+    const payload = {
+      product_id: Number(product?.product_id ?? id),
+      no_of_product_to_buy: Number(qdBuyQty || 0),
+      discount_amount: Number(qdDiscount || 0),
+      start_date: qdStartDate || null,
+      end_date: qdEndDate || null,
+    };
+    try {
+      setQdSubmitting(true);
+      const res = await createQuantityDiscountPromotion(payload);
+      const message = res?.message || res?.result?.message || 'Quantity discount created successfully';
+      Alert.alert('Success', message);
+      setQdModalVisible(false);
+    } catch (e) {
+      Alert.alert('Error', e?.message || 'Failed to create quantity discount.');
+    } finally {
+      setQdSubmitting(false);
+    }
   };
 
   const formatVariantName = (value) => {
@@ -725,54 +801,61 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
 
             {/* Cart / Print buttons (unchanged) */}
             {userrole !== 'customer' && (
-              <TouchableOpacity
-                style={[styles.btn, styles.variantBtn, { marginTop: 16 }]}
-                onPress={openVariantModal}
-              >
-                <Text style={styles.btnText}>Create Variant Product</Text>
-              </TouchableOpacity>
+              <View style={[styles.row, { marginTop: 16 }]}>
+                <TouchableOpacity
+                  style={[styles.btn, styles.btnPrimary]}
+                  onPress={openVariantModal}
+                >
+                  <Text style={styles.btnText}>Create Variant Product</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.btn, styles.btnAccent]}
+                  onPress={openQdModal}
+                >
+                  <Text style={styles.btnText}>Create Qty Discount</Text>
+                </TouchableOpacity>
+              </View>
             )}
-            <View style={[styles.row, { marginTop: 12 }]}>
-           {userrole === 'customer' ?
-      
-              inCart ? (
-                <View style={styles.qtyRow}>
-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => decreaseQty(product.product_id)}><Text style={styles.qtyText}>-</Text></TouchableOpacity>
-                  <Text style={styles.qtyValue}>{inCart.qty}</Text>
-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => increaseQty(product.product_id)}><Text style={styles.qtyText}>+</Text></TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity style={[styles.btn, { backgroundColor: THEME.secondary }]} onPress={() => addToCart(product)}>
-                  <Text style={styles.btnText}>Add to Cart</Text>
-                </TouchableOpacity>
-              )
-            
-:
-              inPrint ? (
+            {userrole === 'customer' ? (
+              <View style={[styles.row, { marginTop: 12 }]}>
+                {inCart ? (
+                  <View style={styles.qtyRow}>
+                    <TouchableOpacity style={styles.qtyBtn} onPress={() => decreaseQty(product.product_id)}><Text style={styles.qtyText}>-</Text></TouchableOpacity>
+                    <Text style={styles.qtyValue}>{inCart.qty}</Text>
+                    <TouchableOpacity style={styles.qtyBtn} onPress={() => increaseQty(product.product_id)}><Text style={styles.qtyText}>+</Text></TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity style={[styles.btn, { backgroundColor: THEME.secondary }]} onPress={() => addToCart(product)}>
+                    <Text style={styles.btnText}>Add to Cart</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              <View style={[styles.row, { marginTop: 12 }]}>
+                {inPrint ? (
+                  <TouchableOpacity
+                    style={[styles.btn, styles.btnDanger]}
+                    onPress={() => removeFromprint(product.product_id)}
+                  >
+                    <Text style={styles.btnText}>Remove from Print</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.btn, styles.btnSuccess]}
+                    onPress={() => addToPrint(product)}
+                  >
+                    <Text style={styles.btnText}>Add to Print</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
-                  style={[styles.btn, styles.removePrintBtn]}
-                  onPress={() => removeFromprint(product.product_id)}
+                  style={[styles.btn, styles.btnTeal, { opacity: submitting ? 0.6 : 1 }]}
+                  disabled={submitting}
+                  onPress={handleUpdate}
                 >
-                  <Text style={styles.btnText}>Remove from Print</Text>
+                  <Text style={styles.btnText}>{submitting ? 'Updating…' : 'Update Product'}</Text>
                 </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.btn, { backgroundColor: "#16A34A" }]}
-                  onPress={() => addToPrint(product)}
-                >
-                  <Text style={styles.btnText}>Add to Print</Text>
-                </TouchableOpacity>
-              )
-            }
-            </View>
-
-            <TouchableOpacity
-              style={[styles.btn, { marginTop: 10, backgroundColor: '#1B9C85', opacity: submitting ? 0.6 : 1 }]}
-              disabled={submitting}
-              onPress={handleUpdate}
-            >
-              <Text style={styles.btnText}>{submitting ? 'Updating…' : 'Update Product'}</Text>
-            </TouchableOpacity>
+              </View>
+            )}
           </ScrollView>
         )}
       </RBSheet>
@@ -835,6 +918,85 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                 onPress={() => setVariantModalVisible(false)}
               >
                 <Text style={styles.btnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={qdModalVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Create Quantity Discount</Text>
+
+            <TextInput
+              style={styles.modalInput}
+              value={qdBuyQty}
+              onChangeText={setQdBuyQty}
+              placeholder="No. of products to buy"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="number-pad"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={qdDiscount}
+              onChangeText={setQdDiscount}
+              placeholder="Discount amount"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="decimal-pad"
+            />
+
+            <TouchableOpacity
+              style={styles.dateInput}
+              onPress={() => setQdShowStartPicker(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.dateInputLabel}>Start Date</Text>
+              <Text style={qdStartDate ? styles.dateInputText : styles.dateInputPlaceholder}>
+                {qdStartDate ? formatDateOnly(qdStartDate) : 'Select date'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.dateInput}
+              onPress={() => setQdShowEndPicker(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.dateInputLabel}>End Date</Text>
+              <Text style={qdEndDate ? styles.dateInputText : styles.dateInputPlaceholder}>
+                {qdEndDate ? formatDateOnly(qdEndDate) : 'Select date'}
+              </Text>
+            </TouchableOpacity>
+
+            {qdShowStartPicker && (
+              <DateTimePicker
+                value={toDate(qdStartDate)}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleQdStartDateChange}
+              />
+            )}
+            {qdShowEndPicker && (
+              <DateTimePicker
+                value={toDate(qdEndDate)}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleQdEndDateChange}
+              />
+            )}
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={[styles.btn, styles.modalCancelBtn]}
+                onPress={() => setQdModalVisible(false)}
+              >
+                <Text style={styles.btnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btn, styles.btnSuccess, qdSubmitting && { opacity: 0.6 }]}
+                onPress={handleCreateQuantityDiscount}
+                disabled={qdSubmitting}
+              >
+                <Text style={styles.btnText}>{qdSubmitting ? 'Saving…' : 'Create'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -949,6 +1111,11 @@ const styles = StyleSheet.create({
   rowGap: { flexDirection: 'row', gap: 10 },
   btn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: '700' },
+  btnPrimary: { backgroundColor: THEME.primary },
+  btnAccent: { backgroundColor: THEME.secondary },
+  btnSuccess: { backgroundColor: '#16A34A' },
+  btnTeal: { backgroundColor: '#1B9C85' },
+  btnDanger: { backgroundColor: '#D9534F' },
 
   smallBtn: { backgroundColor: THEME.secondary, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 },
   smallBtnText: { color: '#fff', fontWeight: '700' },
@@ -1050,6 +1217,18 @@ const styles = StyleSheet.create({
     color: '#111',
     marginBottom: 10,
   },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    marginBottom: 10,
+    backgroundColor: '#fff',
+  },
+  dateInputLabel: { fontSize: 11, color: '#6B7280', fontWeight: '600' },
+  dateInputText: { marginTop: 4, fontSize: 13, color: '#111', fontWeight: '600' },
+  dateInputPlaceholder: { marginTop: 4, fontSize: 13, color: '#9CA3AF' },
   modalBtnRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
   modalCancelBtn: { backgroundColor: '#D9534F' },
   variantToggleBtn: {

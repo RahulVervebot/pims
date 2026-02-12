@@ -46,7 +46,7 @@ const renderContent = () => (
          navigation.navigate('Tabs'); // fallback screen
        }
      }} style={styles.leftIcon}>
-      <Ionicons name="arrow-back-outline" size={24} color="#000" />
+      <Ionicons name="arrow-back-outline" size={24} color="#fff" />
          </TouchableOpacity>
     {/* Center (absolute) */}
     <View style={styles.titleOverlay} pointerEvents="none">
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: '#fff',
     paddingHorizontal: 80,         // reserves space so it won’t overlap icons
     textAlign: 'center',
   },
