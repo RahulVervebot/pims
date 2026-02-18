@@ -20,7 +20,6 @@ import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { request, PERMISSIONS, RESULTS } from "react-native-permissions";
 import { Camera, CameraType } from "react-native-camera-kit";
-import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function CreateProductModal({ visible, onClose, onCreated }) {
@@ -39,10 +38,13 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
   const [ewic, setEwic] = useState(false);
   const [otc, setOtc] = useState(false);
 
-  const [category, setCategory] = useState(''); // categ_id
-  const [selectedTaxId, setSelectedTaxId] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [selectedTaxIds, setSelectedTaxIds] = useState([]);
   const [selectedVendorId, setSelectedVendorId] = useState(''); // picked from search suggestions
   const [selectedUomId, setSelectedUomId] = useState('');
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [taxModalVisible, setTaxModalVisible] = useState(false);
+  const [uomModalVisible, setUomModalVisible] = useState(false);
 
   // Vendor search
   const [searchText, setSearchText] = useState('');
@@ -62,6 +64,7 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
   const [uomList, setUomList] = useState([]);
 
   const [submitting, setSubmitting] = useState(false);
+  const [successVisible, setSuccessVisible] = useState(false);
   const [storeUrl, setStoreUrl] = useState('');
   const [token, setToken] = useState('');
 
@@ -175,6 +178,59 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
     return Number.isFinite(n) ? n : NaN;
   }, [qtyavailable]);
 
+  const sortedCategories = useMemo(() => (
+    (Array.isArray(allCats) ? allCats : [])
+      .map((cat) => ({
+        id: String(cat?.id ?? cat?._id ?? ''),
+        label: String(cat?.name ?? cat?.category ?? '').trim(),
+      }))
+      .filter((item) => item.id && item.label)
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))
+  ), [allCats]);
+
+  const sortedTaxes = useMemo(() => (
+    (Array.isArray(taxList) ? taxList : [])
+      .map((tax) => ({
+        id: String(tax?.id ?? ''),
+        label: String(tax?.name ?? '').trim(),
+      }))
+      .filter((item) => item.id && item.label)
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))
+  ), [taxList]);
+
+  const sortedUom = useMemo(() => (
+    (Array.isArray(uomList) ? uomList : [])
+      .map((uom) => ({
+        id: String(uom?.id ?? ''),
+        label: String(uom?.name ?? '').trim(),
+      }))
+      .filter((item) => item.id && item.label)
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))
+  ), [uomList]);
+
+  const noTaxId = useMemo(() => {
+    const noTax = sortedTaxes.find((t) => t.label.toLowerCase() === 'no tax');
+    return noTax?.id || '';
+  }, [sortedTaxes]);
+
+  const categorySummary = useMemo(() => {
+    if (!selectedCategoryId) return 'Select Category';
+    return sortedCategories.find((c) => c.id === selectedCategoryId)?.label || 'Select Category';
+  }, [selectedCategoryId, sortedCategories]);
+
+  const taxSummary = useMemo(() => {
+    if (selectedTaxIds.length === 0) return 'Select Tax';
+    const labels = sortedTaxes
+      .filter((t) => selectedTaxIds.includes(t.id))
+      .map((t) => t.label);
+    return labels.join(', ');
+  }, [selectedTaxIds, sortedTaxes]);
+
+  const uomSummary = useMemo(() => {
+    if (!selectedUomId) return 'Select UoM';
+    return sortedUom.find((u) => u.id === selectedUomId)?.label || 'Select UoM';
+  }, [selectedUomId, sortedUom]);
+
   const onReadCode = (event) => {
     const value = event?.nativeEvent?.codeStringValue;
     if (value) setBarcode(value);
@@ -192,12 +248,34 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
   };
 
   const resetForm = () => {
-    setName(''); setSize(''); setPrice(''); setCost(''); setCategory('');
+    setName(''); setSize(''); setPrice(''); setCost('');
     setImgBase64(''); setImgMime('image/jpeg');
     setCaseCost(''); setUnitc(''); setQtyAvailable('');
     setToWeight(false); setAvailablePOS(false); setIsEBT(false); setEwic(false); setOtc(false);
-    setSelectedTaxId(''); setSelectedVendorId(''); setSelectedUomId('');
+    setSelectedCategoryId(''); setSelectedTaxIds([]); setSelectedVendorId(''); setSelectedUomId('');
     setBarcode(''); setSearchText(''); setVendorList([]); setShowVendorDropdown(false);
+  };
+
+  const toggleCategory = (categoryId) => {
+    setSelectedCategoryId((prev) => (prev === categoryId ? '' : categoryId));
+  };
+
+  const toggleTax = (taxId) => {
+    setSelectedTaxIds((prev) => {
+      const isSelected = prev.includes(taxId);
+      if (taxId === noTaxId) {
+        return isSelected ? [] : [taxId];
+      }
+      if (isSelected) {
+        return prev.filter((id) => id !== taxId);
+      }
+      const withoutNoTax = noTaxId ? prev.filter((id) => id !== noTaxId) : prev;
+      return [...withoutNoTax, taxId];
+    });
+  };
+
+  const toggleUom = (uomId) => {
+    setSelectedUomId((prev) => (prev === uomId ? '' : uomId));
   };
 
   const pickFromGallery = async () => {
@@ -269,14 +347,14 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
       const body = {
         name: name.trim(),
         barcode: barcode || undefined,
-        list_price: Number.isFinite(costNumber) ? costNumber : undefined, // ✅ unit cost                               
-        standard_price: priceNumber, // ✅ sale price
+        list_price: priceNumber, // ✅ unit cost                               
+        standard_price: Number.isFinite(costNumber) ? costNumber : undefined, // ✅ sale price
         detailed_type: 'product',
-        categ_id: category ? Number(category) : undefined,
+        categ_id: selectedCategoryId ? Number(selectedCategoryId) : undefined,
         uom_id: selectedUomId ? Number(selectedUomId) : undefined,
         vendorcode: selectedVendorId ? Number(selectedVendorId) : undefined, // from search selection
         size: size?.trim() || undefined,
-        taxes_id: selectedTaxId ? [Number(selectedTaxId)] : [],
+        taxes_id: selectedTaxIds.map((id) => Number(id)).filter(Number.isFinite),
         is_ebt_product: !!isEBT,
         available_in_pos: !!availablePOS,
         to_weight: !!toWeight,
@@ -300,10 +378,10 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || data?.message || 'Failed to create product');
 
-      Alert.alert('Success', 'Product created successfully');
       onCreated?.(data || body);
       resetForm();
       onClose?.();
+      setSuccessVisible(true);
     } catch (e) {
       console.log('Create product error:', e);
       Alert.alert('Error', e.message);
@@ -378,19 +456,8 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
                 onChangeText={setPrice}
                 keyboardType="decimal-pad"
               />
-              <TextInput
-                style={styles.inputCol}
-                placeholder="Unit Cost"
-                placeholderTextColor={PLACEHOLDER}
-                value={cost}
-                onChangeText={setCost}
-                keyboardType="decimal-pad"
-              />
-            </View>
-
-            {/* Row 3: Case Cost | Units in Case + Calculate */}
-            <View style={styles.rowGap}>
-              <TextInput
+  
+                <TextInput
                 style={styles.inputCol}
                 placeholder="Case Cost"
                 placeholderTextColor={PLACEHOLDER}
@@ -398,6 +465,10 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
                 keyboardType="decimal-pad"
                 onChangeText={setCaseCost}
               />
+            </View>
+
+            {/* Row 3: Case Cost | Units in Case + Calculate */}
+            <View style={styles.rowGap}>
       
                 <TextInput
                   style={[styles.inputCol, { marginTop: 0 }]}
@@ -407,6 +478,14 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
                   keyboardType="number-pad"
                   onChangeText={setUnitc}
                 />
+                   <TextInput
+                style={styles.inputCol}
+                placeholder="Unit Cost"
+                placeholderTextColor={PLACEHOLDER}
+                value={cost}
+                onChangeText={setCost}
+                keyboardType="decimal-pad"
+              />
                 <TouchableOpacity style={styles.calcBtn} onPress={calculateUnitCost}>
                   <Text style={styles.calcBtnText}>Calculate</Text>
                 </TouchableOpacity>
@@ -426,23 +505,10 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
 
             {/* Row 5: Category | Vendor Search | UoM */}
             <View style={styles.rowGap}>
-              <View style={styles.pickerCol}>
-                <Picker
-                  selectedValue={category}
-                  onValueChange={setCategory}
-                  style={{ color: '#111' }}
-                  dropdownIconColor="#333"
-                >
-                  <Picker.Item label="Select Category" value="" />
-                  {allCats.map((cat) => (
-                    <Picker.Item
-                      key={String(cat.id ?? cat._id)}
-                      label={String(cat.name ?? cat.category)}
-                      value={String(cat.id ?? cat._id)}
-                    />
-                  ))}
-                </Picker>
-              </View>
+              <TouchableOpacity style={styles.selectBox} onPress={() => setCategoryModalVisible(true)}>
+                <Text style={styles.selectLabel}>Category</Text>
+                <Text numberOfLines={2} style={styles.selectValue}>{categorySummary}</Text>
+              </TouchableOpacity>
 
               {/* Vendor search with suggestions */}
               <View style={[styles.vendorBox]}>
@@ -476,32 +542,14 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
 
             {/* Row 6: Tax */}
             <View style={styles.rowGap}>
-              <View style={styles.pickerCol}>
-                <Picker
-                  selectedValue={selectedTaxId}
-                  onValueChange={setSelectedTaxId}
-                  style={{ color: '#111' }}
-                  dropdownIconColor="#333"
-                >
-                  <Picker.Item label="Select Tax" value="" />
-                  {taxList.map((tax) => (
-                    <Picker.Item key={String(tax.id)} label={String(tax.name)} value={String(tax.id)} />
-                  ))}
-                </Picker>
-              </View>
-                           <View style={styles.pickerCol}>
-                <Picker
-                  selectedValue={selectedUomId}
-                  onValueChange={setSelectedUomId}
-                  style={{ color: '#111' }}
-                  dropdownIconColor="#333"
-                >
-                  <Picker.Item label="Select UoM" value="" />
-                  {uomList.map((u) => (
-                    <Picker.Item key={String(u.id)} label={String(u.name)} value={String(u.id)} />
-                  ))}
-                </Picker>
-              </View>
+              <TouchableOpacity style={styles.selectBox} onPress={() => setTaxModalVisible(true)}>
+                <Text style={styles.selectLabel}>Tax</Text>
+                <Text numberOfLines={2} style={styles.selectValue}>{taxSummary}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.selectBox} onPress={() => setUomModalVisible(true)}>
+                <Text style={styles.selectLabel}>UoM</Text>
+                <Text numberOfLines={2} style={styles.selectValue}>{uomSummary}</Text>
+              </TouchableOpacity>
 
             </View>
 
@@ -579,6 +627,79 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
             </TouchableOpacity>
           </View>
         )}
+      </Modal>
+
+      <Modal visible={categoryModalVisible} transparent animationType="fade" onRequestClose={() => setCategoryModalVisible(false)}>
+        <View style={styles.optionModalRoot}>
+          <TouchableOpacity style={styles.optionModalBackdrop} activeOpacity={1} onPress={() => setCategoryModalVisible(false)} />
+          <View style={styles.optionModalCard}>
+            <Text style={styles.optionModalTitle}>Select Category</Text>
+            <ScrollView style={styles.optionList}>
+              {sortedCategories.map((item) => (
+                <TouchableOpacity key={item.id} style={styles.optionRow} onPress={() => toggleCategory(item.id)}>
+                  <Text style={styles.optionLabel}>{item.label}</Text>
+                  <Switch value={selectedCategoryId === item.id} onValueChange={() => toggleCategory(item.id)} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.btn} onPress={() => setCategoryModalVisible(false)}>
+              <Text style={styles.btnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={taxModalVisible} transparent animationType="fade" onRequestClose={() => setTaxModalVisible(false)}>
+        <View style={styles.optionModalRoot}>
+          <TouchableOpacity style={styles.optionModalBackdrop} activeOpacity={1} onPress={() => setTaxModalVisible(false)} />
+          <View style={styles.optionModalCard}>
+            <Text style={styles.optionModalTitle}>Select Tax</Text>
+            <ScrollView style={styles.optionList}>
+              {sortedTaxes.map((item) => (
+                <TouchableOpacity key={item.id} style={styles.optionRow} onPress={() => toggleTax(item.id)}>
+                  <Text style={styles.optionLabel}>{item.label}</Text>
+                  <Switch value={selectedTaxIds.includes(item.id)} onValueChange={() => toggleTax(item.id)} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.btn} onPress={() => setTaxModalVisible(false)}>
+              <Text style={styles.btnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={uomModalVisible} transparent animationType="fade" onRequestClose={() => setUomModalVisible(false)}>
+        <View style={styles.optionModalRoot}>
+          <TouchableOpacity style={styles.optionModalBackdrop} activeOpacity={1} onPress={() => setUomModalVisible(false)} />
+          <View style={styles.optionModalCard}>
+            <Text style={styles.optionModalTitle}>Select UoM</Text>
+            <ScrollView style={styles.optionList}>
+              {sortedUom.map((item) => (
+                <TouchableOpacity key={item.id} style={styles.optionRow} onPress={() => toggleUom(item.id)}>
+                  <Text style={styles.optionLabel}>{item.label}</Text>
+                  <Switch value={selectedUomId === item.id} onValueChange={() => toggleUom(item.id)} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.btn} onPress={() => setUomModalVisible(false)}>
+              <Text style={styles.btnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={successVisible} transparent animationType="fade" onRequestClose={() => setSuccessVisible(false)}>
+        <View style={styles.optionModalRoot}>
+          <TouchableOpacity style={styles.optionModalBackdrop} activeOpacity={1} onPress={() => setSuccessVisible(false)} />
+          <View style={styles.successCard}>
+            <Text style={styles.optionModalTitle}>Success</Text>
+            <Text style={styles.successText}>Product created successfully.</Text>
+            <TouchableOpacity style={styles.btn} onPress={() => setSuccessVisible(false)}>
+              <Text style={styles.btnText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </>
   );
@@ -680,6 +801,25 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#fff'
   },
+  selectBox: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff'
+  },
+  selectLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#666',
+    marginBottom: 4,
+  },
+  selectValue: {
+    color: '#111',
+    fontSize: 14,
+  },
   colWithButton: {
     flex: 1,
     flexDirection: 'column',
@@ -725,4 +865,51 @@ const styles = StyleSheet.create({
   vendorText: { color: '#111', fontWeight: '600' },
   vendorSub: { color: '#666', fontSize: 12, marginTop: 2 },
   selectedVendorNote: { fontSize: 12, color: '#2c1e70', marginTop: 6 },
+  optionModalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  optionModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#00000077',
+  },
+  optionModalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    maxHeight: '75%',
+    padding: 14,
+  },
+  optionModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111',
+    marginBottom: 10,
+  },
+  optionList: {
+    marginBottom: 12,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eee',
+    paddingVertical: 10,
+  },
+  optionLabel: {
+    flex: 1,
+    color: '#111',
+    fontWeight: '600',
+    paddingRight: 10,
+  },
+  successCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+  },
+  successText: {
+    color: '#111',
+    marginBottom: 12,
+  },
 });

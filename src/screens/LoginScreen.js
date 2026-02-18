@@ -216,6 +216,7 @@ export default function LoginScreen({ navigation }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      console.log("body & url",body,url);
       const data = await res.json().catch(() => ({}));
       console.log("login response:", data);
       if (!res.ok || !data?.result) {

@@ -12,56 +12,13 @@ import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { Camera, CameraType } from 'react-native-camera-kit';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { getTopCategories, VendorList, TaxList, createCustomVariantProduct, updateCustomVariantProduct } from '../functions/product-function';
+import { getTopCategories, VendorList, TaxList, getUOMList, createCustomVariantProduct, updateCustomVariantProduct } from '../functions/product-function';
 import { CartContext } from '../context/CartContext';
 import { PrintContext } from '../context/PrintContext';
-import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createQuantityDiscountPromotion } from '../screens/promotions/function';
 
 const THEME = { primary: '#2C1E70', secondary: '#319241', price: '#27ae60' };
-
-/** Little modal for multi-select list with checkboxes */
-const MultiSelectModal = ({ visible, title, options, selectedIds, onChange, onClose }) => {
-  const toggle = (id) => {
-    const idStr = String(id);
-    if (selectedIds.includes(idStr)) {
-      onChange(selectedIds.filter(x => x !== idStr));
-    } else {
-      onChange([...selectedIds, idStr]);
-    }
-  };
-  return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={msStyles.container}>
-        <Text style={msStyles.title}>{title}</Text>
-        <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-          {options.length === 0 && (
-            <Text style={msStyles.emptyText}>No items available.</Text>
-          )}
-          {options.map(opt => {
-            const idStr = String(opt.id);
-            const checked = selectedIds.includes(idStr);
-            return (
-              <TouchableOpacity key={idStr} style={msStyles.row} onPress={() => toggle(idStr)}>
-                <Text style={msStyles.label}>{opt.name}</Text>
-                <Icon name={checked ? 'check-box' : 'check-box-outline-blank'} size={22} color="#333" />
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-        <View style={msStyles.footer}>
-          <TouchableOpacity style={[msStyles.btn, msStyles.clear]} onPress={() => onChange([])}>
-            <Text style={msStyles.btnTextClear}>Clear</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={msStyles.btn} onPress={onClose}>
-            <Text style={msStyles.btnText}>Done</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-};
 
 const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   const sheetRef = useRef(null);
@@ -109,6 +66,7 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   const [allCats, setAllCats] = useState([]);
   const [vendorList, setVendorList] = useState([]);
   const [taxList, setTaxList] = useState([]);
+  const [uomList, setUomList] = useState([]);
 
   // Image (raw base64; send "" if unchanged)
   const [imgBase64, setImgBase64] = useState('');
@@ -119,7 +77,10 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
 
   // Multi-select modals
-  const [taxModal, setTaxModal] = useState(false);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [taxModalVisible, setTaxModalVisible] = useState(false);
+  const [uomModalVisible, setUomModalVisible] = useState(false);
+  const [selectedUomId, setSelectedUomId] = useState('');
   const [variantModalVisible, setVariantModalVisible] = useState(false);
   const [variantName, setVariantName] = useState('');
   const [variantCode, setVariantCode] = useState('');
@@ -180,9 +141,10 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   useEffect(() => {
     (async () => {
       try {
-        const [cats, taxes] = await Promise.all([
+        const [cats, taxes, uoms] = await Promise.all([
           getTopCategories(),
           TaxList(),
+          getUOMList(),
         ]);
         const normCats = Array.isArray(cats) ? cats.map(c => ({
           id: String(c.id ?? c._id ?? ''),
@@ -192,9 +154,14 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
           id: String(t.id ?? t.taxId ?? t._id ?? ''),
           name: String(t.name ?? t.taxName ?? ''),
         })) : [];
+        const normUom = Array.isArray(uoms) ? uoms.map(u => ({
+          id: String(u.id ?? u.uomId ?? u._id ?? ''),
+          name: String(u.name ?? u.uomName ?? ''),
+        })) : [];
         setAllCats(normCats);
         setVendorList([]);
         setTaxList(normTaxes);
+        setUomList(normUom);
       } catch (e) {
         console.log('Failed to fetch lists:', e?.message);
       }
@@ -220,6 +187,7 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
         setCaseCost(p.case_cost != null ? String(p.case_cost) : '');
 
         setCategoryId(p.categoryId != null ? String(p.categoryId) : '');
+        setSelectedUomId(p.uom_id != null ? String(p.uom_id) : (p.uomId != null ? String(p.uomId) : ''));
 
         // taxes -> ids
         const tIds = Array.isArray(p.productTaxes) ? p.productTaxes.map(t => String(t.taxId)) : [];
@@ -482,13 +450,68 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
     setCost((cc / uc).toFixed(2)); // sets new_std_price
   };
 
-  const idsToLabelSummary = (ids, options) => {
-    if (!ids?.length) return 'Select...';
-    const names = ids
-      .map(id => options.find(o => String(o.id) === String(id))?.name)
-      .filter(Boolean);
-    if (!names.length) return `${ids.length} selected`;
-    return names.length > 2 ? `${names.slice(0,2).join(', ')} +${names.length-2}` : names.join(', ');
+  const sortedCategories = useMemo(() => (
+    (Array.isArray(allCats) ? allCats : [])
+      .slice()
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }))
+  ), [allCats]);
+
+  const sortedTaxes = useMemo(() => (
+    (Array.isArray(taxList) ? taxList : [])
+      .slice()
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }))
+  ), [taxList]);
+
+  const sortedUom = useMemo(() => (
+    (Array.isArray(uomList) ? uomList : [])
+      .slice()
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }))
+  ), [uomList]);
+
+  const noTaxId = useMemo(() => {
+    const noTax = sortedTaxes.find((t) => String(t.name || '').trim().toLowerCase() === 'no tax');
+    return noTax?.id || '';
+  }, [sortedTaxes]);
+
+  useEffect(() => {
+    if (!noTaxId) return;
+    if (selectedTaxIds.includes(noTaxId) && selectedTaxIds.length > 1) {
+      setSelectedTaxIds([noTaxId]);
+    }
+  }, [noTaxId, selectedTaxIds]);
+
+  const categorySummary = useMemo(() => {
+    if (!categoryId) return 'Select Category';
+    return sortedCategories.find((c) => String(c.id) === String(categoryId))?.name || 'Select Category';
+  }, [categoryId, sortedCategories]);
+
+  const taxSummary = useMemo(() => {
+    if (!selectedTaxIds.length) return 'Select Tax';
+    return sortedTaxes
+      .filter((t) => selectedTaxIds.includes(String(t.id)))
+      .map((t) => t.name)
+      .join(', ');
+  }, [selectedTaxIds, sortedTaxes]);
+
+  const uomSummary = useMemo(() => {
+    if (!selectedUomId) return 'Select UoM';
+    return sortedUom.find((u) => String(u.id) === String(selectedUomId))?.name || 'Select UoM';
+  }, [selectedUomId, sortedUom]);
+
+  const toggleTax = (taxId) => {
+    const id = String(taxId);
+    setSelectedTaxIds((prev) => {
+      const isSelected = prev.includes(id);
+      if (id === noTaxId) return isSelected ? [] : [id];
+      if (isSelected) return prev.filter((x) => x !== id);
+      const withoutNoTax = noTaxId ? prev.filter((x) => x !== noTaxId) : prev;
+      return [...withoutNoTax, id];
+    });
+  };
+
+  const toggleUom = (uomId) => {
+    const id = String(uomId);
+    setSelectedUomId((prev) => (String(prev) === id ? '' : id));
   };
 
   const handleVendorSearch = (text) => {
@@ -541,6 +564,7 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
       unit_in_case: (unitc ?? '').trim(),
       case_cost: (casecost ?? '').trim(),
       categ_id: categoryId ? Number(categoryId) : undefined,
+      uom_id: selectedUomId ? Number(selectedUomId) : undefined,
       vendorcode: selectedVendorId ? Number(selectedVendorId) : undefined,
       available_in_pos: String(!!availablePOS),
       taxes_id: selectedTaxIds.map(t => Number(t)),
@@ -715,7 +739,7 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
               </View>
 
               {/* Row 4: Qty | Category */}
-                   <View style={[styles.rowGap, { marginTop: 10 }]}>
+              <View style={[styles.rowGap, { marginTop: 10 }]}>
                 <TextInput
                   style={[styles.inputCol, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
                   placeholder="Net QTY"
@@ -724,17 +748,13 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                   onChangeText={setQtyAvailable}
                   keyboardType="decimal-pad"
                 />
-                <View style={[styles.pickerCol, { borderColor: inputBorder, backgroundColor: inputBg }]}>
-                  <Picker
-                    selectedValue={categoryId}
-                    onValueChange={setCategoryId}
-                    style={{ color: inputTextColor }}
-                    dropdownIconColor={iconColor}
-                  >
-                    <Picker.Item label="Select Category" value="" />
-                    {allCats.map(c => <Picker.Item key={c.id} label={c.name} value={c.id} />)}
-                  </Picker>
-                </View>
+                <TouchableOpacity
+                  style={[styles.selectBox, { borderColor: inputBorder, backgroundColor: inputBg }]}
+                  onPress={() => setCategoryModalVisible(true)}
+                >
+                  <Text style={styles.selectLabel}>Category</Text>
+                  <Text style={[styles.selectValue, { color: inputTextColor }]} numberOfLines={2}>{categorySummary}</Text>
+                </TouchableOpacity>
               </View>
               {/* Row 5: Vendors (search) | Taxes (multi) */}
               <View style={styles.rowGap}>
@@ -768,13 +788,24 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                 {/* Taxes */}
                 <TouchableOpacity
                   style={[styles.pickerCol, styles.fakePicker, { borderColor: inputBorder, backgroundColor: inputBg }]}
-                  onPress={() => setTaxModal(true)}
+                  onPress={() => setTaxModalVisible(true)}
                 >
                   <Text style={[styles.fakePickerText, { color: inputTextColor }]}>
-                    {idsToLabelSummary(selectedTaxIds, taxList)}
+                    {taxSummary}
                   </Text>
                   <Icon name="arrow-drop-down" size={24} color={iconColor} />
                 </TouchableOpacity>
+              </View>
+
+              <View style={[styles.rowGap, { marginTop: 10 }]}>
+                <TouchableOpacity
+                  style={[styles.selectBox, { borderColor: inputBorder, backgroundColor: inputBg }]}
+                  onPress={() => setUomModalVisible(true)}
+                >
+                  <Text style={styles.selectLabel}>UoM</Text>
+                  <Text style={[styles.selectValue, { color: inputTextColor }]} numberOfLines={2}>{uomSummary}</Text>
+                </TouchableOpacity>
+                <View style={{ flex: 1 }} />
               </View>
 
               {/* Switches */}
@@ -860,15 +891,65 @@ const ProductBottomSheet = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
         )}
       </RBSheet>
 
-      {/* Tax multi-select modal */}
-      <MultiSelectModal
-        visible={taxModal}
-        title="Select Taxes"
-        options={taxList}
-        selectedIds={selectedTaxIds}
-        onChange={setSelectedTaxIds}
-        onClose={() => setTaxModal(false)}
-      />
+      <Modal visible={categoryModalVisible} transparent animationType="fade" onRequestClose={() => setCategoryModalVisible(false)}>
+        <View style={styles.optionModalRoot}>
+          <TouchableOpacity style={styles.optionModalBackdrop} activeOpacity={1} onPress={() => setCategoryModalVisible(false)} />
+          <View style={styles.optionModalCard}>
+            <Text style={styles.optionModalTitle}>Select Category</Text>
+            <ScrollView style={styles.optionList}>
+              {sortedCategories.map((item) => (
+                <TouchableOpacity key={item.id} style={styles.optionRow} onPress={() => setCategoryId(String(item.id))}>
+                  <Text style={styles.optionLabel}>{item.name}</Text>
+                  <Switch value={String(categoryId) === String(item.id)} onValueChange={() => setCategoryId(String(item.id))} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.btn} onPress={() => setCategoryModalVisible(false)}>
+              <Text style={styles.btnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={taxModalVisible} transparent animationType="fade" onRequestClose={() => setTaxModalVisible(false)}>
+        <View style={styles.optionModalRoot}>
+          <TouchableOpacity style={styles.optionModalBackdrop} activeOpacity={1} onPress={() => setTaxModalVisible(false)} />
+          <View style={styles.optionModalCard}>
+            <Text style={styles.optionModalTitle}>Select Tax</Text>
+            <ScrollView style={styles.optionList}>
+              {sortedTaxes.map((item) => (
+                <TouchableOpacity key={item.id} style={styles.optionRow} onPress={() => toggleTax(item.id)}>
+                  <Text style={styles.optionLabel}>{item.name}</Text>
+                  <Switch value={selectedTaxIds.includes(String(item.id))} onValueChange={() => toggleTax(item.id)} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.btn} onPress={() => setTaxModalVisible(false)}>
+              <Text style={styles.btnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={uomModalVisible} transparent animationType="fade" onRequestClose={() => setUomModalVisible(false)}>
+        <View style={styles.optionModalRoot}>
+          <TouchableOpacity style={styles.optionModalBackdrop} activeOpacity={1} onPress={() => setUomModalVisible(false)} />
+          <View style={styles.optionModalCard}>
+            <Text style={styles.optionModalTitle}>Select UoM</Text>
+            <ScrollView style={styles.optionList}>
+              {sortedUom.map((item) => (
+                <TouchableOpacity key={item.id} style={styles.optionRow} onPress={() => toggleUom(item.id)}>
+                  <Text style={styles.optionLabel}>{item.name}</Text>
+                  <Switch value={String(selectedUomId) === String(item.id)} onValueChange={() => toggleUom(item.id)} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.btn} onPress={() => setUomModalVisible(false)}>
+              <Text style={styles.btnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={variantModalVisible} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
@@ -1153,6 +1234,24 @@ const styles = StyleSheet.create({
 
   fakePicker: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 12 },
   fakePickerText: { color: '#333' },
+  selectBox: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+  },
+  selectLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#666',
+    marginBottom: 4,
+  },
+  selectValue: {
+    color: '#111',
+    fontSize: 14,
+  },
   vendorBox: { flex: 1, position: 'relative' },
   vendorDropdown: {
     position: 'absolute',
@@ -1174,6 +1273,44 @@ const styles = StyleSheet.create({
   vendorText: { color: '#111', fontWeight: '600' },
   vendorSub: { color: '#666', fontSize: 12, marginTop: 2 },
   selectedVendorNote: { fontSize: 12, color: '#2c1e70', marginTop: 6 },
+  optionModalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  optionModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#00000077',
+  },
+  optionModalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    maxHeight: '75%',
+    padding: 14,
+  },
+  optionModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111',
+    marginBottom: 10,
+  },
+  optionList: {
+    marginBottom: 12,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eee',
+    paddingVertical: 10,
+  },
+  optionLabel: {
+    flex: 1,
+    color: '#111',
+    fontWeight: '600',
+    paddingRight: 10,
+  },
 
   colWithButton: { flex: 1, flexDirection: 'column', gap: 8 },
   calcBtn: { backgroundColor: THEME.secondary, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, marginTop: 8, alignSelf: 'flex-end' },
@@ -1259,26 +1396,4 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth, borderColor: '#eee', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 12,
   },
   switchLabel: { color: '#111', fontWeight: '600' },
-});
-
-const msStyles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 20, paddingHorizontal: 16, backgroundColor: '#fff' },
-  title: { fontSize: 18, fontWeight: '700', color: '#111', marginBottom: 12, textAlign: 'center' },
-  row: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
-  },
-  label: { color: '#111', fontSize: 15, flex: 1, marginRight: 8 },
-  emptyText: { color: '#111', textAlign: 'center', paddingVertical: 12 },
-  footer: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, paddingVertical: 12 },
-  btn: { backgroundColor: THEME.secondary, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8 },
-  btnText: { color: '#fff', fontWeight: '700' },
-  clear: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd' },
-  btnTextClear: { color: '#111', fontWeight: '700' },
 });

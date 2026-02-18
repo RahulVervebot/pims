@@ -125,18 +125,53 @@ export async function getDaysList() {
 export async function searchProductsByBarcode(text) {
   const headers = await buildHeaders();
   const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/pos/app/product/search?query=${encodeURIComponent(text)}`, {
-    method: 'GET',
-    headers,
-  });
+  const runSearch = async (q) => {
+    const res = await fetch(`${baseUrl}/pos/app/product/search?query=${encodeURIComponent(q)}`, {
+      method: 'GET',
+      headers,
+    });
+    if (!res.ok) {
+      const textRes = await res.text().catch(() => '');
+      throw new Error(`Failed to search products (${res.status}): ${textRes || 'No details'}`);
+    }
+    const json = await res.json().catch(() => ({}));
+    return Array.isArray(json?.products) ? json.products : [];
+  };
 
-  if (!res.ok) {
-    const textRes = await res.text().catch(() => '');
-    throw new Error(`Failed to search products (${res.status}): ${textRes || 'No details'}`);
+  const raw = String(text || '').trim();
+  if (!raw) return [];
+
+  // 1) Try exact first
+  let results = await runSearch(raw);
+  if (results.length) return results;
+
+  // Only retry when not found
+  let candidates = [];
+  if (/^00/.test(raw)) {
+    candidates.push(raw.replace(/^00/, '0'));
+  }
+  if (/^0/.test(raw)) {
+    candidates.push(raw.replace(/^0/, ''));
+  }
+  if (raw.length > 1) {
+    candidates.push(raw.slice(0, -1));
+  }
+  if (/^0/.test(raw) && raw.length > 1) {
+    candidates.push(raw.replace(/^0/, '').slice(0, -1));
+  }
+  if (!/^0/.test(raw)) {
+    candidates.push(`0${raw}`);
   }
 
-  const json = await res.json().catch(() => ({}));
-  return Array.isArray(json?.products) ? json.products : [];
+  // Deduplicate + remove empties
+  candidates = [...new Set(candidates.map((c) => c.trim()).filter(Boolean))];
+
+  for (const q of candidates) {
+    results = await runSearch(q);
+    if (results.length) return results;
+  }
+
+  return [];
 }
 
 export async function getQuantityDiscountPromotions({ page = 1, limit = 10, start_date, end_date }) {

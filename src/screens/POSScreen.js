@@ -163,19 +163,17 @@ export default function POSScreen() {
           </View>
         )}
       </View>
- <CreateCategoryModal
+<CreateCategoryModal
   visible={showCreate}
   onClose={() => setShowCreate(false)}
   onCreated={() => {
-   fetchCategories();
+    setShowCreate(false);
   }}
 />
   <CreateProductModal
         visible={showProductCreate}
         onClose={() => setShowProductCreate(false)}
         onCreated={() => {
-          // If you want to refresh immediately after product creation:
-          setListReloadKey((k) => k + 1);
           setShowProductCreate(false);
         }}
       />

@@ -329,11 +329,11 @@ setStoreurl(storeulr)
             ) : null}
 
             <View style={styles.rowButtons}>
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: THEME.accent }]} onPress={() => onAddToCart()}>
+              {/* <TouchableOpacity style={[styles.actionBtn, { backgroundColor: THEME.accent }]} onPress={() => onAddToCart()}>
                 <Text style={styles.actionText}>Add to Cart</Text>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
 
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: THEME.primary }]} onPress={() => onAddToPrint()}>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: THEME.accent }]} onPress={() => onAddToPrint()}>
                 <Text style={styles.actionText}>Add to Print</Text>
               </TouchableOpacity>
             </View>
