@@ -18,6 +18,7 @@ export async function searchVendors(query) {
     body: JSON.stringify({ q: query }),
   });
 
+console.log("token:",token,icms_store,API_ENDPOINTS);
   if (!res.ok) {
     console.warn('searchVendors failed:', res.status, await res.text().catch(()=>''));
     return [];

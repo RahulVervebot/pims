@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,7 @@ import SaleSummaryReport from './src/screens/SalesSummaryReport';
 import PrintScreen from './src/screens/PrintScreen';
 import AppProviders from './src/context/AppProviders';
 import OcrScreen from './src/components/icms/OcrCameraScreen';
+import AddNewVendorInvoice from './src/components/icms/AddNewVendorInvoice';
 import SettingScreen from './src/screens/SettingScreen';
 import POSScreen from './src/screens/POSScreen';
 import ICMSScreen from './src/screens/ICMSScreen';
@@ -49,6 +50,7 @@ import OrdersScreen from './src/components/orders/order.js';
 import MixMatchScreen from './src/screens/promotions/mixmatch.js';
 import QuantityDiscountScreen from './src/screens/promotions/QuantityDiscount';
 import SalePrintScreen from './src/screens/SalePrintScreen';
+import ArchivedProductList from './src/components/ArchivedProductList';
 import HomeIcon from './src/assets/icons/HomeIcon.svg';
 import ProductIcon from './src/assets/icons/Icon-Product.svg';
 import ProductScreen from './src/screens/ProductScreen.js';
@@ -176,8 +178,19 @@ function ChatOverlay() {
   return <Chat style={{ bottom: 70 + insets.bottom, right: 16 }} />;
 }
 
+function getActiveRouteName(state) {
+  if (!state || !state.routes || state.index == null) return '';
+  const route = state.routes[state.index];
+  if (!route) return '';
+  if (route.state) return getActiveRouteName(route.state);
+  return route.name || '';
+}
+
 export default function App() {
   const [initialRoute, setInitialRoute] = useState(null);
+  const [activeRouteName, setActiveRouteName] = useState('');
+  const navigationRef = useRef(null);
+  const CHAT_HIDDEN_ROUTES = new Set(['Login', 'CategoryListScreen', 'CategoryProducts', 'ProductScreen']);
 
   useEffect(() => {
     const checkLogin = async () => {
@@ -202,7 +215,18 @@ export default function App() {
   return (
     <AppProviders>
       <SafeAreaProvider>
-        <NavigationContainer>
+        <NavigationContainer
+          ref={navigationRef}
+          onReady={() => {
+            const rootState = navigationRef.current?.getRootState?.();
+            const current = getActiveRouteName(rootState);
+            if (current) setActiveRouteName(current);
+          }}
+          onStateChange={(state) => {
+            const current = getActiveRouteName(state);
+            setActiveRouteName(current);
+          }}
+        >
         <View style={{ flex: 1 }}>
           <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Login" component={LoginScreen} />
@@ -218,10 +242,12 @@ export default function App() {
 
 
       <Stack.Screen name="OcrScreen" component={OcrScreen} />     
+      <Stack.Screen name="AddNewVendorInvoice" component={AddNewVendorInvoice} />
        <Stack.Screen name="SettingScreen" component={SettingScreen} />    
             <Stack.Screen name="CategoryListScreen" component={CategoryListScreen} />  
      <Stack.Screen name="PrintScreen" component={PrintScreen} /> 
      <Stack.Screen name="SalePrintScreen" component={SalePrintScreen} />
+     <Stack.Screen name="ArchivedProductList" component={ArchivedProductList} />
     <Stack.Screen name="MixMatchScreen" component={MixMatchScreen} /> 
     <Stack.Screen name="QuantityDiscountScreen" component={QuantityDiscountScreen} />
 
@@ -273,7 +299,7 @@ export default function App() {
             options={{ title: 'Pending Invoices' }}
           />
           </Stack.Navigator>
-          <ChatOverlay />
+          {!CHAT_HIDDEN_ROUTES.has(activeRouteName) && <ChatOverlay />}
         </View>
         </NavigationContainer>
       </SafeAreaProvider>

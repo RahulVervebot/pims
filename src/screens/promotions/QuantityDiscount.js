@@ -12,8 +12,8 @@ import {
   ImageBackground,
   Platform,
   Modal,
+  KeyboardAvoidingView,
 } from 'react-native';
-import RBSheet from 'react-native-raw-bottom-sheet';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Camera, CameraType } from 'react-native-camera-kit';
@@ -37,7 +37,6 @@ const DEFAULT_FORM = {
 };
 
 export default function QuantityDiscountScreen() {
-  const sheetRef = useRef(null);
   const onEndReachedCalledDuringMomentum = useRef(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -64,6 +63,7 @@ export default function QuantityDiscountScreen() {
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+  const [formModalVisible, setFormModalVisible] = useState(false);
 
   const formatDateOnly = (value) => {
     if (!value) return '';
@@ -163,7 +163,7 @@ export default function QuantityDiscountScreen() {
     setProductQuery('');
     setProductResults([]);
     setProductDropdownVisible(false);
-    sheetRef.current?.open();
+    setFormModalVisible(true);
   };
 
   const handleCreateOrUpdate = async () => {
@@ -184,7 +184,7 @@ export default function QuantityDiscountScreen() {
         : await createQuantityDiscountPromotion(payload);
       const message = res?.message || res?.result?.message || 'Quantity discount saved successfully';
       Alert.alert('Success', message);
-      sheetRef.current?.close();
+      setFormModalVisible(false);
       loadPromotions();
     } catch (e) {
       Alert.alert('Error', e?.message || 'Failed to save promotion.');
@@ -311,7 +311,7 @@ export default function QuantityDiscountScreen() {
         setProductQuery('');
         setProductResults([]);
         setProductDropdownVisible(false);
-        sheetRef.current?.open();
+        setFormModalVisible(true);
       }}
     >
       <View style={styles.cardHeader}>
@@ -459,15 +459,28 @@ export default function QuantityDiscountScreen() {
         <Text style={styles.createBtnText}>Create Quantity Discount</Text>
       </TouchableOpacity>
 
-      <RBSheet
-        ref={sheetRef}
-        height={520}
-        openDuration={220}
-        closeOnDragDown
-        customStyles={{ container: styles.sheet, draggableIcon: { backgroundColor: '#ccc', width: 60 } }}
+      <Modal
+        visible={formModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFormModalVisible(false)}
       >
-        <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-          <Text style={styles.sheetTitle}>{editingId ? 'Update Quantity Discount' : 'Create Quantity Discount'}</Text>
+        <View style={styles.formModalRoot}>
+          <TouchableOpacity
+            style={styles.formModalOverlay}
+            activeOpacity={1}
+            onPress={() => setFormModalVisible(false)}
+          />
+          <KeyboardAvoidingView
+            behavior={Platform.select({ ios: 'padding', android: undefined })}
+            style={styles.formModalCentered}
+          >
+            <View style={styles.formModalCard}>
+            <TouchableOpacity style={styles.formModalCloseBtn} onPress={() => setFormModalVisible(false)}>
+              <Icon name="close" size={20} color="#111" />
+            </TouchableOpacity>
+            <ScrollView contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+              <Text style={styles.sheetTitle}>{editingId ? 'Update Quantity Discount' : 'Create Quantity Discount'}</Text>
 
           <View style={styles.searchBox}>
             <View style={styles.searchRowInline}>
@@ -587,8 +600,11 @@ export default function QuantityDiscountScreen() {
               {submitting ? 'Saving…' : editingId ? 'Update Quantity Discount' : 'Create Quantity Discount'}
             </Text>
           </TouchableOpacity>
-        </ScrollView>
-      </RBSheet>
+            </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
 
       <Modal visible={scannerVisible} animationType="slide">
         {hasCameraPermission ? (
@@ -749,8 +765,40 @@ const styles = StyleSheet.create({
   },
   loadMoreText: { color: '#166534', fontWeight: '700' },
 
-  sheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16 },
-  sheetTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 12 },
+  formModalRoot: {
+    flex: 1,
+  },
+  formModalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#00000077',
+  },
+  formModalCentered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  formModalCard: {
+    width: '100%',
+    maxWidth: 520,
+    maxHeight: '86%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+  },
+  formModalCloseBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  sheetTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 12, textAlign: 'center' },
   input: {
     borderWidth: 1,
     borderColor: '#E5E7EB',

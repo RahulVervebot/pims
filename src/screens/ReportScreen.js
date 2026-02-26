@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ImageBackground, Image, useWindowDimensions, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground, Image, useWindowDimensions, Platform, TouchableOpacity, ScrollView } from 'react-native';
 import CustomHeader from '../components/CustomHeader';
 import reportbg from '../assets/images/report-bg.png';
 import HourlyReport from '../assets/icons/Hourly-Reports.png';
@@ -20,14 +20,13 @@ export default function ReportScreen() {
   const navigation = useNavigation();
   const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
 
-  const Row = ({ icon, label, isFirst, isLast }) => (
-    <View style={[
-      styles.row,
-      isFirst && styles.rowFirst,
-      !isLast && styles.rowDivider
-    ]}>
-      <Image source={icon} style={styles.rowIcon} resizeMode="contain" />
+  const Row = ({ icon, label }) => (
+    <View style={styles.row}>
+      <View style={styles.rowIconWrap}>
+        <Image source={icon} style={styles.rowIcon} resizeMode="contain" />
+      </View>
       <Text style={styles.rowTitle}>{label}</Text>
+      <Text style={styles.rowArrow}>{'>'}</Text>
     </View>
   );
 
@@ -41,49 +40,53 @@ export default function ReportScreen() {
         backgroundType="image" backgroundValue={reportbg}>
       </CustomHeader>
       <View style={styles.panelInner}>
-        <TouchableOpacity
-          style={styles.checkoutBtn}
-          onPress={() => navigation.navigate('SaleSummaryReport')}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.panelContent}
         >
-          <Row icon={SaleSummaryReport} label="Sales Summary Reports" isFirst />
-        </TouchableOpacity>
-         <TouchableOpacity
-          style={styles.checkoutBtn}
-          onPress={() => navigation.navigate('OrdersScreen')}
-        >
-          <Row icon={Orders} label="Orders" isFirst />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.checkoutBtn}
-          onPress={() => navigation.navigate('ReportsByHours')}
-        >
-          <Row icon={HourlyReport} label="Hourly Reports" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.checkoutBtn}
-          onPress={() => navigation.navigate('TopSellingCustomerReport')}
-        >
-        <Row icon={TopCustumerList} label="Top Customer List" />
-       </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.checkoutBtn}
-          onPress={() => navigation.navigate('TopSellingProductsReportScreen')}
-        >
-          <Row icon={TopSellingProducts} label="Top Selling Products" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.checkoutBtn}
-          onPress={() => navigation.navigate('TopSellingCategoriesReport')}
-        >
-        <Row icon={TopSellingCategories} label="Top Selling Categories" />
-        </TouchableOpacity>
-             <TouchableOpacity
-          style={styles.checkoutBtn}
-          onPress={() => navigation.navigate('SessionReports')}
-        >
-          <Row icon={SessionReports} label="Sessions Report" isLast />
-        </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => navigation.navigate('SaleSummaryReport')}
+          >
+            <Row icon={SaleSummaryReport} label="Sales Summary Reports" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => navigation.navigate('OrdersScreen')}
+          >
+            <Row icon={Orders} label="Orders" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => navigation.navigate('ReportsByHours')}
+          >
+            <Row icon={HourlyReport} label="Hourly Reports" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => navigation.navigate('TopSellingCustomerReport')}
+          >
+            <Row icon={TopCustumerList} label="Top Customer List" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => navigation.navigate('TopSellingProductsReportScreen')}
+          >
+            <Row icon={TopSellingProducts} label="Top Selling Products" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => navigation.navigate('TopSellingCategoriesReport')}
+          >
+            <Row icon={TopSellingCategories} label="Top Selling Categories" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => navigation.navigate('SessionReports')}
+          >
+            <Row icon={SessionReports} label="Sessions Report" />
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
     </ImageBackground>
@@ -136,46 +139,68 @@ const getStyles = (isTablet) => StyleSheet.create({
   },
   panelInner: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.85)', // helps separate items from bg image
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingVertical: isTablet ? 14 : 10,
-    paddingHorizontal: isTablet ? 16 : 12,
+    backgroundColor: '#D4E7DC',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingVertical: isTablet ? 18 : 12,
+    paddingHorizontal: isTablet ? 18 : 12,
 
     ...Platform.select({
-      android: { elevation: 1 },
+      android: { elevation: 0 },
       ios: {
-        shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0,
       },
     }),
+  },
+  panelContent: {
+    paddingBottom: isTablet ? 26 : 16,
   },
 
   // Rows
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: isTablet ? 22 : 14,
+    marginBottom: isTablet ? 16 : 10,
+    paddingHorizontal: isTablet ? 18 : 14,
     paddingVertical: isTablet ? 16 : 12,
-    gap: isTablet ? 14 : 10,
+    borderRadius: 18,
+    backgroundColor: '#D9EBE1',
+    ...Platform.select({
+      android: { elevation: 1 },
+      ios: {
+        shadowColor: '#9CB9A8',
+        shadowOpacity: 0.15,
+        shadowRadius: 3,
+        shadowOffset: { width: 0, height: 1 },
+      },
+    }),
   },
-  rowFirst: {
-    paddingTop: isTablet ? 16 : 8,
-  },
-  rowDivider: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.12)', // elegant separator under image+title
+  rowIconWrap: {
+    width: isTablet ? 68 : 56,
+    height: isTablet ? 68 : 56,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
   },
   rowIcon: {
-    width: isTablet ? 36 : 28,
-    height: isTablet ? 36 : 28,
+    width: isTablet ? 40 : 32,
+    height: isTablet ? 40 : 32,
   },
   rowTitle: {
+    flex: 1,
     flexShrink: 1,
     fontSize: isTablet ? 20 : 16,
     fontWeight: '600',
     color: '#111',
     letterSpacing: 0.2,
+  },
+  rowArrow: {
+    fontSize: isTablet ? 44 : 30,
+    color: '#101010',
+    fontWeight: '600',
+    lineHeight: isTablet ? 44 : 32,
+    paddingRight: 6,
   },
 });

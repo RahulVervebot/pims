@@ -55,9 +55,8 @@ export default function LoginScreen({ navigation }) {
           await AsyncStorage.setItem('icms_url', data.icmsurl);
           await AsyncStorage.setItem('tulsi_websocket', data.tulsi_websocket);
           await AsyncStorage.setItem('tulsi_ai_backend', data.tulsi_ai_backend);
-
-
-        }
+          await AsyncStorage.setItem('tulsifrontendurl', data.tulsifrontendurl);
+      }
       } else {
         console.warn('Firestore: tulsi/storelist does not exist');
       }
@@ -116,12 +115,7 @@ export default function LoginScreen({ navigation }) {
     }, [fetchFirebaseDataLogin])
   );
 
-  // -----------------------------
-  // 2) Fetch storelist.json from firebaseeurl
-  //    Expected shape (simplified):
-  //    [ { "delight.us": [ { "STORE NAME": { storeurl, dbname, password } }, ... ],
-  //        "gmail.com":   [ { "STORE NAME": {...}}, ... ] } ]
-  // -----------------------------
+
   const fetchStoreListFromFirebaseUrl = useCallback(async (url) => {
     try {
       if (!url) return;
@@ -222,6 +216,7 @@ export default function LoginScreen({ navigation }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      console.log("body & url",body,url);
       const data = await res.json().catch(() => ({}));
       console.log("login response:", data);
       if (!res.ok || !data?.result) {

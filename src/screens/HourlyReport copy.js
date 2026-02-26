@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, ScrollView, StyleSheet, useColorScheme,
   TouchableOpacity, Modal, Platform, ImageBackground, Switch, Dimensions, Alert,
 } from "react-native";
-import { LineChart, Grid, XAxis, YAxis } from "react-native-svg-charts";
+import { BarChart, Grid, XAxis, YAxis } from "react-native-svg-charts";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { IconButton } from "react-native-paper";
 import AppHeader from "../components/AppHeader";
@@ -159,13 +159,6 @@ export default function ReportsByHours({ navigation }) {
   }, [reportDate, compareSales, compareDate]);
 
   const getImageSource = (val) => (typeof val === "number" ? val : { uri: val });
-  const primarySeries = hourlyData.datasets?.[0]?.data || [];
-  const comparisonSeries = hourlyData.datasets?.[1]?.data || [];
-  const mergedSeries = useMemo(() => {
-    return compareSales && comparisonSeries.length
-      ? [...primarySeries, ...comparisonSeries]
-      : primarySeries;
-  }, [compareSales, primarySeries, comparisonSeries]);
 
   return (
     <ImageBackground source={getImageSource(reportbg)} style={styles.screen} resizeMode="cover">
@@ -233,58 +226,54 @@ export default function ReportsByHours({ navigation }) {
 
         {hourlyData.datasets.length > 0 ? (
           <ScrollView horizontal>
-            <View style={{ height: 520, flexDirection: "row", paddingHorizontal: 10, paddingBottom: 24 }}>
+            <View style={{ height: 480, flexDirection: "row", paddingHorizontal: 10, paddingBottom: 24 }}>
               <YAxis
-                style={{ paddingBottom: 82 }}
-                data={mergedSeries}
+                style={{ paddingBottom: 110 }}
+                data={hourlyData.datasets[0].data}
                 contentInset={{ top: 20, bottom: 20 }}
                 svg={{ fontSize: 10, fill: "black" }}
                 formatLabel={(value) => `$${value}`}
               />
               <ScrollView horizontal>
-                <View style={{ flex: 1, marginLeft: 10, width: screenWidth * 2, gap: 10 }}>
-                  <View style={styles.legendRow}>
-                    <View style={styles.legendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: "#0A3B91" }]} />
-                      <Text style={styles.legendText}>Primary</Text>
-                    </View>
-                    {compareSales && comparisonSeries.length > 0 && (
-                      <View style={styles.legendItem}>
-                        <View style={[styles.legendDot, { backgroundColor: "#E84A8A" }]} />
-                        <Text style={styles.legendText}>Comparison</Text>
-                      </View>
-                    )}
-                  </View>
+                <View style={{ flex: 1, marginLeft: 10, width: screenWidth * 2 }}>
+                  <BarChart
+                    style={{ flex: 1 }}
+                    data={hourlyData.datasets}
+                    yAccessor={({ item }) => item}
+                    contentInset={{ top: 40, bottom: 20 }}
+                    yMin={0}
+                    gridMin={0}
+                    svg={{ fill: "rgba(134, 65, 244, 0.8)" }}
+                    spacingInner={0.3}
+                  >
+                    <Grid />
+                  </BarChart>
 
-                  <View style={{ height: 250 }}>
-                    <LineChart
-                      style={{ flex: 1 }}
-                      data={primarySeries}
-                      contentInset={{ top: 24, bottom: 16 }}
-                      yMin={0}
-                      svg={{ stroke: "#0A3B91", strokeWidth: 3 }}
-                    >
-                      <Grid />
-                    </LineChart>
-                    {compareSales && comparisonSeries.length > 0 && (
-                      <LineChart
-                        style={StyleSheet.absoluteFill}
-                        data={comparisonSeries}
-                        contentInset={{ top: 24, bottom: 16 }}
-                        yMin={0}
-                        svg={{ stroke: "#E84A8A", strokeWidth: 3 }}
-                      />
-                    )}
-                  </View>
-
+                  {hourlyData.datasets.length > 0 && (
+                    <XAxis
+                      style={{ marginHorizontal: -10, height: 24, marginTop: 8 }}
+                      data={hourlyData.datasets[0].data}
+                      formatLabel={(value, index) => `$${hourlyData.datasets[0].data[index].toFixed(2)}`}
+                      contentInset={{ left: 30, right: 30 }}
+                      svg={{ fontSize: 10, fill: "#00008B" }}
+                    />
+                  )}
+                  {hourlyData.datasets.length > 1 && (
+                    <XAxis
+                      style={{ marginHorizontal: -10, height: 24, marginTop: 8 }}
+                      data={hourlyData.datasets[1].data}
+                      formatLabel={(value, index) => `$${hourlyData.datasets[1].data[index].toFixed(2)}`}
+                      contentInset={{ left: 30, right: 30 }}
+                      svg={{ fontSize: 10, fill: "#FF69B4" }}
+                    />
+                  )}
                   <XAxis
-                    style={{ height: 28, marginTop: 2 }}
+                    style={{ marginHorizontal: -10, height: 28, marginTop: 8 }}
                     data={hourlyData.labels}
                     formatLabel={(value, index) => hourlyData.labels[index]}
-                    contentInset={{ left: 10, right: 10 }}
+                    contentInset={{ left: 30, right: 30 }}
                     svg={{ fontSize: 11, fill: "black" }}
                   />
-
                 </View>
               </ScrollView>
             </View>
@@ -407,10 +396,7 @@ const styles = StyleSheet.create({
   },
   title: { color: "#f58b40", fontSize: 21, fontWeight: "bold", margin: 10 },
   noData: { fontSize: 18, color: "red", marginTop: 20 },
-  legendRow: { flexDirection: "row", alignItems: "center", gap: 16, marginBottom: -2, marginLeft: 2 },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontSize: 12, color: "#374151", fontWeight: "700" },
+
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center", padding: 20 },
   modalCard: { width: "100%", backgroundColor: "#fff", borderRadius: 12, padding: 16 },

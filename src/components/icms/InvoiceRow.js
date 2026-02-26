@@ -1,12 +1,10 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Platform } from 'react-native';
 
-const InvoiceRow = ({ item, index, isExpanded, onToggle, onLongPress, selectedIds, onToggleSelect, onEdit, onLinkProduct }) => {
+const InvoiceRow = ({ item, index, categoryMetaByDept = {}, isExpanded, onToggle, onLongPress, selectedIds, onToggleSelect, onEdit, onLinkProduct, onRemoveLinkedItem }) => {
     const { width, fontScale } = useWindowDimensions();
     const isTablet = width >= 768;
-
     if (!item) return null;
-
     let Invqty;
     if (item.qty == '0' && item.extendedPrice === '0.00') {
       return null;
@@ -14,7 +12,7 @@ const InvoiceRow = ({ item, index, isExpanded, onToggle, onLongPress, selectedId
     if (!item.qty) {
       Invqty = (Number(item.extendedPrice) / Number(item.unitPrice)).toFixed(0);
     }
-
+// console.log("items for row invoice:",item);
     // responsive sizes
     const base = isTablet ? 14 : 12.6;
     const labelSize = Math.max(11, base - 1 / fontScale);
@@ -36,6 +34,20 @@ const InvoiceRow = ({ item, index, isExpanded, onToggle, onLongPress, selectedId
       : '#FFFFFF';
     const rowBg = isSelected ? '#DFF7E0' : baseBg;
     const textColor = '#21262E';
+    const isBaseUnlinked = baseBg.toLowerCase() === '#ff0000';
+    const isBaseCentral = baseBg.toLowerCase() === '#ffecec';
+    const isStockUpdated = item?.isStockUpdated === true || item?.isStockUpdated === 'true';
+    const hideUnlinkButton = isBaseUnlinked || isBaseCentral || isStockUpdated;
+    const deptKey = String(item?.department ?? '').trim().toLowerCase();
+    const pricingMeta = categoryMetaByDept?.[deptKey] || { margin: 0, markup: 0 };
+    const margin = Number(pricingMeta?.margin ?? 0);
+    const markup = Number(pricingMeta?.markup ?? 0);
+    const cpNum = Number(item?.cp ?? 0);
+    const appliedRate = margin !== 0 ? margin : (markup !== 0 ? markup : 0);
+    const newSellingPrice =
+      Number.isFinite(cpNum) && appliedRate !== 0
+        ? (cpNum + (cpNum * appliedRate) / 100).toFixed(2)
+        : (item?.sellingPrice != null ? String(item.sellingPrice) : '-');
 
     return (
       <TouchableOpacity
@@ -91,19 +103,21 @@ const InvoiceRow = ({ item, index, isExpanded, onToggle, onLongPress, selectedId
         {isExpanded && (
           <View style={styles.expanded}>
             {[
-              ['POS Description', item.description],
-              ['itemNo', item.itemNo], 
-               ['Product Id', item.ProductId], 
-              ['Qty Shipped', item.pieces],
-              ['U. Cost', `$${item.unitPrice}`],
-              ['Description', item.description],
-              ['Inv Quntity', Invqty],
-              ['Units in Case', item.pieces],
-              ['Case Cost', `$${(Number(item.unitPrice) * Number(item.pieces)).toFixed(2)}`],
-              ['Extended Price', `${item.extendedPrice}`],
-              ['Unit Price', `$${item.unitPrice}`],
-            ].map(([label, value], idx) => (
-              <View key={idx} style={[styles.expandedRow, idx === 8 && { borderBottomWidth: 0 }]}>
+              ['POS Description', item.posName],
+              ['(Inv) itemNo', item.itemNo], 
+              ['(Inv) Description', item.description],
+              ['(Inv) Qty Shipped', item.qty],
+              ['POS Department', item.department],
+              ['Unit in Case', item.pieces],
+              ['Unit Cost', `$${(Number(item.cp))}`],
+              ['Unit Price', `$${item.sellingPrice}`],
+              ...(margin !== 0 ? [['Category Margin', `${margin}%`]] : []),
+              ...(margin === 0 && markup !== 0 ? [['Category Markup', `${markup}%`]] : []),
+              ['New Unit Price', `$${newSellingPrice}`],
+              ['(Inv) Case Cost', `$${item.unitPrice}`],
+              ['(Inv) Extended Price', `${item.extendedPrice}`],
+            ].map(([label, value], idx, arr) => (
+              <View key={idx} style={[styles.expandedRow, idx === arr.length - 1 && { borderBottomWidth: 0 }]}>
                 <Text style={[styles.expandedLabel, { fontSize: labelSize }]}>{label}:</Text>
                 <Text
                   style={[styles.expandedValue, { fontSize: valueSize }]}
@@ -116,23 +130,38 @@ const InvoiceRow = ({ item, index, isExpanded, onToggle, onLongPress, selectedId
 
             {/* Action buttons */}
             <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                onPress={() => onEdit(item)}
-                activeOpacity={0.9}
-                style={[styles.actionBtn, styles.editBtn]}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.actionText}>✎ Edit</Text>
-              </TouchableOpacity>
+              {!isStockUpdated && (
+                <TouchableOpacity
+                  onPress={() => onEdit(item)}
+                  activeOpacity={0.9}
+                  style={[styles.actionBtn, styles.editBtn]}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.actionText}>✎ Edit</Text>
+                </TouchableOpacity>
+              )}
 
-              <TouchableOpacity
-                onPress={() => onLinkProduct(item)}
-                activeOpacity={0.9}
-                style={[styles.actionBtn, styles.linkBtn]}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.actionText}>🔗 Link Product</Text>
-              </TouchableOpacity>
+              {!isStockUpdated && (
+                <TouchableOpacity
+                  onPress={() => onLinkProduct(item)}
+                  activeOpacity={0.9}
+                  style={[styles.actionBtn, styles.linkBtn]}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.actionText}>🔗 Link Product</Text>
+                </TouchableOpacity>
+              )}
+
+              {!hideUnlinkButton && (
+                <TouchableOpacity
+                  onPress={() => onRemoveLinkedItem && onRemoveLinkedItem(item)}
+                  activeOpacity={0.9}
+                  style={[styles.actionBtn, styles.removeLinkBtn]}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.actionText}>Unlink</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         )}
@@ -228,6 +257,10 @@ const styles = StyleSheet.create({
   linkBtn: {
     backgroundColor: '#6366F1', // indigo
     borderColor: '#5457D6',
+  },
+  removeLinkBtn: {
+    backgroundColor: '#EF4444',
+    borderColor: '#DC2626',
   },
   actionText: {
     color: '#FFFFFF',

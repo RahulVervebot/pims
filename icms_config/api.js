@@ -1,12 +1,11 @@
 // icms_config/api.js
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ICMSAPIsURL } from '@env'; // optional fallback
-
 const STORAGE_KEY = 'icms_url';
 
 const PATHS = {
   VENDORS: '/api/getvendorlist',
-  FINDPRODUCTFROMHICKSVILL: '/api/find-hicksville-products',
+  FINDPRODUCTFROMHICKSVILL: '/find-hicksville-products-for-mobile',
   PRODUCTLINKING: '/api/invoice/product/update',
   SEARCHVENDOR: '/api/searchvendor',
   GETINVOICEDATA: '/api/getCompletedInvoiceData',
@@ -17,7 +16,7 @@ const PATHS = {
   PREVIEW_OCR: '/api/ocr-preview',
   SAVE_INVOICE: '/api/invoice/scaninvoicedata',
   FETCH_INVOICE: '/api/invoice/getsavedinvoices',
-  CREATE_INVOICE: '/api/invoice/create_data',
+  // CREATE_INVOICE: '/api/invoice/create_data',
   UPDATE_INVOICE: '/api/invoice/updateinvoicedetails',
   RED_PRODUCTS: '/api/proxy/redproducts',
   UPDATE_RED_PRODUCTS: '/api/update-redproduct',
@@ -26,7 +25,10 @@ const PATHS = {
   UPDATE_ROWINOVICE: '/api/update_invoice_status',
  linkingcollectiontransfer: '/api/linkingcollectiontransfer',
  REMOVE_LINKING: '/api/invoice/removeLinking',
- 
+  REMOVE_LINKED_ITEM: '/api/invoice/removeLinkedItem',
+  STEPPER_COUNT: '/api/step_count',
+QUANTITY_SP_COSTUPDATE: '/api/invoice/quantity_sellinprice_and_cost_update',
+
 };
 
 // normalize base: strip trailing slashes

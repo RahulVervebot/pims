@@ -20,7 +20,7 @@ import { API_URL } from "@env";
 import { request, PERMISSIONS, RESULTS } from "react-native-permissions";
 import { CartContext } from "../context/CartContext";
 import { PrintContext } from "../context/PrintContext";
-import ProductBottomSheet from "./ProductBottomSheet"; // ✅ ADD
+import ProductModal from "./ProductModal";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 const THEME = {
   primary: "#2C1E70",
@@ -212,7 +212,7 @@ setStoreurl(storeulr)
             }
           }}
         >
-          <Icon name="camera" size={28} color="#333" />
+          <Icon name="camera-alt" size={28} color="#333" />
         </TouchableOpacity>
       </View>
 
@@ -346,7 +346,7 @@ setStoreurl(storeulr)
       </Modal>
 
       {/* ✅ Bottom Sheet for list item tap */}
-      <ProductBottomSheet
+      <ProductModal
         ref={sheetRef}
         onAddToCart={(p) => onAddToCart(p)}
         onAddToPrint={(p) => onAddToPrint(p)}

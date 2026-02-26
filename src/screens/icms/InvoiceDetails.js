@@ -1,14 +1,15 @@
 //invoxie deatail.js
-import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
+  Modal,
   LayoutAnimation,
   Platform,
   UIManager,
-  Button,
+  ActivityIndicator,
   StyleSheet,
   TextInput,
   
@@ -19,9 +20,8 @@ import AppHeader from '../../components/AppHeader.js';
 import EditProduct from '../../components/icms/EditProduct.js';
 import reportbg from '../../assets/images/report-bg.png';
 import InvoiceRow from '../../components/icms/InvoiceRow.js';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 import LinkProductModal from '../../components/icms/LinkProduct.js';
-import { transparent } from 'react-native-paper/lib/typescript/styles/themes/v2/colors.js';
 import API_ENDPOINTS, { initICMSBase } from '../../../icms_config/api';
 if (
   Platform.OS === 'android' &&
@@ -31,6 +31,31 @@ if (
 }
 
 const getImageSource = val => (typeof val === 'number' ? val : { uri: val });
+const isItemRow = (x) =>
+  !!x &&
+  typeof x === 'object' &&
+  (
+    x.description != null ||
+    x.barcode != null ||
+    x.itemNo != null ||
+    x.ProductId != null ||
+    x.unitPrice != null ||
+    x.extendedPrice != null
+  );
+
+const extractRowsFromPayload = (payload, fallbackInvoice) => {
+  if (Array.isArray(payload?.InvoiceData)) return payload.InvoiceData;
+  if (Array.isArray(payload?.tableData)) return payload.tableData;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload) && Array.isArray(payload?.[0]?.InvoiceData)) return payload[0].InvoiceData;
+  if (Array.isArray(payload) && Array.isArray(payload?.[0]?.tableData)) return payload[0].tableData;
+  if (Array.isArray(payload) && payload.every(isItemRow)) return payload;
+  if (isItemRow(payload)) return [payload];
+  if (Array.isArray(fallbackInvoice?.InvoiceData)) return fallbackInvoice.InvoiceData;
+  if (Array.isArray(fallbackInvoice?.tableData)) return fallbackInvoice.tableData;
+  return [];
+};
 
 export default function InvoiceDetails() {
   const itemsRef = useRef([]);
@@ -40,23 +65,84 @@ export default function InvoiceDetails() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
-  const [InvoiceDetails, setInvoiceDetails] = useState(null);
+  const [invoiceData, setInvoiceData] = useState(null);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [invoiceError, setInvoiceError] = useState('');
   const [query, setQuery] = useState('');
   const [transferLoading, setTransferLoading] = useState(false);
   const [transferMessage, setTransferMessage] = useState('');
   const [storedVendor, setStoredVendor] = useState(null);
-  const [invoiceList, setInvoiceList] = useState([]);
-  const [summaryCollapsed, setSummaryCollapsed] = useState(false);
-  const navigation = useNavigation();
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [categories, setCategories] = useState([]);
   const route = useRoute();
-  const { Invoice,vendorDatabaseName } = route.params;
+  const params = route?.params ?? {};
+  const fallbackInvoice = params?.Invoice ?? null;
+  const invoiceNoParam = params?.invoiceNo ?? fallbackInvoice?.SavedInvoiceNo ?? '';
+  const invoiceNameParam = params?.invoiceName ?? fallbackInvoice?.InvoiceName ?? '';
+  const dateParam = params?.date ?? fallbackInvoice?.SavedDate ?? '';
+
+  const fetchInvoiceData = useCallback(async () => {
+    const hasRequiredPayload = !!(invoiceNoParam && invoiceNameParam && dateParam);
+    if (!hasRequiredPayload) {
+      setInvoiceData(fallbackInvoice);
+      itemsRef.current = extractRowsFromPayload(fallbackInvoice, fallbackInvoice);
+      return;
+    }
+
+    try {
+      setInvoiceLoading(true);
+      setInvoiceError('');
+      await initICMSBase();
+      const token = await AsyncStorage.getItem('access_token');
+      const icms_store = await AsyncStorage.getItem('icms_store');
+
+      const bodyPayload = {
+        invoiceNo: invoiceNoParam,
+        invoiceName: invoiceNameParam,
+        date: dateParam,
+      };
+
+      const res = await fetch(API_ENDPOINTS.GETINVOICEDATA, {
+        method: 'POST',
+        body: JSON.stringify(bodyPayload),
+        headers: {
+          'Content-Type': 'application/json',
+          store: icms_store ?? '',
+          access_token: token ?? '',
+          mode: 'MOBILE',
+        },
+      });
+
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        const msg = json?.message || json?.error?.message || 'Failed to fetch invoice details';
+        throw new Error(msg);
+      }
+console.log("resonse details:",json);
+      const normalized = Array.isArray(json) ? (json[0] ?? null) : json;
+      const normalizedInvoice = isItemRow(normalized)
+        ? {
+            SavedInvoiceNo: invoiceNoParam,
+            InvoiceName: invoiceNameParam,
+            SavedDate: dateParam,
+          }
+        : (normalized || fallbackInvoice || null);
+
+      setInvoiceData(normalizedInvoice);
+      itemsRef.current = extractRowsFromPayload(json, fallbackInvoice);
+    } catch (e) {
+      setInvoiceError(e?.message || 'Failed to fetch invoice details');
+      setInvoiceData(fallbackInvoice || null);
+      itemsRef.current = extractRowsFromPayload(fallbackInvoice, fallbackInvoice);
+    } finally {
+      setInvoiceLoading(false);
+    }
+  }, [dateParam, fallbackInvoice, invoiceNameParam, invoiceNoParam]);
 
   useEffect(() => {
-    setInvoiceDetails(Invoice);
-    itemsRef.current = Array.isArray(Invoice?.InvoiceData)
-      ? Invoice.InvoiceData
-      : [];
-  }, [Invoice]);
+    fetchInvoiceData();
+    setSelectedIds(new Set());
+  }, [fetchInvoiceData]);
 
   useEffect(() => {
     const loadVendor = async () => {
@@ -70,27 +156,56 @@ export default function InvoiceDetails() {
     loadVendor();
   }, []);
 
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const storeUrl = await AsyncStorage.getItem('storeurl');
+        const token = await AsyncStorage.getItem('access_token');
+        if (!storeUrl || !token) return;
+        const url = `${storeUrl}/pos/app/categories`;
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: { accept: 'application/json', access_token: token },
+        });
+        if (!res.ok) return;
+        const json = await res.json().catch(() => ({}));
+        setCategories(Array.isArray(json?.categories) ? json.categories : []);
+      } catch {
+        setCategories([]);
+      }
+    };
+    fetchCategories();
+  }, []);
 
-  
-  console.log("Invoice:",Invoice);
-  console.log("invoiceName:",vendorDatabaseName);
+  const categoryMetaByDept = useMemo(() => {
+    const map = {};
+    (categories || []).forEach((cat) => {
+      const key = String(cat?.categoryName ?? '').trim().toLowerCase();
+      if (!key) return;
+      map[key] = {
+        margin: Number(cat?.categoryMargin ?? 0),
+        markup: Number(cat?.categoryMarkup ?? 0),
+      };
+    });
+    return map;
+  }, [categories]);
 
-  const day = Invoice?.SavedDate;
-  const InvNumber = Invoice?.SavedInvoiceNo;
-  const vendorName = Invoice?.InvoiceName;
+  const invoice = invoiceData || fallbackInvoice || {};
+  const vendorDatabaseName =
+    params?.vendorDatabaseName || invoice?.vendorDatabaseName || invoice?.invoice || '';
+  const day = invoice?.SavedDate || dateParam;
+  const InvNumber = invoice?.SavedInvoiceNo || invoiceNoParam;
+  const vendorName = invoice?.InvoiceName || invoiceNameParam;
   const items = itemsRef.current;
   const totalExtendedPrice = items.reduce(
-    (sum, item) => sum + Number(item.extendedPrice),
+    (sum, item) => sum + (Number(item?.extendedPrice) || 0),
     0,
   );
   const totalUnitPrice = items.reduce(
-    (sum, item) => sum + Number(item.unitPrice),
+    (sum, item) => sum + (Number(item?.unitPrice) || 0),
     0,
   );
-  const totalPieces = items.reduce(
-    (sum, item) => sum + Number(item.pieces),
-    0,
-  );
+  const totalRows = items.length;
   const filteredItems = items.filter(item => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
@@ -245,6 +360,54 @@ export default function InvoiceDetails() {
     }
   };
 
+  const handleRemoveLinkedItem = async (rowItem) => {
+    const rowInvoiceNo = rowItem?.itemNo ?? rowItem?.ProductId ?? rowItem?.invoiceNo ?? '';
+    if (!vendorName) {
+      alert('Vendor name missing.');
+      return;
+    }
+    if (!rowInvoiceNo) {
+      alert('Row item number missing.');
+      return;
+    }
+
+    try {
+      setTransferLoading(true);
+      setTransferMessage('');
+      await initICMSBase();
+      const token = await AsyncStorage.getItem('access_token');
+      const icms_store = await AsyncStorage.getItem('icms_store');
+      const storeurl = await AsyncStorage.getItem('storeurl');
+
+      const res = await fetch(API_ENDPOINTS.REMOVE_LINKED_ITEM, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          access_token: token ?? '',
+          mode: 'MOBILE',
+          store: icms_store,
+        },
+        body: JSON.stringify({
+          invoiceName: vendorDatabaseName,
+          itemNo: rowItem?.itemNo,
+        }),
+      });
+
+      const json = await res.text().catch(() => ({}));
+      if (!res.ok) {
+        const msg = json?.message || json?.error?.message || 'Failed to remove linked item';
+        throw new Error(msg);
+      }
+      console.log("unlinked json:",json)
+      setTransferMessage(json?.message || 'Linked item removed successfully.');
+      await fetchInvoiceData();
+    } catch (err) {
+      setTransferMessage(err?.message || 'Failed to remove linked item');
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
   const handleSave = useCallback(
     (updatedItem, commit = true) => {
       if (commit) {
@@ -307,16 +470,18 @@ export default function InvoiceDetails() {
       <InvoiceRow
         item={item}
         index={index}
+        categoryMetaByDept={categoryMetaByDept}
         isExpanded={expandedId === item.ProductId}
         onToggle={() => toggleExpand(item.ProductId)}
         onLongPress={handleLongPress}
         onToggleSelect={handleToggleSelect}
         selectedIds={selectedIds}
         onEdit={openModal}
-        onLinkProduct={openLinkProduct} 
+        onLinkProduct={openLinkProduct}
+        onRemoveLinkedItem={handleRemoveLinkedItem}
       />
     ),
-    [expandedId, toggleExpand, handleLongPress, handleToggleSelect, selectedIds],
+    [expandedId, toggleExpand, handleLongPress, handleToggleSelect, selectedIds, handleRemoveLinkedItem, categoryMetaByDept],
   );
 
   return (
@@ -326,58 +491,16 @@ export default function InvoiceDetails() {
       resizeMode="cover"
     >
       <AppHeader
-        Title="Invoice"
+        Title={`Invoice ${InvNumber ? `- ${InvNumber}` : ''}`}
         backgroundType="image"
         backgroundValue={reportbg}
       ></AppHeader> 
     <View style={{ flex: 1, backgroundColor: '#F5F6FA'}}>
-      {/* Summary Bar */}
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={() => setSummaryCollapsed((prev) => !prev)}
-        style={styles.summaryBar}
-      >
-        <View style={styles.summaryHeader}>
-          <View>
-            <Text style={styles.summaryTitle}>Invoice Summary</Text>
-            <Text style={styles.summarySub} numberOfLines={1}>
-              {vendorName || '-'} • {InvNumber || '-'}
-            </Text>
-          </View>
-          <View style={styles.summaryToggle}>
-            <Text style={styles.summaryToggleText}>{summaryCollapsed ? 'Show' : 'Hide'}</Text>
-          </View>
-        </View>
-
-        {!summaryCollapsed && (
-          <View style={styles.summaryBody}>
-            <View style={styles.summaryCol}>
-              <Text style={styles.summaryText}>INV No</Text>
-              <Text style={styles.summaryValue} numberOfLines={1}>
-                {InvNumber}
-              </Text>
-              <Text style={styles.summaryText}>V. Name</Text>
-              <Text style={styles.summaryValue} numberOfLines={1}>
-                {vendorName}
-              </Text>
-              <Text style={styles.summaryText}>S. Date</Text>
-              <Text style={styles.summaryValue} numberOfLines={1}>
-                {day}
-              </Text>
-            </View>
-            <View style={[styles.summaryCol, styles.summaryColRight]}>
-              <Text style={styles.summaryText}>No. Units</Text>
-              <Text style={styles.summaryValue}>{totalPieces}</Text>
-              <Text style={styles.summaryText}>E. Price</Text>
-              <Text style={styles.summaryValue}>${totalExtendedPrice.toFixed(2)}</Text>
-              <Text style={styles.summaryText}>C. Cost</Text>
-              <Text style={styles.summaryValue}>${totalUnitPrice.toFixed(2)}</Text>
-            </View>
-          </View>
-        )}
-      </TouchableOpacity>
 
       <View style={styles.searchWrap}>
+        <View style={styles.totalWrap}>
+          <Text style={styles.totalText}>Total: {totalRows}</Text>
+        </View>
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -388,15 +511,37 @@ export default function InvoiceDetails() {
           placeholderTextColor="#6b7280"
           selectionColor="#1f1f1f"
         />
+        <TouchableOpacity
+          style={styles.infoBtn}
+          onPress={() => setDetailsModalVisible(true)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.infoBtnText}>!</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.legendWrap}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendBox, { backgroundColor: '#ff0000' }]} />
+          <Text style={styles.legendText}>Unlinked</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendBox, { backgroundColor: '#FFECEC' }]} />
+          <Text style={styles.legendText}>centralizedb</Text>
+        </View>
       </View>
 
       {/* List */}
-      {filteredItems.length === 0 ? (
+      {invoiceLoading ? (
+        <View style={styles.centerWrap}>
+          <ActivityIndicator size="small" color="#319241" />
+          <Text style={styles.loadingText}>Loading invoice details...</Text>
+        </View>
+      ) : filteredItems.length === 0 ? (
         <View
           style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
         >
           <Text style={styles.emptyText}>
-            {query ? 'No matching items.' : 'No items found in this invoice.'}
+            {query ? 'No matching items.' : (invoiceError || 'No items found in this invoice.')}
           </Text>
         </View>
       ) : (
@@ -420,7 +565,9 @@ export default function InvoiceDetails() {
           )}
           <FlatList
             data={filteredItems}
-            keyExtractor={item => item.ProductId.toString()}
+            keyExtractor={(item, index) =>
+              (item?.ProductId ?? item?.itemNo ?? index).toString()
+            }
             ListHeaderComponent={renderHeader}
             stickyHeaderIndices={[0]}
             renderItem={renderItem}
@@ -448,7 +595,7 @@ export default function InvoiceDetails() {
               onClose={() => setLinkModalVisible(false)}
               onSelect={handleProductSelect}
               linkingItem={linkingItem}
-              invoice={Invoice}
+              invoice={invoice}
               // ✅ Pass the item being linked
             />
           )}
@@ -456,6 +603,48 @@ export default function InvoiceDetails() {
         </View>
       )}
     </View>
+    <Modal visible={detailsModalVisible} transparent animationType="fade">
+      <View style={styles.detailsModalOverlay}>
+        <TouchableOpacity
+          style={styles.detailsModalBackdrop}
+          activeOpacity={1}
+          onPress={() => setDetailsModalVisible(false)}
+        />
+        <View style={styles.detailsModalCard}>
+          <Text style={styles.detailsTitle}>Invoice Details</Text>
+          <View style={styles.detailsRow}>
+            <Text style={styles.detailsKey}>Inv Number</Text>
+            <Text style={styles.detailsVal}>{InvNumber || '-'}</Text>
+          </View>
+          <View style={styles.detailsRow}>
+            <Text style={styles.detailsKey}>Vendor</Text>
+            <Text style={styles.detailsVal}>{vendorName || '-'}</Text>
+          </View>
+          <View style={styles.detailsRow}>
+            <Text style={styles.detailsKey}>Saved Date</Text>
+            <Text style={styles.detailsVal}>{day || '-'}</Text>
+          </View>
+          <View style={styles.detailsRow}>
+            <Text style={styles.detailsKey}>Total Rows</Text>
+            <Text style={styles.detailsVal}>{totalRows}</Text>
+          </View>
+          <View style={styles.detailsRow}>
+            <Text style={styles.detailsKey}>Extended Price</Text>
+            <Text style={styles.detailsVal}>${totalExtendedPrice.toFixed(2)}</Text>
+          </View>
+          <View style={styles.detailsRow}>
+            <Text style={styles.detailsKey}>Case Cost</Text>
+            <Text style={styles.detailsVal}>${totalUnitPrice.toFixed(2)}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.detailsCloseBtn}
+            onPress={() => setDetailsModalVisible(false)}
+          >
+            <Text style={styles.detailsCloseText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
 
     </ImageBackground>
   );
@@ -557,55 +746,56 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 24,
   },
-  summaryBar: {
-    margin: 8,
-    padding: 14,
+  invTopWrap: {
+    marginHorizontal: 8,
+    marginTop: 8,
+    marginBottom: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     backgroundColor: '#ECFDF5',
-    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#BBF7D0',
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  summaryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  summaryTitle: { fontSize: 15, fontWeight: '800', color: '#14532D' },
-  summarySub: { fontSize: 12, color: '#166534', marginTop: 2 },
-  summaryToggle: {
-    backgroundColor: '#16A34A',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  summaryToggleText: { color: '#fff', fontWeight: '700', fontSize: 11 },
-  summaryBody: { flexDirection: 'row', justifyContent: 'space-between' },
-  summaryCol: {
-    flex: 1,
-    gap: 4,
-  },
-  summaryColRight: {
-    alignItems: 'flex-end',
-  },
-  summaryText: {
+  invTopLabel: {
     fontSize: 12,
-    color: '#166534',
     fontWeight: '700',
+    color: '#166534',
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
   },
-  summaryValue: {
+  invTopValue: {
+    flex: 1,
     fontSize: 14,
-    fontWeight: '600',
-    color: '#0F172A',
+    fontWeight: '700',
+    color: '#14532D',
   },
   searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginHorizontal: 8,
     marginTop: 4,
     marginBottom: 4,
   },
+  totalWrap: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    justifyContent: 'center',
+  },
+  totalText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#166534',
+  },
   searchInput: {
+    flex: 1,
     borderWidth: 1,
     borderColor: '#cfd6ea',
     borderRadius: 10,
@@ -614,6 +804,46 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     fontSize: 13,
     color: '#1f1f1f',
+  },
+  infoBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#16A34A',
+    borderWidth: 1,
+    borderColor: '#15803D',
+  },
+  infoBtnText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
+  legendWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginHorizontal: 10,
+    marginBottom: 6,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendBox: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  legendText: {
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '600',
   },
   transferBar: {
     flexDirection: 'row',
@@ -637,5 +867,66 @@ const styles = StyleSheet.create({
   transferBtnDisabled: { opacity: 0.6 },
   transferBtnText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   transferMessage: { fontSize: 12, color: '#111', marginBottom: 6 },
+  detailsModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+  },
+  detailsModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  detailsModalCard: {
+    width: '100%',
+    maxWidth: 460,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#dbe3e7',
+    padding: 14,
+  },
+  detailsTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 10,
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 7,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eef2f7',
+    gap: 10,
+  },
+  detailsKey: {
+    fontSize: 13,
+    color: '#475569',
+    fontWeight: '700',
+  },
+  detailsVal: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 13,
+    color: '#111827',
+    fontWeight: '600',
+  },
+  detailsCloseBtn: {
+    marginTop: 12,
+    alignSelf: 'flex-end',
+    backgroundColor: '#16A34A',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  detailsCloseText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  centerWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 8, fontSize: 13, color: '#4B5563' },
   emptyText: { fontSize: 16, color: '#666' },
 });

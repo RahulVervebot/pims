@@ -13,6 +13,7 @@ import {
 import CustomHeader from "../components/CustomHeader";
 import ProductSearch from "../components/ProductSearch";
 import ProductList from "../components/ProductList";
+import CreateProductModal from "../components/CreateProductModal";
 import { getTopCategories, looksLikeSvg, capitalizeWords } from "../functions/product-function";
 import CategoriesRow from "../components/CategoriesRow";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -259,6 +260,28 @@ const currentBackground = useMemo(() => {
 
       </View>
 
+      <TouchableOpacity
+        onPress={() => setShowCreate(true)}
+        activeOpacity={0.85}
+        style={[
+          styles.createFab,
+          {
+            bottom: (cart.length > 0 ? 84 : 16) + insets.bottom,
+          },
+        ]}
+      >
+        <Text style={styles.createFabText}>+</Text>
+      </TouchableOpacity>
+
+      <CreateProductModal
+        visible={showCreate}
+        onClose={() => setShowCreate(false)}
+        onCreated={() => {
+          setShowCreate(false);
+          setListReloadKey((k) => k + 1);
+        }}
+      />
+
     </SafeAreaView>
   );
 }
@@ -300,4 +323,26 @@ const styles = StyleSheet.create({
     color: "#fff"
   },
   content: { flex: 1 },
+  createFab: {
+    position: "absolute",
+    right: 16,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#319241",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  createFabText: {
+    color: "#fff",
+    fontSize: 30,
+    lineHeight: 32,
+    fontWeight: "700",
+    marginTop: -2,
+  },
 });

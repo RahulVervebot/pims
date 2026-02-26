@@ -367,7 +367,7 @@ export default function SalePrintScreen() {
                   resizeMode="contain"
                 />
               ) : (
-                <Text style={styles.logoPlaceholder}>Logo</Text>
+                <Text style={styles.logoPlaceholder}>Your Logo</Text>
               )}
             </View>
 

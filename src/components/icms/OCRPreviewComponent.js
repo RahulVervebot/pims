@@ -73,7 +73,7 @@ const OCRPreviewComponent = ({
 
         const previewResult = await response.json();
         setHighlightedImages(previewResult.highlightedImages || []);
-        console.log('🟢 OCR Preview Response');
+        console.log('🟢 OCR Preview Response',previewResult);
       } catch (error) {
         console.error('OCR Preview Failed:', error);
         Alert.alert('Error', error.message);
@@ -147,6 +147,9 @@ const OCRPreviewComponent = ({
       <Modal visible={modalVisible} transparent={true} animationType="fade">
         <View style={styles.modalBackground}>
           <TouchableOpacity style={styles.closeArea} onPress={closeModal} />
+          <TouchableOpacity style={styles.modalCloseBtn} onPress={closeModal}>
+            <Text style={styles.modalCloseBtnText}>Close</Text>
+          </TouchableOpacity>
           <Image
             source={{ uri: selectedImage }}
             style={styles.fullImage}
@@ -250,6 +253,21 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     left: 0,
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: 44,
+    right: 16,
+    zIndex: 2,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  modalCloseBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   fullImage: {
     width: '90%',

@@ -11,7 +11,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  TouchableWithoutFeedback,
   Switch,
   ScrollView
 } from 'react-native';
@@ -22,7 +21,7 @@ import { request, PERMISSIONS, RESULTS } from "react-native-permissions";
 import { Camera, CameraType } from "react-native-camera-kit";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function CreateProductModal({ visible, onClose, onCreated }) {
+export default function CreateProductModal({ visible, onClose, onCreated, initialCategoryId = '' }) {
   const [name, setName] = useState('');
   const [size, setSize] = useState('');
   const [barcode, setBarcode] = useState('');
@@ -187,6 +186,12 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
       .filter((item) => item.id && item.label)
       .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))
   ), [allCats]);
+
+  useEffect(() => {
+    if (!visible) return;
+    if (initialCategoryId === null || initialCategoryId === undefined || initialCategoryId === '') return;
+    setSelectedCategoryId(String(initialCategoryId));
+  }, [visible, initialCategoryId]);
 
   const sortedTaxes = useMemo(() => (
     (Array.isArray(taxList) ? taxList : [])
@@ -392,16 +397,15 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
 
   return (
     <>
-      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-        <TouchableWithoutFeedback onPress={onClose}>
-          <View style={styles.backdrop} />
-        </TouchableWithoutFeedback>
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+        <View style={styles.mainModalRoot}>
+          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
 
-        <KeyboardAvoidingView
-          behavior={Platform.select({ ios: 'padding', android: undefined })}
-          style={styles.centered}
-        >
-          <View style={styles.sheet}>
+          <KeyboardAvoidingView
+            behavior={Platform.select({ ios: 'padding', android: undefined })}
+            style={styles.centered}
+          >
+            <View style={styles.sheet}>
             <Text style={styles.title}>Create Product</Text>
 
             {/* Image */}
@@ -442,7 +446,7 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
                   Alert.alert('Camera Permission','Enable camera access in settings to scan.')}
                 hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
               >
-                <Icon name="camera" size={22} color="#333" />
+                <Icon name="camera-alt" size={22} color="#333" />
               </TouchableOpacity>
             </View>
 
@@ -596,8 +600,9 @@ export default function CreateProductModal({ visible, onClose, onCreated }) {
               </TouchableOpacity>
             </View>
 
-          </View>
-        </KeyboardAvoidingView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* Scanner */}
@@ -709,15 +714,26 @@ const THEME = { primary: '#2C1E70', secondary: '#319241' };
 const PLACEHOLDER = '#9AA3AF';
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: '#00000077' },
+  mainModalRoot: {
+    flex: 1,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#00000077',
+  },
   centered: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'flex-end'
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
   sheet: {
-    width: '100%', backgroundColor: '#fff',
-    borderTopLeftRadius: 16, borderTopRightRadius: 16,
-    padding: 16
+    width: '100%',
+    maxWidth: 620,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
   },
   title: { fontSize: 18, fontWeight: '700', color: THEME.primary, marginBottom: 10 },
   subTitle: { marginTop: 12, marginBottom: 6, fontWeight: '700', color: '#111' },

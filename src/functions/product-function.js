@@ -314,3 +314,121 @@ export async function updateCustomVariantProduct(productId, payload) {
   }
   return data;
 }
+
+export async function archiveProduct(productId) {
+  const [storeUrl, token] = await Promise.all([
+    AsyncStorage.getItem('storeurl'),
+    AsyncStorage.getItem('access_token'),
+  ]);
+
+  if (!storeUrl || !token) {
+    throw new Error('Missing store_url or access_token in AsyncStorage.');
+  }
+
+  const pid = Number(productId);
+  if (!Number.isFinite(pid) || pid <= 0) {
+    throw new Error('Invalid product id');
+  }
+
+  const res = await fetch(
+    `${storeUrl}/pos/app/product/archive?product_id=${encodeURIComponent(pid)}`,
+    {
+      method: 'PUT',
+      headers: {
+        accept: 'application/json',
+        access_token: token,
+      },
+    }
+  );
+
+  const raw = await res.text().catch(() => '');
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    data = { message: raw };
+  }
+  console.log("archive id:",pid);
+console.log("archive data:",data);
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || `Failed to archive product (${res.status})`);
+  }
+  return data;
+}
+
+export async function getArchivedProducts() {
+  const [storeUrl, token] = await Promise.all([
+    AsyncStorage.getItem('storeurl'),
+    AsyncStorage.getItem('access_token'),
+  ]);
+
+  if (!storeUrl || !token) {
+    throw new Error('Missing store_url or access_token in AsyncStorage.');
+  }
+
+  const res = await fetch(`${storeUrl}/pos/app/list-archived-products`, {
+    method: 'GET',
+    headers: {
+      accept: 'application/json',
+      access_token: token,
+    },
+  });
+
+  const raw = await res.text().catch(() => '');
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    data = {};
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || `Failed to fetch archived products (${res.status})`);
+  }
+
+  const rows = Array.isArray(data?.archived_products) ? data.archived_products : [];
+  return {
+    count: Number(data?.count ?? rows.length ?? 0),
+    rows,
+  };
+}
+
+export async function unarchiveProduct(productId) {
+  const [storeUrl, token] = await Promise.all([
+    AsyncStorage.getItem('storeurl'),
+    AsyncStorage.getItem('access_token'),
+  ]);
+
+  if (!storeUrl || !token) {
+    throw new Error('Missing store_url or access_token in AsyncStorage.');
+  }
+
+  const pid = Number(productId);
+  if (!Number.isFinite(pid) || pid <= 0) {
+    throw new Error('Invalid product id');
+  }
+
+  const res = await fetch(
+    `${storeUrl}/pos/app/product/unarchive?product_id=${encodeURIComponent(pid)}`,
+    {
+      method: 'PUT',
+      headers: {
+        accept: 'application/json',
+        access_token: token,
+      },
+    }
+  );
+
+  const raw = await res.text().catch(() => '');
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    data = { message: raw };
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || `Failed to unarchive product (${res.status})`);
+  }
+  return data;
+}

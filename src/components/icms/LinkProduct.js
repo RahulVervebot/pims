@@ -9,7 +9,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import { Camera, CameraType } from 'react-native-camera-kit';
 import API_ENDPOINTS, { initICMSBase } from '../../../icms_config/api';
 
 const LinkProductModal =  ({
@@ -25,6 +29,8 @@ const LinkProductModal =  ({
   const [products, setProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState('');
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState(false);
 
   // const vender = await AsyncStorage.getItem('vendor');
   const day = invoice?.SavedDate;
@@ -49,6 +55,18 @@ const LinkProductModal =  ({
   }, []);
 
   useEffect(() => {
+    (async () => {
+      try {
+        const perm = Platform.OS === 'ios' ? PERMISSIONS.IOS.CAMERA : PERMISSIONS.ANDROID.CAMERA;
+        const result = await request(perm);
+        setHasCameraPermission(result === RESULTS.GRANTED);
+      } catch {
+        setHasCameraPermission(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
     if (searchTerm.length < 2) {
       setProducts([]);
       return;
@@ -60,6 +78,11 @@ const LinkProductModal =  ({
        const token = await   AsyncStorage.getItem('access_token');
        const icms_store = await AsyncStorage.getItem('icms_store');
        console.log("AsyncStorage:",token);
+        const queryValue = String(searchTerm ?? '').trim();
+        const bodyPayload = {
+          query: [queryValue],
+        };
+        console.log("queryValue:",bodyPayload);
         const res = await fetch(API_ENDPOINTS.FINDPRODUCTFROMHICKSVILL, {
           method: 'POST',
           headers: {
@@ -68,14 +91,17 @@ const LinkProductModal =  ({
           'mode': 'MOBILE',
           'store': icms_store
           },
-          body: JSON.stringify({barcodes: [searchTerm]}),
+          body: JSON.stringify(bodyPayload),
         });
 
         const data = await res.json();
         console.log('API response:', data);
-
-        const {matchedProducts} = data;
-        setProducts(matchedProducts || []);
+        const matchedProducts =
+          data?.matchedProducts ||
+          data?.products ||
+          data?.results ||
+          [];
+        setProducts(Array.isArray(matchedProducts) ? matchedProducts : []);
       } catch (err) {
         console.error('Error fetching products:', err);
       } finally {
@@ -153,23 +179,78 @@ const linkProduct = async (item, qty) => {
   }
 };
 
+  const onReadCode = (event) => {
+    const value = event?.nativeEvent?.codeStringValue;
+    if (value) {
+      setSearchTerm(String(value));
+      setSelectedProduct(null);
+    }
+    setScannerVisible(false);
+  };
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.container}>
+    <>
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={onClose} />
+          <View style={styles.modalCard}>
+        <View style={styles.modalHeaderRow}>
+          <Text style={styles.header}>Link Product</Text>
+          <TouchableOpacity style={styles.closeIconBtn} onPress={onClose}>
+            <Text style={styles.closeIconText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.linkingSummaryCard}>
+          <Text style={styles.summaryTitle}>Invoice Row Details</Text>
+          <View style={styles.summaryGrid}>
+            <View style={styles.summaryCell}>
+              <Text style={styles.summaryLabel}>Description</Text>
+              <Text style={styles.summaryValue} numberOfLines={1}>
+                {linkingItem?.description || '-'}
+              </Text>
+            </View>
+            <View style={styles.summaryCell}>
+              <Text style={styles.summaryLabel}>Item No</Text>
+              <Text style={styles.summaryValue} numberOfLines={1}>
+                {linkingItem?.itemNo || '-'}
+              </Text>
+            </View>
+            <View style={styles.summaryCell}>
+              <Text style={styles.summaryLabel}>CP</Text>
+              <Text style={styles.summaryValue} numberOfLines={1}>
+                {linkingItem?.cp ?? '-'}
+              </Text>
+            </View>
+            <View style={styles.summaryCell}>
+              <Text style={styles.summaryLabel}>Unit Price</Text>
+              <Text style={styles.summaryValue} numberOfLines={1}>
+                {linkingItem?.unitPrice ?? '-'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
         {!selectedProduct ? (
           // 🔍 Search & list view
           <>
-            <Text style={styles.header}>Search Product</Text>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Type product name or barcode"
-              value={searchTerm}
-              onChangeText={setSearchTerm}
-              placeholderTextColor="#6b7280"
-            />
+            <Text style={styles.sectionHeader}>Search Product</Text>
+            <View style={styles.searchRow}>
+              <TextInput
+                style={[styles.searchInput, styles.searchInputFlex]}
+                placeholder="Type product name or barcode"
+                value={searchTerm}
+                onChangeText={setSearchTerm}
+                placeholderTextColor="#6b7280"
+              />
+              <TouchableOpacity style={styles.scanBtn} onPress={() => setScannerVisible(true)}>
+                <Icon name="camera-alt" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
             {loading && <ActivityIndicator size="small" color="#000" />}
             <FlatList
               data={products}
+              style={styles.resultsList}
               keyExtractor={(item, idx) =>
                 (item.upc || item.sku || idx).toString()
               }
@@ -191,7 +272,7 @@ const linkProduct = async (item, qty) => {
         ) : (
           // 📦 Product detail + quantity view
           <>
-            <Text style={styles.header}>Product Details</Text>
+            <Text style={styles.sectionHeader}>Product Details</Text>
             <View style={styles.detailCard}>
               <Text style={styles.detailLabel}>Name:</Text>
               <Text style={styles.detailValue}>{selectedProduct.name}</Text>
@@ -248,16 +329,115 @@ const linkProduct = async (item, qty) => {
             </TouchableOpacity>
           </>
         )}
-      </View>
-    </Modal>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={scannerVisible} animationType="slide" onRequestClose={() => setScannerVisible(false)}>
+        {hasCameraPermission ? (
+          <View style={{ flex: 1 }}>
+            <Camera style={styles.camera} cameraType={CameraType.Back} scanBarcode onReadCode={onReadCode} />
+            <View style={styles.controls}>
+              <TouchableOpacity style={styles.controlBtn} onPress={() => setScannerVisible(false)}>
+                <Text style={styles.controlText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.permissionDenied}>
+            <Text style={{ color: 'red' }}>Camera permission denied. Please allow access in settings.</Text>
+            <TouchableOpacity style={styles.controlBtn} onPress={() => setScannerVisible(false)}>
+              <Text style={styles.controlText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </Modal>
+    </>
   );
 };
 
 export default LinkProductModal;
 
 const styles = StyleSheet.create({
-  container: {flex: 1, padding: 16, backgroundColor: '#fff'},
-  header: {fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#111'},
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 620,
+    maxHeight: '90%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#dbe3ea',
+    padding: 14,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  header: {fontSize: 18, fontWeight: '800', color: '#111'},
+  closeIconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#d6dee8',
+  },
+  closeIconText: { color: '#475569', fontSize: 14, fontWeight: '800' },
+  linkingSummaryCard: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
+  },
+  summaryTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 8,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  summaryCell: {
+    width: '48%',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+    marginBottom: 2,
+  },
+  summaryValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  sectionHeader: {fontSize: 16, fontWeight: '700', marginBottom: 8, color: '#111'},
   searchInput: {
     borderWidth: 1,
     borderColor: '#ccc',
@@ -266,6 +446,20 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: '#fff',
     color: '#1f1f1f',
+  },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  searchInputFlex: { flex: 1, marginBottom: 0 },
+  scanBtn: {
+    backgroundColor: '#319241',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minWidth: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resultsList: {
+    maxHeight: 300,
   },
   detailCard: {
     backgroundColor: '#f8f9fa',
@@ -309,4 +503,9 @@ detailValue: {
     marginTop: 10,
   },
   closeText: {textAlign: 'center', color: '#fff', fontWeight: 'bold'},
+  camera: { flex: 1 },
+  controls: { position: 'absolute', bottom: 30, width: '100%', flexDirection: 'row', justifyContent: 'center', gap: 10 },
+  controlBtn: { backgroundColor: '#000000AA', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8 },
+  controlText: { color: '#fff', fontWeight: '700' },
+  permissionDenied: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
 });

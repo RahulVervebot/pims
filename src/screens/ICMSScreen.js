@@ -1,65 +1,68 @@
 import React from 'react';
-import { View, Text, StyleSheet, ImageBackground, Image, useWindowDimensions, Platform,TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, useWindowDimensions, Platform, TouchableOpacity, ImageBackground, ScrollView } from 'react-native';
 import CustomHeader from '../components/CustomHeader';
 import reportbg from '../assets/images/report-bg.png';
-import HourlyReport from '../assets/icons/Hourly-Reports.png';
-import SaleSummaryReport from '../assets/icons/Sales-Summary-Report.png';
-import TopCustumerList from '../assets/icons/Top-Customers-List.png';
-import TopSellingProducts from '../assets/icons/Top-Selling-Products.png'
-import TopSellingCategories from '../assets/icons/Top-Selling-Categories.png'
+import Create_invoice from '../assets/icons/create_new_invoice.svg';
+import InvoiceList from '../assets/icons/invoice_list.svg';
+import ProductsIcon from '../assets/icons/red_products.svg';
+import Pending_invoice from '../assets/icons/pending_invoices.svg';
 import { useNavigation } from '@react-navigation/native';
 
-const PANEL_RADIUS = 28;
+const PANEL_RADIUS = 36;
 
 export default function ICMSScreen() {
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const styles = getStyles(isTablet);
- const navigation = useNavigation();
+  const navigation = useNavigation();
   const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
 
-  const Row = ({ icon, label, isFirst, isLast }) => (
-    <View style={[
-      styles.row,
-      isFirst && styles.rowFirst,
-      !isLast && styles.rowDivider
-    ]}>
-      <Image source={icon} style={styles.rowIcon} resizeMode="contain" />
+  const Row = ({ icon: IconComp, label }) => (
+    <View style={styles.row}>
+      <View style={styles.rowIconWrap}>
+        <IconComp width={styles.rowIcon.width} height={styles.rowIcon.height} />
+      </View>
       <Text style={styles.rowTitle}>{label}</Text>
+      <Text style={styles.rowArrow}>{'>'}</Text>
     </View>
   );
 
   return (
-<ImageBackground
- source={getImageSource(reportbg)}
- style={styles.screen}
-resizeMode="cover"
->
-      <CustomHeader Title="TULSI AI"
-      backgroundType="image" backgroundValue={reportbg}>
-      </CustomHeader>  
-        <View style={styles.panelInner}>
-           <TouchableOpacity
-                      style={styles.checkoutBtn}
-                      onPress={() => navigation.navigate('OcrScreen')}
-                    >
-                  <Row icon={SaleSummaryReport} label="Create New Invoice" isFirst />
-                    </TouchableOpacity>
-               <TouchableOpacity
-                    onPress={()=> navigation.navigate('InvoiceList')}
-                  >
-                  <Row icon={TopCustumerList} label="Invoice List" />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => navigation.navigate('RedProducts')}>
-                    <Row icon={TopSellingProducts} label="Red Products" isLast />
-                  </TouchableOpacity>
-                    <TouchableOpacity onPress={() => navigation.navigate('PedingInvoices')}>
-                    <Row icon={TopSellingProducts} label="Pending Invoices" isLast />
-                  </TouchableOpacity>
-        </View>
-        </ImageBackground>
+    <ImageBackground
+      source={getImageSource(reportbg)}
+      style={styles.screen}
+      resizeMode="cover"
+    >
+      <CustomHeader
+        Title="TULSI AI"
+        backgroundType="image"
+        backgroundValue={reportbg}
+      />
+
+      <View style={styles.panel}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.panelContent}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={() => navigation.navigate('OcrScreen')}>
+            <Row icon={Create_invoice} label="Add Invoices" />
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={1} onPress={() => navigation.navigate('AddNewVendorInvoice')}>
+            <Row icon={Create_invoice} label="Add New Vendor Invoice" />
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={1} onPress={() => navigation.navigate('InvoiceList')}>
+            <Row icon={InvoiceList} label="Invoice List" />
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={1} onPress={() => navigation.navigate('RedProducts')}>
+            <Row icon={ProductsIcon} label="Unlinked Product" />
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={1} onPress={() => navigation.navigate('PedingInvoices')}>
+            <Row icon={Pending_invoice} label="Pending Invoice" />
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    </ImageBackground>
   );
-  
 }
 
 
@@ -67,88 +70,61 @@ const getStyles = (isTablet) => StyleSheet.create({
   screen: {
     flex: 1,
   },
-  // Header
-  headerTitle: {
-    fontSize: isTablet ? 24 : 20,
-    fontWeight: '700',
-    color: '#000',
-    paddingBottom:10
-  },
-  headerUnderline: {
-    alignSelf: 'center',
-    width: isTablet ? 160 : 120,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-    borderRadius: 2,
-    marginTop: 2,
-  },
-
-  // Panel (the image background area)
   panel: {
     flex: 1,
-    paddingTop: isTablet ? 24 : 16,
+    backgroundColor: '#D4E7DC',
+    borderTopLeftRadius: PANEL_RADIUS,
+    borderTopRightRadius: PANEL_RADIUS,
+    paddingTop: isTablet ? 28 : 18,
     paddingHorizontal: isTablet ? 28 : 16,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: PANEL_RADIUS,
-    borderTopRightRadius: PANEL_RADIUS,
-
-    // nice subtle card feel against the header background
-    ...Platform.select({
-      android: { elevation: 2 },
-      ios: {
-        shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: -2 },
-      },
-    }),
   },
-  panelImage: {
-    borderTopLeftRadius: PANEL_RADIUS,
-    borderTopRightRadius: PANEL_RADIUS,
+  panelContent: {
+    paddingBottom: isTablet ? 24 : 16,
   },
-  panelInner: {
-    flex :1,
-    backgroundColor: 'rgba(255,255,255,0.85)', // helps separate items from bg image
-    borderTopLeftRadius: 16,
-      borderTopRightRadius: 16,
-    paddingVertical: isTablet ? 14 : 10,
-    paddingHorizontal: isTablet ? 16 : 12,
-
-    ...Platform.select({
-      android: { elevation: 1 },
-      ios: {
-        shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 2 },
-      },
-    }),
-  },
-
-  // Rows
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: isTablet ? 16 : 12,
-    gap: isTablet ? 14 : 10,
+    gap: isTablet ? 22 : 14,
+    marginBottom: isTablet ? 20 : 14,
+    paddingHorizontal: isTablet ? 22 : 16,
+    paddingVertical: isTablet ? 18 : 14,
+    borderRadius: 22,
+    backgroundColor: '#D9EBE1',
+    ...Platform.select({
+      android: { elevation: 1 },
+      ios: {
+        shadowColor: '#9CB9A8',
+        shadowOpacity: 0.15,
+        shadowRadius: 3,
+        shadowOffset: { width: 0, height: 1 },
+      },
+    }),
   },
-  rowFirst: {
-    paddingTop: isTablet ? 16 : 8,
-  },
-  rowDivider: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.12)', // elegant separator under image+title
+  rowIconWrap: {
+    width: isTablet ? 94 : 78,
+    height: isTablet ? 94 : 78,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: '#fff',
   },
   rowIcon: {
-    width: isTablet ? 36 : 28,
-    height: isTablet ? 36 : 28,
+    width: isTablet ? 62 : 52,
+    height: isTablet ? 62 : 52,
   },
   rowTitle: {
+    flex: 1,
     flexShrink: 1,
-    fontSize: isTablet ? 20 : 16,
-    fontWeight: '600',
-    color: '#111',
+    fontSize: isTablet ? 24 : 16,
+    fontWeight: '500',
+    color: '#0C0C0C',
     letterSpacing: 0.2,
+  },
+  rowArrow: {
+    fontSize: isTablet ? 44 : 30,
+    color: '#101010',
+    fontWeight: '600',
+    lineHeight: isTablet ? 44 : 32,
+    paddingRight: 6,
   },
 });

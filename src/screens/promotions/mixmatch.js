@@ -14,7 +14,6 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import RBSheet from 'react-native-raw-bottom-sheet';
 import { Picker } from '@react-native-picker/picker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -54,7 +53,6 @@ const OFFER_TYPES = [
 
 
 export default function MixMatchScreen() {
-  const sheetRef = useRef(null);
   const onEndReachedCalledDuringMomentum = useRef(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -84,6 +82,7 @@ export default function MixMatchScreen() {
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+  const [formModalVisible, setFormModalVisible] = useState(false);
 
   const normalizeDayIds = (list) => {
     const raw = Array.isArray(list)
@@ -255,7 +254,7 @@ export default function MixMatchScreen() {
     setProductDropdownVisible(false);
     setDiscountDropdownVisible(false);
     setDayPickerValue('');
-    sheetRef.current?.open();
+    setFormModalVisible(true);
   };
 
   const handleCreate = async () => {
@@ -294,7 +293,7 @@ export default function MixMatchScreen() {
         console.log("response:",res);
       const message = res?.result?.message || 'Discount product group created successfully';
       Alert.alert('Success', message);
-      sheetRef.current?.close();
+      setFormModalVisible(false);
       loadPromotions();
     } catch (e) {
       Alert.alert('Error', e?.message || 'Failed to create promotion.');
@@ -368,7 +367,7 @@ export default function MixMatchScreen() {
         setDiscountResults([]);
         setProductDropdownVisible(false);
         setDiscountDropdownVisible(false);
-        sheetRef.current?.open();
+        setFormModalVisible(true);
       }}
     >
    
@@ -649,14 +648,14 @@ export default function MixMatchScreen() {
         <Text style={styles.createBtnText}>Create Mix Match</Text>
       </TouchableOpacity>
 
-      <RBSheet
-        ref={sheetRef}
-        height={640}
-        openDuration={220}
-        closeOnDragDown
-        customStyles={{ container: styles.sheet, draggableIcon: { backgroundColor: '#ccc', width: 60 } }}
-      >
-        <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+      <Modal visible={formModalVisible} transparent animationType="fade" onRequestClose={() => setFormModalVisible(false)}>
+        <View style={styles.mainModalRoot}>
+          <TouchableOpacity style={styles.mainModalBackdrop} activeOpacity={1} onPress={() => setFormModalVisible(false)} />
+          <View style={styles.sheet}>
+            <TouchableOpacity style={styles.mainModalCloseBtn} onPress={() => setFormModalVisible(false)}>
+              <Icon name="close" size={24} color="#111" />
+            </TouchableOpacity>
+            <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
           <Text style={styles.sheetTitle}>{editingId ? 'Update Mix Match' : 'Create Mix Match'}</Text>
 
           <TextInput
@@ -920,8 +919,10 @@ export default function MixMatchScreen() {
               {submitting ? 'Saving…' : editingId ? 'Update Mix Match' : 'Create Mix Match'}
             </Text>
           </TouchableOpacity>
-        </ScrollView>
-      </RBSheet>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={scannerVisible} animationType="slide">
         {hasCameraPermission ? (
@@ -1097,7 +1098,29 @@ const styles = StyleSheet.create({
   },
   loadMoreText: { color: '#166534', fontWeight: '700' },
 
-  sheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16 },
+  mainModalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  mainModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#00000077',
+  },
+  sheet: {
+    width: '100%',
+    maxWidth: 620,
+    maxHeight: '88%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+  },
+  mainModalCloseBtn: {
+    alignSelf: 'flex-end',
+    padding: 4,
+  },
   sheetTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 12 },
   input: {
     borderWidth: 1,

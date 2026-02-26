@@ -86,6 +86,7 @@ export default function SessionReports() {
       setSessions(Array.isArray(data) ? data : []);
     } catch (err) {
       setErrorMsg(err?.message || 'Failed to load sessions.');
+      console.log("error message:",err?.message);
       setSessions([]);
     } finally {
       setLoading(false);
@@ -287,9 +288,12 @@ export default function SessionReports() {
                   <Text style={styles.cardTitle}>{s.name || `Session ${s.id}`}</Text>
                   <View style={[styles.stateBadge, s.state === 'closed' && styles.stateBadgeClosed]}>
                     <Text style={styles.stateText}>{s.state || 'unknown'}</Text>
+                    
                   </View>
                 </View>
-                <Text style={styles.cardSub}>{s.config_name || s.config_id}</Text>
+
+
+                <Text style={styles.cardSub}>{s.config_name || s.config_id}</Text> 
                 <View style={styles.cardMetaRow}>
                   <Text style={styles.cardMeta}>Start: {s.start_at || '-'}</Text>
                   <Text style={styles.cardMeta}>Stop: {s.stop_at || '-'}</Text>

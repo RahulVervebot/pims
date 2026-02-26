@@ -94,7 +94,7 @@ export function DonutPie({
               alignmentBaseline="middle"
               fill="#111"
             >
-              {currency(s.value)}
+              {/* {currency(s.value)} */}
             </SvgText>
           );
         })}

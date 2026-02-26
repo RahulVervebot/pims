@@ -12,11 +12,13 @@ import {
   StatusBar,
   ScrollView,
   Modal,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import TulsiLogo from '../assets/icons/Tulsi_Icon_white.svg';
+import LoginBackground from '../assets/images/Loginscreen.svg';
+import LinearGradient from 'react-native-linear-gradient';
 import { dbPromise } from '../firebaseConfig';
 
 export default function LoginScreen({ navigation }) {
@@ -254,70 +256,86 @@ export default function LoginScreen({ navigation }) {
   // -----------------------------
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={GREEN} />
+      <StatusBar barStyle="light-content" backgroundColor="#319241" />
+      <View style={styles.screen}>
+        <LoginBackground style={styles.backgroundSvg} preserveAspectRatio="xMidYMid slice" />
 
-      <View style={styles.headerArea}>
-        <View style={styles.logoCircle}>
-          <TulsiLogo />
-        </View>
-        <Text style={styles.appTitle}>Welcome to TULSI</Text>
-        <Text style={styles.subtitle}>Sign in to continue</Text>
-      </View>
-      <View style={styles.panel}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.panelContent}>
-            <Text style={styles.heading}>Login</Text>
-            <Text style={styles.subtext}>Enter your credentials below.</Text>
-            <View style={styles.field}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="you@example.com"
-                placeholderTextColor="#9AA3AF"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoCorrect={false}
+        <KeyboardAvoidingView style={styles.keyboardRoot} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.contentWrap}>
+            <View style={styles.brandWrap}>
+              <Image
+                source={require('../assets/images/Tulsi_Logo_white.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
               />
             </View>
-            {/* NEW: Select Store field (below Email) */}
-            <View style={styles.field}>
-              <Text style={styles.label}>Select Store</Text>
-              <TouchableOpacity
-                style={[styles.input, styles.selectInput, !storeOptions.length && { opacity: 0.6 }]}
-                onPress={() => storeOptions.length && setStoreModalVisible(true)}
-                activeOpacity={0.8}
-              >
-                <Text style={{ color: selectedStore ? TEXT : '#9AA3AF' }}>
-                  {selectedStore?.name ||
-                    (email
-                      ? storeOptions.length
-                        ? 'Tap to choose store'
-                        : 'No stores for this email domain'
-                      : 'Enter email to see stores')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.field}>
-              <Text style={styles.label}>Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="••••••••"
-                placeholderTextColor="#9AA3AF"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
-            </View>
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleManualLogin} activeOpacity={0.85}>
-              <Text style={styles.primaryBtnText}>Login</Text>
-            </TouchableOpacity>
-            {signingIn && (
-              <View style={styles.loadingOverlay}>
-                <ActivityIndicator size="large" />
+
+            <View style={styles.card}>
+              <Text style={styles.heading}>Sign In to Continue</Text>
+              <Text style={styles.subtext}></Text>
+
+              <View style={styles.field}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email"
+                  placeholderTextColor="#9CA3AF"
+                  value={email}
+                  onChangeText={setEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoCorrect={false}
+                />
               </View>
-            )}
+
+              <View style={styles.field}>
+                <TouchableOpacity
+                  style={[styles.input, styles.selectInput, !storeOptions.length && { opacity: 0.7 }]}
+                  onPress={() => storeOptions.length && setStoreModalVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: selectedStore ? '#111827' : '#9CA3AF' }}>
+                    {selectedStore?.name ||
+                      (email
+                        ? storeOptions.length
+                          ? 'Tap to choose store'
+                          : 'No stores for this email domain'
+                        : 'Select Store')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.field}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Password"
+                  placeholderTextColor="#9CA3AF"
+                  secureTextEntry
+                  value={password}
+                  onChangeText={setPassword}
+                />
+              </View>
+
+              <Text style={styles.termsText}></Text>
+
+              <TouchableOpacity style={styles.primaryBtnWrap} onPress={handleManualLogin} activeOpacity={0.9}>
+                <LinearGradient
+                  colors={['#C8FF71', '#45D83A', '#33CC33']}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={styles.primaryBtn}
+                >
+                  <Text style={styles.primaryBtnText}>Login</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {signingIn && (
+                <View style={styles.loadingOverlay}>
+                  <ActivityIndicator size="large" />
+                </View>
+              )}
+            </View>
+
+            <Text style={styles.helpText}></Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
@@ -341,47 +359,98 @@ export default function LoginScreen({ navigation }) {
     </SafeAreaView>
   );
 }
-// ---- your existing colors / styles ----
-const GREEN = '#E6FAE6';
-const PANEL_RADIUS = 28;
-const PRIMARY = '#2ECC71';
-const TEXT = '#1C2833';
-const MUTED = '#5D6D7E';
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: GREEN },
-  headerArea: { height: '30%', alignItems: 'center', justifyContent: 'center', paddingTop: 8 },
-  logoCircle: {
-    width: 120, height: 120, borderRadius: 44, backgroundColor: '#F5FFF5', alignItems: 'center', justifyContent: 'center',
-    marginBottom: 8, borderWidth: 2, borderColor: '#BDE6BD', shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
-  },
-  appTitle: { fontSize: 20, fontWeight: '700', color: TEXT },
-  subtitle: { fontSize: 14, color: MUTED, marginTop: 2 },
-  panel: {
-    flex: 1, backgroundColor: '#FFFFFF', borderTopLeftRadius: PANEL_RADIUS, borderTopRightRadius: PANEL_RADIUS,
-    paddingTop: 18, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: -2 }, elevation: 8,
-  },
-  panelContent: { paddingHorizontal: 22, paddingBottom: 30 },
-  heading: { fontSize: 24, fontWeight: '700', color: TEXT, marginTop: 6 },
-  subtext: { color: MUTED, marginTop: 6, marginBottom: 18 },
 
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
+  screen: { flex: 1, backgroundColor: '#FFFFFF' },
+  backgroundSvg: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  keyboardRoot: { flex: 1 },
+  contentWrap: {
+    flexGrow: 1,
+    paddingHorizontal: 18,
+    paddingTop: 52,
+    paddingBottom: 28,
+    justifyContent: 'space-between',
+  },
+  brandWrap: {
+    alignItems: 'center',
+    marginTop: 42,
+  },
+  logoImage: {
+    width: 230,
+    height: 130,
+  },
+  card: {
+    backgroundColor: '#ECECEC',
+    borderRadius: 34,
+    paddingHorizontal: 18,
+    paddingVertical: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+    marginTop: 12,
+  },
+  heading: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#111827',
+    textAlign: 'center',
+  },
+  subtext: {
+    fontSize: 16,
+    color: '#111827',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 20,
+    fontStyle: 'italic',
+  },
   field: { marginBottom: 14 },
-  label: { fontSize: 13, fontWeight: '600', color: TEXT, marginBottom: 6 },
   input: {
-    width: '100%', paddingVertical: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: '#D5DBDB', backgroundColor: '#FBFBFB',
-    borderRadius: 12, color: TEXT,
+    width: '100%',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    backgroundColor: '#DCDCDC',
+    borderRadius: 16,
+    color: '#111827',
+    fontSize: 15,
   },
   selectInput: { justifyContent: 'center' },
-
-  primaryBtn: {
-    marginTop: 10, backgroundColor: PRIMARY, paddingVertical: 14, borderRadius: 14, alignItems: 'center',
-    shadowColor: PRIMARY, shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 3,
+  termsText: {
+    marginTop: 10,
+    textAlign: 'center',
+    color: '#1F2937',
+    fontSize: 15,
   },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
-
+  primaryBtnWrap: {
+    marginTop: 18,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  primaryBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 58,
+    borderRadius: 999,
+  },
+  primaryBtnText: { color: '#fff', fontSize: 24, fontWeight: '700', letterSpacing: 0.2 },
+  helpText: {
+    textAlign: 'center',
+    marginTop: 20,
+    color: '#9CA3AF',
+    fontSize: 18,
+    fontWeight: '500',
+  },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.6)', alignItems: 'center', justifyContent: 'center',
-    borderTopLeftRadius: PANEL_RADIUS, borderTopRightRadius: PANEL_RADIUS, zIndex: 2,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 34,
+    zIndex: 2,
   },
 
   // modal
@@ -391,10 +460,10 @@ const styles = StyleSheet.create({
   modalCard: {
     backgroundColor: '#fff', padding: 16, borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '60%',
   },
-  modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8, color: TEXT },
+  modalTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8, color: '#1F2937' },
   modalItem: {
     paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E7EB',
   },
-  modalItemText: { fontSize: 15, fontWeight: '600', color: TEXT },
-  modalItemSub: { fontSize: 12, color: MUTED },
+  modalItemText: { fontSize: 15, fontWeight: '600', color: '#1F2937' },
+  modalItemSub: { fontSize: 12, color: '#6B7280' },
 });

@@ -143,6 +143,8 @@ export default function CategoryListScreen() {
     setEditCat({
       id: item.id,
       categoryName: item.categoryName ?? '',
+      categoryMargin: String(item.categoryMargin ?? 0),
+      categoryMarkup: String(item.categoryMarkup ?? 0),
       topList: !!item.topList,
       image: item.image ?? null,
       topIcon: item.topIcon ?? null,
@@ -162,6 +164,8 @@ export default function CategoryListScreen() {
       const url = `${storeUrl}/pos/app/category/update/${editCat.id}`;
       const body = {};
       if (fieldKey === 'categoryName') body.categoryName = editCat.categoryName;
+      if (fieldKey === 'categoryMargin') body.categoryMargin = Number(editCat.categoryMargin || 0);
+      if (fieldKey === 'categoryMarkup') body.categoryMarkup = Number(editCat.categoryMarkup || 0);
       if (fieldKey === 'topList') body.topList = !!editCat.topList;
       if (fieldKey === 'image') body.image = editCat.image || null;
       if (fieldKey === 'topIcon') body.topIcon = editCat.topIcon || null;
@@ -277,21 +281,22 @@ export default function CategoryListScreen() {
   }}
 />
       {/* Responsive, scrollable modal (from previous message) */}
-      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={closeModal}>
+      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={closeModal}>
         <View style={styles.modalWrap}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width: '100%' }}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalKeyboard}>
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
-                <View style={styles.dragHandle} />
-                <TouchableOpacity onPress={closeModal} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <View>
+                  <Text style={styles.modalTitle}>Update Category</Text>
+                  <Text style={styles.modalSub}>ID: {editCat?.id}</Text>
+                </View>
+                <TouchableOpacity style={styles.closeBtn} onPress={closeModal} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Text style={styles.closeX}>✕</Text>
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.modalScroll} contentContainerStyle={{ paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
-                <Text style={styles.modalTitle}>Update Category</Text>
-                <Text style={styles.modalSub}>ID: {editCat?.id}</Text>
-
+                <View style={styles.sectionCard}>
                 <Text style={styles.label}>Category Name</Text>
                 <TextInput
                   value={editCat?.categoryName ?? ''}
@@ -303,8 +308,43 @@ export default function CategoryListScreen() {
                 <TouchableOpacity style={styles.btnPrimary} onPress={() => updateField('categoryName')}>
                   <Text style={styles.btnText}>Update Name</Text>
                 </TouchableOpacity>
+                </View>
 
-                <View style={styles.rowBetween}>
+                <View style={styles.sectionCard}>
+                  <Text style={styles.sectionTitle}>Pricing Controls</Text>
+                  <View style={styles.gridRow}>
+                    <View style={styles.gridCol}>
+                      <Text style={styles.label}>Add Margin</Text>
+                      <TextInput
+                        value={String(editCat?.categoryMargin ?? '0')}
+                        onChangeText={(v) => setEditCat((p) => ({ ...p, categoryMargin: v }))}
+                        placeholder="0"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                        returnKeyType="done"
+                      />
+                      <TouchableOpacity style={styles.btnPrimary} onPress={() => updateField('categoryMargin')}>
+                        <Text style={styles.btnText}>Update Margin</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.gridCol}>
+                      <Text style={styles.label}>Add Markup</Text>
+                      <TextInput
+                        value={String(editCat?.categoryMarkup ?? '0')}
+                        onChangeText={(v) => setEditCat((p) => ({ ...p, categoryMarkup: v }))}
+                        placeholder="0"
+                        keyboardType="decimal-pad"
+                        style={styles.input}
+                        returnKeyType="done"
+                      />
+                      <TouchableOpacity style={styles.btnPrimary} onPress={() => updateField('categoryMarkup')}>
+                        <Text style={styles.btnText}>Update Markup</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+
+                {/* <View style={styles.rowBetween}>
                   <Text style={styles.label}>Top List</Text>
                   <TouchableOpacity
                     style={[styles.pillSwitch, editCat?.topList ? styles.pillOn : styles.pillOff]}
@@ -316,19 +356,19 @@ export default function CategoryListScreen() {
                 </View>
                 <TouchableOpacity style={styles.btnPrimary} onPress={() => updateField('topList')}>
                   <Text style={styles.btnText}>Update Top List</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
 
                 {[
                   { key: 'image', title: 'Image' },
-                  { key: 'topIcon', title: 'Top Icon' },
-                  { key: 'topBanner', title: 'Top Banner' },
-                  { key: 'topBannerBottom', title: 'Top Banner Bottom' },
+                  // { key: 'topIcon', title: 'Top Icon' },
+                  // { key: 'topBanner', title: 'Top Banner' },
+                  // { key: 'topBannerBottom', title: 'Top Banner Bottom' },
                 ].map(({ key, title }) => {
                   const base64 = editCat?.[key];
                   const preview = asDataUri(base64);
                   return (
                     <View key={key} style={styles.mediaBlock}>
-                      <Text style={styles.label}>{title}</Text>
+                      <Text style={styles.sectionTitle}>{title}</Text>
                       {preview ? (
                         <Image source={{ uri: preview }} style={styles.preview} resizeMode="cover" />
                       ) : (
@@ -358,7 +398,7 @@ export default function CategoryListScreen() {
               </ScrollView>
 
               <View style={styles.modalFooter}>
-                <TouchableOpacity style={styles.btnLight} onPress={closeModal}>
+                <TouchableOpacity style={styles.btnSecondary} onPress={closeModal}>
                   <Text style={styles.btnLightText}>Close</Text>
                 </TouchableOpacity>
               </View>
@@ -433,53 +473,132 @@ const styles = StyleSheet.create({
   itemLink: { color: COLORS.primary, fontWeight: '700' },
 
   // Modal (scrollable & responsive)
-  modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  modalCard: {
-    backgroundColor: COLORS.card,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+  modalWrap: {
+    flex: 1,
+    backgroundColor: 'rgba(2,6,23,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: 10,
-    maxHeight: '92%',
+    paddingVertical: 20,
   },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  dragHandle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.15)', flex: 1, marginRight: 8 },
-  closeX: { fontSize: 20, color: '#6B7280', paddingHorizontal: 4 },
+  modalKeyboard: {
+    width: '100%',
+    maxWidth: 640,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 12,
+    maxHeight: '95%',
+    borderWidth: 1,
+    borderColor: '#dbe3ea',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eef2f7',
+  },
+  closeBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#dbe3ea',
+  },
+  closeX: { fontSize: 18, color: '#6B7280', lineHeight: 20 },
   modalScroll: { maxHeight: '100%' },
-  modalFooter: { paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.stroke, alignItems: 'center' },
+  modalFooter: { paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.stroke, alignItems: 'center' },
 
-  modalTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text },
-  modalSub: { fontSize: 12, color: COLORS.sub, marginTop: 2, marginBottom: 10 },
+  modalTitle: { fontSize: 19, fontWeight: '800', color: COLORS.text },
+  modalSub: { fontSize: 12, color: COLORS.sub, marginTop: 2 },
 
-  label: { fontSize: 14, color: COLORS.text, fontWeight: '700', marginTop: 8, marginBottom: 6 },
+  sectionCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e4e9f1',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1f2937',
+    marginBottom: 6,
+  },
+  label: { fontSize: 13, color: COLORS.text, fontWeight: '700', marginTop: 6, marginBottom: 6 },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: '#F9FBFD',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: Platform.OS === 'ios' ? 12 : 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.stroke,
+    borderWidth: 1,
+    borderColor: '#d8e1eb',
+    color: COLORS.text,
   },
 
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  gridRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  gridCol: {
+    flex: 1,
+  },
 
   pillSwitch: { minWidth: 70, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, marginTop:10 },
   pillOn: { backgroundColor: "#22C063" },
   pillOff: { backgroundColor: '#e5e7eb' },
   pillText: { color: '#fff', fontWeight: '800' },
 
-  mediaBlock: { marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.stroke, paddingTop: 10 },
-  preview: { width: '100%', height: 140, borderRadius: 10, backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: COLORS.stroke },
+  mediaBlock: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#e4e9f1',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 12,
+  },
+  preview: { width: '100%', height: 150, borderRadius: 10, backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: COLORS.stroke },
   previewEmpty: { alignItems: 'center', justifyContent: 'center' },
   previewText: { color: COLORS.sub },
 
-  btnPrimary: { marginTop: 8, backgroundColor: COLORS.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  btnPrimary: {
+    marginTop: 8,
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
   btnText: { color: '#fff', fontWeight: '800' },
-  btnOutline: { marginTop: 8, borderWidth: 1, borderColor: COLORS.primary, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14 },
+  btnOutline: { marginTop: 8, borderWidth: 1, borderColor: COLORS.primary, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, backgroundColor: '#fff' },
   btnOutlineText: { color: COLORS.primary, fontWeight: '800' },
   btnGhost: { marginTop: 8, paddingVertical: 10, paddingHorizontal: 14 },
   btnGhostText: { color: COLORS.sub, fontWeight: '700' },
-  btnLight: { backgroundColor: '#E53935', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: COLORS.stroke },
-  btnLightText: { color: '#fff', fontWeight: '800' },
+  btnSecondary: {
+    backgroundColor: '#111827',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  btnLightText: { color: '#fff', fontWeight: '800', letterSpacing: 0.3 },
 });

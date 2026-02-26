@@ -106,7 +106,7 @@ console.log("check body:",bodydata);
                     {
                       translateY: slideAnim.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [300, 0],
+                        outputRange: [40, 0],
                       }),
                     },
                   ],
@@ -192,14 +192,19 @@ console.log("check body:",bodydata);
 const styles = {
   overlay: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   sheet: {
+    width: '100%',
+    maxWidth: 520,
     backgroundColor: '#fff',
     padding: 16,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#dbe3ea',
   },
   titleText: {
     fontWeight: 'bold',
@@ -230,7 +235,7 @@ const styles = {
     color: '#1f1f1f',
   },
   primaryButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#319241',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',

@@ -8,19 +8,25 @@ import {
   useWindowDimensions,
   Platform,
   TouchableOpacity,
+  ScrollView,
   LayoutAnimation,
   UIManager,
 } from 'react-native';
 import CustomHeader from '../components/CustomHeader';
 import reportbg from '../assets/images/report-bg.png';
 import HourlyReport from '../assets/icons/Hourly-Reports.png';
-import SaleSummaryReport from '../assets/icons/Sales-Summary-Report.png';
+import PromotionsIcon from '../assets/icons/Promotions.svg';
 import TopCustumerList from '../assets/icons/Top-Customers-List.png';
-import TopSellingProducts from '../assets/icons/Top-Selling-Products.png';
-import TopSellingCategories from '../assets/icons/Top-Selling-Categories.png';
+import ProductPrint from '../assets/icons/product_print.svg'
 import CreateCategoryModal from '../components/CreateCategoryModal';
 import { useNavigation } from '@react-navigation/native';
+import SaslePrint from '../assets/icons/sale_print.svg'
+import MixMatch from '../assets/icons/mix_match.svg';
+import QuantityDiscount from '../assets/icons/quantity_discount.svg';
 import CreateProductModal from '../components/CreateProductModal';
+import CreateProduct from '../assets/icons/create_product.svg';
+import CreateCategory from '../assets/icons/create_category.svg'
+import CategoryList from '../assets/icons/category_list.svg';
 const PANEL_RADIUS = 28;
 
 // Enable LayoutAnimation on Android
@@ -50,18 +56,27 @@ export default function POSScreen() {
 
   const Row = ({ icon, label, isFirst, isLast, onPress, right, isChild }) => (
     <TouchableOpacity
-      activeOpacity={0.85}
+      activeOpacity={1}
       onPress={onPress}
       style={[
         styles.row,
         isFirst && styles.rowFirst,
         isChild && styles.rowChild,
         !isLast && styles.rowDivider,
-        { justifyContent: 'space-between' }, // inline only
+        { justifyContent: 'space-between' },
       ]}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: isTablet ? 14 : 10 }}>
-        <Image source={icon} style={[styles.rowIcon, isChild && styles.rowIconChild]} resizeMode="contain" />
+      <View style={styles.rowLeft}>
+        <View style={[styles.rowIconWrap, isChild && styles.rowIconWrapChild]}>
+          {typeof icon === 'function' ? (
+            React.createElement(icon, {
+              width: isChild ? styles.rowIconChild.width : styles.rowIcon.width,
+              height: isChild ? styles.rowIconChild.height : styles.rowIcon.height,
+            })
+          ) : (
+            <Image source={icon} style={[styles.rowIcon, isChild && styles.rowIconChild]} resizeMode="contain" />
+          )}
+        </View>
         <Text style={[styles.rowTitle, isChild && styles.rowTitleChild]}>{label}</Text>
       </View>
       {right}
@@ -73,95 +88,106 @@ export default function POSScreen() {
       <CustomHeader Title="POS" backgroundType="image" backgroundValue={reportbg} />
 
       <View style={styles.panelInner}>
-        {/* PROMOTIONS (Accordion) */}
-        <Row
-          icon={SaleSummaryReport}
-          label="Promotions"
-          isFirst
-          onPress={() => toggle('promo')}
-          right={<Text style={{ fontSize: 22,color:"#000" }}>{expanded.promo ? '−' : '+'}</Text>}
-        />
-        {expanded.promo && (
-          <View>
-            <Row
-              icon={TopSellingProducts}
-              label="Mix Match"
-              isChild
-              onPress={() => navigation.navigate('MixMatchScreen')}
-              right={null}
-            />
-            <Row
-              icon={TopSellingCategories}
-              label="Quantity Discount"
-              isChild
-              isLast
-              onPress={() => navigation.navigate('QuantityDiscountScreen')}
-              right={null}
-            />
-          </View>
-        )}
-
-        {/* PRINT (Accordion) */}
-        <Row
-          icon={HourlyReport}
-          label="Print"
-          onPress={() => toggle('print')}
-          right={<Text style={{fontSize: 22,color:"#000"  }}>{expanded.print ? '−' : '+'}</Text>}
-        />
-        {expanded.print && (
-          <View>
-            <Row
-              icon={TopCustumerList}
-              label="Product Print"
-              isChild
-              onPress={() => navigation.navigate('PrintScreen')}
-              right={null}
-            />
-            <Row
-              icon={TopCustumerList}
-              label="Sale Print"
-              isChild
-              isLast
-              onPress={() => navigation.navigate('SalePrintScreen')}
-              right={null}
-            />
-          </View>
-        )}
-
-        {/* PRODUCT CATEGORIES (Accordion) */}
-        <Row
-          icon={TopCustumerList}
-          label="Product Managment"
-          onPress={() => toggle('category')}
-          right={<Text style={{ fontSize: 22,color:"#000" }}>{expanded.category ? '−' : '+'}</Text>}
-        />
-        {expanded.category && (
-          <View>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.panelContent}
+        >
+          {/* PROMOTIONS (Accordion) */}
           <Row
-              icon={TopSellingProducts}
-              label="Create Product"
-              isChild
-              right={null}
+            icon={PromotionsIcon}
+            label="Promotions"
+            isFirst
+            onPress={() => toggle('promo')}
+            right={<Text style={styles.toggleText}>{expanded.promo ? '−' : '+'}</Text>}
+          />
+          {expanded.promo && (
+            <View>
+              <Row
+                icon={MixMatch}
+                label="Mix Match"
+                isChild
+                onPress={() => navigation.navigate('MixMatchScreen')}
+                right={null}
+              />
+              <Row
+                icon={QuantityDiscount}
+                label="Quantity Discount"
+                isChild
+                isLast
+                onPress={() => navigation.navigate('QuantityDiscountScreen')}
+                right={null}
+              />
+            </View>
+          )}
+
+          {/* PRINT (Accordion) */}
+          <Row
+            icon={HourlyReport}
+            label="Print"
+            onPress={() => toggle('print')}
+            right={<Text style={styles.toggleText}>{expanded.print ? '−' : '+'}</Text>}
+          />
+          {expanded.print && (
+            <View>
+              <Row
+                icon={ProductPrint}
+                label="Product Print"
+                isChild
+                onPress={() => navigation.navigate('PrintScreen')}
+                right={null}
+              />
+              <Row
+                icon={SaslePrint}
+                label="Sale Print"
+                isChild
+                isLast
+                onPress={() => navigation.navigate('SalePrintScreen')}
+                right={null}
+              />
+            </View>
+          )}
+
+          {/* PRODUCT CATEGORIES (Accordion) */}
+          <Row
+            icon={TopCustumerList}
+            label="Product Managment"
+            onPress={() => toggle('category')}
+            right={<Text style={styles.toggleText}>{expanded.category ? '−' : '+'}</Text>}
+          />
+          {expanded.category && (
+            <View>
+              <Row
+                icon={CreateProduct}
+                label="Create Product"
+                isChild
+                right={null}
                 onPress={() => setShowProductCreate(true)}
-            />
-            <Row
-              icon={TopSellingProducts}
-              label="Create Category"
-              isChild
-              right={null}
+              />
+              <Row
+                icon={CreateCategory}
+                label="Create Category"
+                isChild
+                right={null}
                 onPress={() => setShowCreate(true)}
-            />
-         
-            <Row
-              icon={TopSellingCategories}
-              label="Category List"
-              isChild
-              isLast
-              onPress={() => navigation.navigate('CategoryListScreen')}
-              right={null}
-            />
-          </View>
-        )}
+              />
+              <Row
+                icon={CategoryList}
+                label="Category List"
+                isChild
+                onPress={() => navigation.navigate('CategoryListScreen')}
+                right={null}
+              />
+              <Row
+                icon={CategoryList}
+                label="Archive Product List"
+                isChild
+                isLast
+                onPress={() => navigation.navigate('ArchivedProductList')}
+                right={null}
+              />
+            </View>
+          )}
+        </ScrollView>
       </View>
 <CreateCategoryModal
   visible={showCreate}
@@ -226,20 +252,20 @@ const getStyles = (isTablet) =>
     },
     panelInner: {
       flex: 1,
-      backgroundColor: 'rgba(255,255,255,0.85)',
-      borderTopLeftRadius: 16,
-      borderTopRightRadius: 16,
-      paddingVertical: isTablet ? 14 : 10,
-      paddingHorizontal: isTablet ? 16 : 12,
+      backgroundColor: '#D4E7DC',
+      borderTopLeftRadius: 22,
+      borderTopRightRadius: 22,
+      paddingVertical: isTablet ? 18 : 12,
+      paddingHorizontal: isTablet ? 18 : 12,
       ...Platform.select({
-        android: { elevation: 1 },
+        android: { elevation: 0 },
         ios: {
-          shadowColor: '#000',
-          shadowOpacity: 0.06,
-          shadowRadius: 4,
-          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0,
         },
       }),
+    },
+    panelContent: {
+      paddingBottom: isTablet ? 26 : 16,
     },
 
     // Rows
@@ -247,27 +273,54 @@ const getStyles = (isTablet) =>
       flexDirection: 'row',
       alignItems: 'center',
       paddingVertical: isTablet ? 16 : 12,
-      gap: isTablet ? 14 : 10,
+      marginBottom: isTablet ? 16 : 10,
+      paddingHorizontal: isTablet ? 18 : 14,
+      borderRadius: 18,
+      backgroundColor: '#D9EBE1',
+      ...Platform.select({
+        android: { elevation: 1 },
+        ios: {
+          shadowColor: '#9CB9A8',
+          shadowOpacity: 0.15,
+          shadowRadius: 3,
+          shadowOffset: { width: 0, height: 1 },
+        },
+      }),
     },
     rowChild: {
-      paddingVertical: isTablet ? 12 : 9,
-      paddingLeft: isTablet ? 16 : 12,
+      marginLeft: isTablet ? 18 : 12,
+      paddingVertical: isTablet ? 12 : 10,
     },
     rowFirst: {
-      paddingTop: isTablet ? 16 : 8,
+      paddingTop: isTablet ? 16 : 12,
     },
     rowDivider: {
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: 'rgba(0,0,0,0.12)',
+      borderBottomWidth: 0,
+    },
+    rowLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: isTablet ? 14 : 10,
     },
     rowIcon: {
-      width: isTablet ? 36 : 28,
-      height: isTablet ? 36 : 28,
+      width: isTablet ? 40 : 32,
+      height: isTablet ? 40 : 32,
+    },
+    rowIconWrap: {
+      width: isTablet ? 68 : 56,
+      height: isTablet ? 68 : 56,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#fff',
+    },
+    rowIconWrapChild: {
+      width: isTablet ? 56 : 48,
+      height: isTablet ? 56 : 48,
     },
     rowIconChild: {
-      width: isTablet ? 30 : 22,
-      height: isTablet ? 30 : 22,
-      opacity: 0.9,
+      width: isTablet ? 30 : 24,
+      height: isTablet ? 30 : 24,
     },
     rowTitle: {
       flexShrink: 1,
@@ -277,9 +330,16 @@ const getStyles = (isTablet) =>
       letterSpacing: 0.2,
     },
     rowTitleChild: {
-      fontSize: isTablet ? 17 : 13,
+      fontSize: isTablet ? 16 : 13,
       fontWeight: '500',
       color: '#1f2937',
       letterSpacing: 0.1,
+    },
+    toggleText: {
+      fontSize: isTablet ? 26 : 22,
+      color: '#000',
+      fontWeight: '500',
+      lineHeight: isTablet ? 28 : 24,
+      paddingHorizontal: 6,
     },
   });

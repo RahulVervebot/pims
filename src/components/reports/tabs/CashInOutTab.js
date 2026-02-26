@@ -1,9 +1,9 @@
 // components/reports/tabs/CashInOutTab.jsx
 import React, { useMemo } from "react";
 import {
-  View, ScrollView, Text, StyleSheet, FlatList, Dimensions, Platform,ActivityIndicator
+  View, ScrollView, Text, StyleSheet, FlatList, ActivityIndicator
 } from "react-native";
-import { SectionCard, DonutPie, LegendList, SummaryRow, PALETTE, currency, safeNumber, sumBy } from "../shared/ReportUI";
+import { SectionCard, LegendList, SummaryRow, PALETTE, currency, safeNumber, sumBy } from "../shared/ReportUI";
 
 function CashTable({ kind, rows }) {
   const isOut = kind === "out";
@@ -57,6 +57,29 @@ function CashTable({ kind, rows }) {
   );
 }
 
+function CashInOutGraph({ series = [] }) {
+  const maxVal = Math.max(...series.map((s) => safeNumber(s.value)), 1);
+
+  return (
+    <View style={styles.graphWrap}>
+      {series.map((s) => {
+        const pct = (safeNumber(s.value) / maxVal) * 100;
+        return (
+          <View key={s.key} style={styles.graphRow}>
+            <View style={styles.graphHeaderRow}>
+              <Text style={styles.graphLabel}>{s.key}</Text>
+              <Text style={styles.graphValue}>$ {currency(s.value)}</Text>
+            </View>
+            <View style={styles.graphTrack}>
+              <View style={[styles.graphBar, { width: `${Math.max(pct, 4)}%`, backgroundColor: s.color }]} />
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function CashInOutTab({ data,loading }) {
   if (loading) {
     return (
@@ -66,11 +89,6 @@ export default function CashInOutTab({ data,loading }) {
       </View>
     );
   }
-  const screenW = Dimensions.get("window").width;
-  const screenH = Dimensions.get("window").height;
-  const donutSize = Math.min(Math.max(screenW - 48, 260), screenW >= 768 ? 520 : 420);
-  const donutHeight = Math.min(Math.max(Math.floor(screenH * 0.42), 240), screenW >= 768 ? 420 : 360);
-
   const {
     headerSummary, series, legendItems, hasData, cashInList, cashOutList,
   } = useMemo(() => {
@@ -112,7 +130,7 @@ export default function CashInOutTab({ data,loading }) {
 
       <SectionCard title="Overview">
         {hasData ? (
-          <DonutPie series={series} width={donutSize} height={donutHeight} innerRatio={0.56} labelMinAngle={8} />
+          <CashInOutGraph series={series} />
         ) : (
           <View style={{ paddingVertical: 32, alignItems: "center" }}>
             <Text style={{ color: "#666", fontSize: 13, fontStyle: "italic" }}>No data for this range.</Text>
@@ -139,6 +157,24 @@ export default function CashInOutTab({ data,loading }) {
 }
 
 const styles = StyleSheet.create({
+  // graph
+  graphWrap: { gap: 12, paddingTop: 4 },
+  graphRow: { gap: 6 },
+  graphHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  graphLabel: { fontSize: 13, fontWeight: "800", color: "#111" },
+  graphValue: { fontSize: 13, fontWeight: "700", color: "#111" },
+  graphTrack: {
+    width: "100%",
+    height: 14,
+    borderRadius: 999,
+    backgroundColor: "#EEF2F7",
+    overflow: "hidden",
+  },
+  graphBar: {
+    height: "100%",
+    borderRadius: 999,
+  },
+
   // tables
   tableWrap: {
     backgroundColor: "#fff",

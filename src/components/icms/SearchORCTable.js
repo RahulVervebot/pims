@@ -1,9 +1,10 @@
 // src/screens/SearchORCTable.js
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, TextInput, StyleSheet, ScrollView, Text, TouchableOpacity,
+  View, TextInput, StyleSheet, ScrollView, Text, TouchableOpacity, Modal,
 } from 'react-native';
 import RBSheet from 'react-native-raw-bottom-sheet';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const COLORS = {
   bg: '#ffffff',
@@ -16,18 +17,121 @@ const COLORS = {
 };
 const GREEN_LIGHT = '#e6f6ec';
 const GREEN_DARK = '#256f3a';
+const STORE_URL_KEY = 'storeurl';
+const ACCESS_TOKEN_KEY = 'access_token';
+
+const parseNumberValue = (value) => {
+  const s = String(value ?? '').trim();
+  if (!s) return '';
+  const cleaned = s.replace(/[$,\s]/g, '');
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : '';
+};
 
 const SearchTableComponent = ({ tableData, setTableData, onRemoveRow, onAddManual }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredData, setFilteredData] = useState(tableData);
+  const [storeUrl, setStoreUrl] = useState('');
+  const [token, setToken] = useState('');
+  const [categories, setCategories] = useState([]);
 
   // Bottom sheets
   const listSheetRef = useRef(null);
-  const editSheetRef = useRef(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
 
   // Row editor state
   const [editIndex, setEditIndex] = useState(null);
-  const [draft, setDraft] = useState({ itemNo: '', description: '', qty: '', unitPrice: '' });
+  const [draft, setDraft] = useState({
+    itemNo: '',
+    posName: '',
+    department: '',
+    barcode: '',
+    cp: '',
+    sellingPrice: '',
+    newSellingPrice: '',
+    categoryMargin: '0',
+    categoryMarkup: '0',
+    description: '',
+    qty: '',
+    unitPrice: '',
+    extendedPrice: '',
+  });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const s = await AsyncStorage.getItem(STORE_URL_KEY);
+        const t = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+        setStoreUrl(s || '');
+        setToken(t || '');
+      } catch {
+        setStoreUrl('');
+        setToken('');
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      if (!storeUrl || !token) return;
+      try {
+        const url = `${storeUrl}/pos/app/categories`;
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: { accept: 'application/json', access_token: token },
+        });
+        if (!res.ok) return;
+        const json = await res.json().catch(() => ({}));
+        setCategories(Array.isArray(json?.categories) ? json.categories : []);
+      } catch {
+        setCategories([]);
+      }
+    };
+    fetchCategories();
+  }, [storeUrl, token]);
+
+  const getCategoryPricing = (department, cpValue, currentSellingPrice) => {
+    const dep = String(department ?? '').trim().toLowerCase();
+    const matched = (categories || []).find(
+      (cat) => String(cat?.categoryName ?? '').trim().toLowerCase() === dep
+    );
+
+    const marginNum = Number(matched?.categoryMargin ?? 0);
+    const markupNum = Number(matched?.categoryMarkup ?? 0);
+    const cpNum = parseNumberValue(cpValue);
+    const appliedRate = marginNum !== 0 ? marginNum : (markupNum !== 0 ? markupNum : 0);
+
+    const computedSellingPrice =
+      cpNum !== '' && appliedRate !== 0
+        ? (Number(cpNum) + (Number(cpNum) * Number(appliedRate)) / 100).toFixed(2)
+        : String(currentSellingPrice ?? '');
+
+    return {
+      categoryMargin: String(Number.isFinite(marginNum) ? marginNum : 0),
+      categoryMarkup: String(Number.isFinite(markupNum) ? markupNum : 0),
+      newSellingPrice: computedSellingPrice,
+    };
+  };
+
+  useEffect(() => {
+    if (!editModalVisible) return;
+    setDraft((prev) => {
+      const pricing = getCategoryPricing(prev.department, prev.cp, prev.sellingPrice);
+      if (
+        String(prev.categoryMargin ?? '0') === String(pricing.categoryMargin ?? '0') &&
+        String(prev.categoryMarkup ?? '0') === String(pricing.categoryMarkup ?? '0') &&
+        String(prev.newSellingPrice ?? '') === String(pricing.newSellingPrice ?? '')
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        categoryMargin: String(pricing.categoryMargin ?? '0'),
+        categoryMarkup: String(pricing.categoryMarkup ?? '0'),
+        newSellingPrice: String(pricing.newSellingPrice ?? ''),
+      };
+    });
+  }, [categories, editModalVisible]);
 
   useEffect(() => {
     setFilteredData(tableData);
@@ -51,31 +155,66 @@ const SearchTableComponent = ({ tableData, setTableData, onRemoveRow, onAddManua
   const openEditorForIndex = (idx) => {
     setEditIndex(idx);
     const row = tableData[idx] || {};
+    const pricing = getCategoryPricing(row.department, row.cp, row.sellingPrice);
     setDraft({
       itemNo: row.itemNo || '',
+      posName: row.posName || '',
+      department: row.department || '',
+      barcode: row.barcode || '',
+      cp: String(row.cp ?? ''),
+      sellingPrice: String(row.sellingPrice ?? ''),
+      newSellingPrice: String(pricing.newSellingPrice ?? ''),
+      categoryMargin: String(pricing.categoryMargin ?? '0'),
+      categoryMarkup: String(pricing.categoryMarkup ?? '0'),
       description: row.description || '',
       qty: String(row.qty ?? ''),
       unitPrice: String(row.unitPrice ?? ''),
+      extendedPrice: String(row.extendedPrice ?? ''),
     });
-    editSheetRef.current?.open();
+    setEditModalVisible(true);
   };
 
   const openEditorForNew = () => {
     setEditIndex(tableData.length); // new index (to be appended)
-    setDraft({ itemNo: '', description: '', qty: '', unitPrice: '' });
-    editSheetRef.current?.open();
+    setDraft({
+      itemNo: '',
+      posName: '',
+      department: '',
+      barcode: '',
+      cp: '',
+      sellingPrice: '',
+      newSellingPrice: '',
+      categoryMargin: '0',
+      categoryMarkup: '0',
+      description: '',
+      qty: '',
+      unitPrice: '',
+      extendedPrice: '',
+    });
+    setEditModalVisible(true);
   };
 
   const saveDraft = () => {
-    const qtyNum = draft.qty === '' ? '' : Number(draft.qty);
-    const priceNum = draft.unitPrice === '' ? '' : Number(draft.unitPrice);
+    const qtyNum = parseNumberValue(draft.qty);
+    const priceNum = parseNumberValue(draft.unitPrice);
+    const enteredExtended = parseNumberValue(draft.extendedPrice);
+    const computedExtended = qtyNum !== '' && priceNum !== '' ? Number(qtyNum) * Number(priceNum) : '';
+    const finalExtended = enteredExtended !== '' ? enteredExtended : computedExtended;
 
     const newRow = {
       itemNo: draft.itemNo,
+      posName: draft.posName,
+      department: draft.department,
+      barcode: draft.barcode,
+      cp: draft.cp,
+      sellingPrice: draft.sellingPrice,
+      newSellingPrice: draft.newSellingPrice,
+      categoryMargin: draft.categoryMargin,
+      categoryMarkup: draft.categoryMarkup,
       description: draft.description,
       qty: qtyNum,
       unitPrice: priceNum,
-      extendedPrice: qtyNum !== '' && priceNum !== '' ? (Number(qtyNum) * Number(priceNum)).toFixed(2) : '',
+      extendedPrice: finalExtended !== '' ? Number(finalExtended).toFixed(2) : '',
       manuallyAdded: true,
       condition: 'normal',
     };
@@ -89,7 +228,7 @@ const SearchTableComponent = ({ tableData, setTableData, onRemoveRow, onAddManua
       }
       return next;
     });
-    editSheetRef.current?.close();
+    setEditModalVisible(false);
   };
 
   const removeRow = (idx) => onRemoveRow ? onRemoveRow(idx) : setTableData(prev => prev.filter((_, i) => i !== idx));
@@ -109,6 +248,9 @@ const SearchTableComponent = ({ tableData, setTableData, onRemoveRow, onAddManua
     <View style={styles.container}>
       {/* Search + Add Manual */}
       <View style={styles.topBar}>
+        <View style={styles.totalWrap}>
+          <Text style={styles.totalText}>Total: {tableData.length}</Text>
+        </View>
         <TextInput
           style={styles.searchBox}
           placeholder="Search by ItemNo, Barcode, or Description..."
@@ -133,7 +275,7 @@ const SearchTableComponent = ({ tableData, setTableData, onRemoveRow, onAddManua
           <Text style={styles.headerText}>Qty ⌄</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tableHeaderCell, { flex: 1 }]} onPress={onHeaderTap}>
-          <Text style={styles.headerText}>UnitPrice ⌄</Text>
+          <Text style={styles.headerText}>Case Cost ⌄</Text>
         </TouchableOpacity>
         <View style={[styles.tableHeaderCell, { width: 44 }]}>
           <Text style={styles.headerText}>❌</Text>
@@ -203,78 +345,124 @@ const SearchTableComponent = ({ tableData, setTableData, onRemoveRow, onAddManua
         </ScrollView>
       </RBSheet>
 
-      {/* === Bottom Sheet: Row Editor === */}
-      <RBSheet
-        ref={editSheetRef}
-        height={460}
-        openDuration={180}
-        closeOnDragDown
-        customStyles={{
-          container: styles.sheetContainer,
-          draggableIcon: { backgroundColor: '#ccc' },
-        }}
-      >
-        <View style={styles.sheetHeader}>
-          <Text style={styles.sheetTitle}>{editIndex != null && editIndex < tableData.length ? 'Edit Row' : 'Add Row'}</Text>
-        </View>
+      {/* === Modal: Row Editor === */}
+      <Modal visible={editModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} onPress={() => setEditModalVisible(false)} />
+          <View style={styles.modalCard}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>{editIndex != null && editIndex < tableData.length ? 'Edit Row' : 'Add Row'}</Text>
+            </View>
 
-        <View style={styles.formRow}>
-          <Text style={styles.label}>ItemNo</Text>
-          <TextInput
-            style={styles.input}
-            value={draft.itemNo}
-            onChangeText={(t) => setDraft(prev => ({ ...prev, itemNo: t }))}
-            placeholder="Enter item no"
-            placeholderTextColor={COLORS.sub}
-          />
-        </View>
+            <View style={styles.formRow}>
+              <Text style={styles.groupTitle}>Read Only Details</Text>
+              <View style={styles.readonlyGrid}>
+                <View style={styles.readonlyCard}>
+                  <Text style={styles.readonlyLabel}>ItemNo</Text>
+                  <Text style={styles.readonlyValue}>{draft.itemNo || '-'}</Text>
+                </View>
+                <View style={styles.readonlyCard}>
+                  <Text style={styles.readonlyLabel}>POS Name</Text>
+                  <Text style={styles.readonlyValue}>{String(draft.posName ?? '-') || '-'}</Text>
+                </View>
+                <View style={styles.readonlyCard}>
+                  <Text style={styles.readonlyLabel}>Department</Text>
+                  <Text style={styles.readonlyValue}>{String(draft.department ?? '-') || '-'}</Text>
+                </View>
+                <View style={styles.readonlyCard}>
+                  <Text style={styles.readonlyLabel}>Barcode</Text>
+                  <Text style={styles.readonlyValue}>{String(draft.barcode ?? '-') || '-'}</Text>
+                </View>
+                <View style={styles.readonlyCard}>
+                  <Text style={styles.readonlyLabel}>CP</Text>
+                  <Text style={styles.readonlyValue}>{String(draft.cp ?? '-') || '-'}</Text>
+                </View>
+                <View style={styles.readonlyCard}>
+                  <Text style={styles.readonlyLabel}>Selling Price</Text>
+                  <Text style={styles.readonlyValue}>{String(draft.sellingPrice ?? '-') || '-'}</Text>
+                </View>
+                <View style={styles.readonlyCard}>
+                  <Text style={styles.readonlyLabel}>New Selling Price</Text>
+                  <Text style={styles.readonlyValue}>{String(draft.newSellingPrice ?? '-') || '-'}</Text>
+                </View>
+              </View>
+              {(Number(draft.categoryMargin || 0) !== 0 || Number(draft.categoryMarkup || 0) !== 0) && (
+                <View style={styles.readonlyMetaWrap}>
+                  {Number(draft.categoryMargin || 0) !== 0 && (
+                    <View style={styles.metaBadge}>
+                      <Text style={styles.metaBadgeText}>Margin: {draft.categoryMargin}%</Text>
+                    </View>
+                  )}
+                  {Number(draft.categoryMarkup || 0) !== 0 && (
+                    <View style={styles.metaBadge}>
+                      <Text style={styles.metaBadgeText}>Markup: {draft.categoryMarkup}%</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
 
-        <View style={styles.formRow}>
-          <Text style={styles.label}>Desc</Text>
-          <TextInput
-            style={[styles.input, { height: 72 }]}
-            value={draft.description}
-            onChangeText={(t) => setDraft(prev => ({ ...prev, description: t }))}
-            placeholder="Enter description"
-            placeholderTextColor={COLORS.sub}
-            multiline
-          />
-        </View>
+            <View style={styles.formRow}>
+              <Text style={styles.groupTitle}>Editable Fields</Text>
+              <Text style={styles.label}>Description</Text>
+              <TextInput
+                style={[styles.input, { height: 72 }]}
+                value={draft.description}
+                onChangeText={(t) => setDraft(prev => ({ ...prev, description: t }))}
+                placeholder="Enter description"
+                placeholderTextColor={COLORS.sub}
+                multiline
+              />
+            </View>
 
-        <View style={[styles.formRow, { flexDirection: 'row', gap: 12 }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Qty</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="numeric"
-              value={String(draft.qty ?? '')}
-              onChangeText={(t) => setDraft(prev => ({ ...prev, qty: t }))}
-              placeholder="0"
-              placeholderTextColor={COLORS.sub}
-            />
+            <View style={[styles.formRow, { flexDirection: 'row', gap: 12 }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Qty</Text>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="numeric"
+                  value={String(draft.qty ?? '')}
+                  onChangeText={(t) => setDraft(prev => ({ ...prev, qty: t }))}
+                  placeholder="0"
+                  placeholderTextColor={COLORS.sub}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Case Cost</Text>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="decimal-pad"
+                  value={String(draft.unitPrice ?? '')}
+                  onChangeText={(t) => setDraft(prev => ({ ...prev, unitPrice: t }))}
+                  placeholder="0.00"
+                  placeholderTextColor={COLORS.sub}
+                />
+              </View>
+            </View>
+
+            <View style={styles.formRow}>
+              <Text style={styles.label}>Extended Price</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={String(draft.extendedPrice ?? '')}
+                onChangeText={(t) => setDraft(prev => ({ ...prev, extendedPrice: t }))}
+                placeholder="0.00"
+                placeholderTextColor={COLORS.sub}
+              />
+            </View>
+
+            <View style={styles.sheetActions}>
+              <TouchableOpacity style={[styles.btn, styles.btnPrimary]} onPress={saveDraft}>
+                <Text style={styles.btnText}>Save</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.btn, styles.btnDanger]} onPress={() => setEditModalVisible(false)}>
+                <Text style={styles.btnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Unit Price</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="decimal-pad"
-              value={String(draft.unitPrice ?? '')}
-              onChangeText={(t) => setDraft(prev => ({ ...prev, unitPrice: t }))}
-              placeholder="0.00"
-              placeholderTextColor={COLORS.sub}
-            />
-          </View>
         </View>
-
-        <View style={styles.sheetActions}>
-          <TouchableOpacity style={[styles.btn, styles.btnPrimary]} onPress={saveDraft}>
-            <Text style={styles.btnText}>Save</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.btn, styles.btnDanger]} onPress={() => editSheetRef.current?.close()}>
-            <Text style={styles.btnText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </RBSheet>
+      </Modal>
     </View>
   );
 };
@@ -292,6 +480,20 @@ const styles = StyleSheet.create({
     marginTop: 10
   },
   topBar: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 },
+  totalWrap: {
+    backgroundColor: GREEN_LIGHT,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#cfe9d8',
+    paddingHorizontal: 10,
+    height: 40,
+    justifyContent: 'center',
+  },
+  totalText: {
+    color: GREEN_DARK,
+    fontWeight: '700',
+    fontSize: 12,
+  },
   searchBox: {
     flex: 1,
     height: 40,
@@ -348,6 +550,7 @@ const styles = StyleSheet.create({
   pickSub: { fontSize: 12, color: COLORS.sub, marginTop: 4 },
 
   formRow: { paddingHorizontal: 12, paddingVertical: 8 },
+  groupTitle: { fontSize: 13, fontWeight: '700', color: '#1f2937', marginBottom: 8 },
   label: { fontSize: 12, color: COLORS.sub, marginBottom: 6 },
   input: {
     height: 40,
@@ -358,7 +561,74 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     color: COLORS.text,
   },
+  inputReadonly: {
+    backgroundColor: '#f4f6f8',
+    color: '#6b7280',
+  },
+  readonlyGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  readonlyCard: {
+    width: '48%',
+    borderWidth: 1,
+    borderColor: '#dfe4ea',
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    paddingVertical: 8,
+    paddingHorizontal: 9,
+  },
+  readonlyLabel: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '700',
+    marginBottom: 3,
+  },
+  readonlyValue: {
+    fontSize: 13,
+    color: '#111827',
+    fontWeight: '700',
+  },
+  readonlyMetaWrap: {
+    marginTop: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  metaBadge: {
+    backgroundColor: '#eef8f2',
+    borderWidth: 1,
+    borderColor: '#cfe9d8',
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  metaBadgeText: {
+    color: '#256f3a',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   sheetActions: {
     padding: 12, flexDirection: 'row', gap: 12, justifyContent: 'flex-end',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 560,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingBottom: 12,
   },
 });

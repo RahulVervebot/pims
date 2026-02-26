@@ -11,7 +11,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  TouchableWithoutFeedback,
   ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,6 +26,8 @@ export default function CreateCategoryModal({ visible, onClose, onCreated }) {
   const [token, setToken] = useState('');
 
   const [name, setName] = useState('');
+  const [categoryMargin, setCategoryMargin] = useState('0');
+  const [categoryMarkup, setCategoryMarkup] = useState('0');
   const [topList, setTopList] = useState(false);
   const [image, setImage] = useState(null); // base64
   const [topIcon, setTopIcon] = useState(null);
@@ -117,6 +118,8 @@ export default function CreateCategoryModal({ visible, onClose, onCreated }) {
 
   const resetForm = () => {
     setName('');
+    setCategoryMargin('0');
+    setCategoryMarkup('0');
     setTopList(false);
     setImage(null);
     setTopIcon(null);
@@ -131,10 +134,12 @@ export default function CreateCategoryModal({ visible, onClose, onCreated }) {
 
     try {
       setSubmitting(true);
-      const url = `${storeUrl}/pos/app/create/category`;
+      const url = `${storeUrl}/pos/app/category/create`;
       // Send only fields needed; backend treats missing as optional
       const body = {
         name: name.trim(),
+        categoryMargin: Number(categoryMargin || 0),
+        categoryMarkup: Number(categoryMarkup || 0),
         ...(image != null ? { image } : {}),
         ...(typeof topList === 'boolean' ? { topList } : {}),
         ...(topIcon != null ? { topIcon } : {}),
@@ -152,6 +157,7 @@ export default function CreateCategoryModal({ visible, onClose, onCreated }) {
       });
 
       const json = await res.json().catch(() => ({}));
+      console.log("categories resoonse",json);
       if (!res.ok) {
         throw new Error(json?.message || json?.error || `HTTP ${res.status}`);
       }
@@ -161,6 +167,7 @@ export default function CreateCategoryModal({ visible, onClose, onCreated }) {
       resetForm();
       onClose?.();
     } catch (e) {
+      console.log("error:",e);
       Alert.alert('Error', e?.message || 'Failed to create category.');
     } finally {
       setSubmitting(false);
@@ -168,16 +175,15 @@ export default function CreateCategoryModal({ visible, onClose, onCreated }) {
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.backdrop} />
-      </TouchableWithoutFeedback>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.mainModalRoot}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
 
-      <KeyboardAvoidingView
-        behavior={Platform.select({ ios: 'padding', android: undefined })}
-        style={styles.centered}
-      >
-        <View style={styles.sheet}>
+        <KeyboardAvoidingView
+          behavior={Platform.select({ ios: 'padding', android: undefined })}
+          style={styles.centered}
+        >
+          <View style={styles.sheet}>
           <Text style={styles.title}>Create Category</Text>
 
           <ScrollView
@@ -195,8 +201,33 @@ export default function CreateCategoryModal({ visible, onClose, onCreated }) {
               onChangeText={setName}
             />
 
+            <View style={styles.row}>
+              <View style={styles.halfCol}>
+                <Text style={styles.label}>Add Margin</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Add Margin"
+                  placeholderTextColor="#6B7280"
+                  keyboardType="decimal-pad"
+                  value={categoryMargin}
+                  onChangeText={setCategoryMargin}
+                />
+              </View>
+              <View style={styles.halfCol}>
+                <Text style={styles.label}>Add Markup</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Add Markup"
+                  placeholderTextColor="#6B7280"
+                  keyboardType="decimal-pad"
+                  value={categoryMarkup}
+                  onChangeText={setCategoryMarkup}
+                />
+              </View>
+            </View>
+
             {/* Top List toggle */}
-            <View style={styles.rowBetween}>
+            {/* <View style={styles.rowBetween}>
               <Text style={styles.label}>Top List</Text>
               <TouchableOpacity
                 style={[styles.pill, topList ? styles.pillOn : styles.pillOff]}
@@ -205,14 +236,14 @@ export default function CreateCategoryModal({ visible, onClose, onCreated }) {
               >
                 <Text style={styles.pillText}>{topList ? 'ON' : 'OFF'}</Text>
               </TouchableOpacity>
-            </View>
+            </View> */}
 
             {/* Image fields */}
             {[
               { key: 'image', title: 'Image', value: image, set: setImage },
-              { key: 'topIcon', title: 'Top Icon', value: topIcon, set: setTopIcon },
-              { key: 'topBanner', title: 'Top Banner', value: topBanner, set: setTopBanner },
-              { key: 'topBannerBottom', title: 'Top Banner Bottom', value: topBannerBottom, set: setTopBannerBottom },
+              // { key: 'topIcon', title: 'Top Icon', value: topIcon, set: setTopIcon },
+              // { key: 'topBanner', title: 'Top Banner', value: topBanner, set: setTopBanner },
+              // { key: 'topBannerBottom', title: 'Top Banner Bottom', value: topBannerBottom, set: setTopBannerBottom },
             ].map(({ key, title, value, set }) => {
               const preview = asDataUri(value);
               return (
@@ -269,24 +300,35 @@ export default function CreateCategoryModal({ visible, onClose, onCreated }) {
               {submitting ? <ActivityIndicator /> : <Text style={styles.btnText}>Create</Text>}
             </TouchableOpacity>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: '#00000077' },
+  mainModalRoot: {
+    flex: 1,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#00000077',
+  },
   centered: {
-    position: 'absolute',
-    left: 0, right: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'flex-end',
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
   sheet: {
-    width: '100%', backgroundColor: '#fff',
-    borderTopLeftRadius: 16, borderTopRightRadius: 16,
-    padding: 16,
+    width: '100%',
+    maxWidth: 620,
     maxHeight: '92%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
   },
   title: { fontSize: 18, fontWeight: '700', color: THEME.primary, marginBottom: 10 },
   subTitle: { marginTop: 12, marginBottom: 6, fontWeight: '700', color: '#333' },
@@ -298,6 +340,7 @@ const styles = StyleSheet.create({
   },
 
   row: { flexDirection: 'row', gap: 10, marginTop: 6, alignItems: 'center' },
+  halfCol: { flex: 1 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
 
   pill: { minWidth: 70, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },

@@ -1,18 +1,20 @@
-import React, { useState, useCallback } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Platform, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API_ENDPOINTS, { initICMSBase } from '../../../icms_config/api';
 import DateTimePicker from '@react-native-community/datetimepicker';
-const SaveInvoiceModal = ({ isVisible, onClose,ImageURL, vendorName, tableData,cleardata,selectedVendor }) => {
+const SaveInvoiceModal = ({ isVisible, onClose,ImageURL, vendorName, defaultInvoiceNo = '', defaultInvoiceDateISO = '', tableData,cleardata,selectedVendor }) => {
   const [savedInvoiceNo, setSavedInvoiceNo] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(new Date());
   const [showInvoiceDatePicker, setShowInvoiceDatePicker] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [invoiceMode, setInvoiceMode] = useState('new'); // 'new' | 'existing'
    const baseurl = "https://icmsfrontend.vervebot.io";
      const [ocrurl, setOcrUrl] = useState(null);
    
        const [user_email, setUserEmail] = useState('');
-   useFocusEffect(
+  useFocusEffect(
     useCallback(() => {
       initICMSBase();
       const fetchInitialData = async () => {
@@ -31,11 +33,29 @@ const SaveInvoiceModal = ({ isVisible, onClose,ImageURL, vendorName, tableData,c
       fetchInitialData();
     }, [])
   );
+
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const invoiceNoFromOCR = String(defaultInvoiceNo || '').trim();
+    const dateFromOCR = String(defaultInvoiceDateISO || '').trim();
+
+    setSavedInvoiceNo(invoiceNoFromOCR);
+
+    const parsed = dateFromOCR ? new Date(dateFromOCR) : null;
+    if (parsed && !Number.isNaN(parsed.getTime())) {
+      setInvoiceDate(parsed);
+    } else {
+      setInvoiceDate(new Date());
+    }
+    setInvoiceMode('new');
+  }, [isVisible, defaultInvoiceNo, defaultInvoiceDateISO]);
   const handleSubmit = async () => {
     if (!savedInvoiceNo.trim()) {
       Alert.alert('Missing Invoice Number', 'Please enter a valid invoice number.');
       return;
     }
+    setIsSubmitting(true);
      const invdata = tableData.map((row) => ({
         qty: row.qty || '',
         itemNo: row.itemNo || '',
@@ -64,7 +84,7 @@ const SaveInvoiceModal = ({ isVisible, onClose,ImageURL, vendorName, tableData,c
       InvoiceData: invdata,
       SavedDate: selectedDate,
       SavedInvoiceNo: savedInvoiceNo,
-      Exist: false,
+      Exist: invoiceMode === 'existing',
     };
 
     try {
@@ -89,11 +109,17 @@ const SaveInvoiceModal = ({ isVisible, onClose,ImageURL, vendorName, tableData,c
 
       const data = await response.json();
       console.log('saved response', data);
-      await handleCreateInvoice();
+      // await handleCreateInvoice();
+      cleardata?.();
+      setSavedInvoiceNo('');
+      setInvoiceDate(new Date());
+      setInvoiceMode('new');
       onClose();
      } catch (error) {
       Alert.alert('Error', 'Failed to save invoice.');
       console.log('error', error);
+    } finally {
+      setIsSubmitting(false);
     }
 
   };
@@ -183,6 +209,42 @@ const handleCreateInvoice = async () => {
     <Modal visible={isVisible} transparent animationType="fade">
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
+          <View style={styles.modeToggleWrap}>
+            <TouchableOpacity
+              style={[
+                styles.modeToggleBtn,
+                invoiceMode === 'new' && styles.modeToggleBtnActive,
+              ]}
+              onPress={() => setInvoiceMode('new')}
+              disabled={isSubmitting}
+            >
+              <Text
+                style={[
+                  styles.modeToggleText,
+                  invoiceMode === 'new' && styles.modeToggleTextActive,
+                ]}
+              >
+                New
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.modeToggleBtn,
+                invoiceMode === 'existing' && styles.modeToggleBtnActive,
+              ]}
+              onPress={() => setInvoiceMode('existing')}
+              disabled={isSubmitting}
+            >
+              <Text
+                style={[
+                  styles.modeToggleText,
+                  invoiceMode === 'existing' && styles.modeToggleTextActive,
+                ]}
+              >
+                Existing
+              </Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.title}>Enter Invoice Number</Text>
           <TextInput
             style={styles.input}
@@ -208,10 +270,14 @@ const handleCreateInvoice = async () => {
             />
           )}
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-              <Text style={styles.buttonText}>Submit</Text>
+            <TouchableOpacity style={[styles.button, isSubmitting && styles.disabledButton]} onPress={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Submit</Text>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
+            <TouchableOpacity style={[styles.button, styles.cancelButton, isSubmitting && styles.disabledButton]} onPress={onClose} disabled={isSubmitting}>
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -252,6 +318,34 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  modeToggleWrap: {
+    width: '100%',
+    flexDirection: 'row',
+    backgroundColor: '#f3f5f7',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#d6dbe1',
+    padding: 4,
+    marginBottom: 12,
+  },
+  modeToggleBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeToggleBtnActive: {
+    backgroundColor: '#319241',
+  },
+  modeToggleText: {
+    color: '#4b5563',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modeToggleTextActive: {
+    color: '#fff',
   },
   title: {
     fontSize: 18,
@@ -300,5 +394,8 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
 });

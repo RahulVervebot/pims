@@ -16,7 +16,7 @@ import { PrintContext } from '../context/PrintContext';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { getCategoryProducts, getLatestProducts } from '../functions/product-function';
 import fallbackBg from '../assets/images/green-bg.jpg';
-import ProductBottomSheet from './ProductBottomSheet';
+import ProductModal from './ProductModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import PrinterIcon from '../assets/icons/Printericon.svg'; 
 import CartIcon from "../assets/icons/Carticon.svg"
@@ -202,7 +202,7 @@ const isGifBanner = useMemo(() => {
       )}
 
       {/* Bottom Sheet */}
-      <ProductBottomSheet
+      <ProductModal
         ref={sheetRef}
         onAddToCart={(p) => addToCart(p)}
         onAddToPrint={(p) => addToPrint(p)}

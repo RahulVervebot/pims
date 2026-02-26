@@ -6,17 +6,16 @@ import API_ENDPOINTS, { initICMSBase, setICMSBase } from '../../../icms_config/a
 import AppHeader from '../../components/AppHeader';
 import reportbg from '../../assets/images/report-bg.png';
 import { searchVendors } from '../../components/icms/vendorApi';
-import InvoiceStepperModal from '../../components/icms/InvoiceStepperModal';
 
 const getImageSource = val => (typeof val === 'number' ? val : { uri: val });
 
-function buildFetchInvoiceUrl(vendor) {
-  const base = new URL(API_ENDPOINTS.FETCH_INVOICE);
-  if (vendor?.value) base.searchParams.set('value', vendor.value);
-    if (vendor?.slug) base.searchParams.set('slug', vendor.slug);
-  if (vendor?.jsonName) base.searchParams.set('jsonName', vendor.jsonName);
-    if (vendor?.emptyColumn) base.searchParams.set('emptyColumn', vendor.emptyColumn);
-  if (vendor?.databaseName) base.searchParams.set('databaseName', vendor.databaseName);
+function buildFetchInvoiceUrl() {
+  const base = new URL(API_ENDPOINTS.GETINVOICEDATA);
+  // if (vendor?.value) base.searchParams.set('value', vendor.value);
+  //   if (vendor?.slug) base.searchParams.set('slug', vendor.slug);
+  // if (vendor?.jsonName) base.searchParams.set('jsonName', vendor.jsonName);
+  //   if (vendor?.emptyColumn) base.searchParams.set('emptyColumn', vendor.emptyColumn);
+  // if (vendor?.databaseName) base.searchParams.set('databaseName', vendor.databaseName);
   // if your API expects different keys, set them here
   return base.toString();
 }
@@ -26,18 +25,23 @@ async function fetchInvoicesForVendor(vendor) {
     const token = await AsyncStorage.getItem('access_token');
     console.log("token:",token);
       const icms_store = await AsyncStorage.getItem('icms_store');
-    const url = buildFetchInvoiceUrl(vendor);
+    const url = buildFetchInvoiceUrl();
     console.log('FETCH_INVOICE URL =>', url);
-
+  const bodyPayload = {
+         invoiceNo:'Testdate', 
+        invoiceName:'chetak' ,
+        date: '2026-01-20'
+  }
     const res = await fetch(url, {
-      method: 'GET',
+      method: 'POST',
+      body: JSON.stringify(bodyPayload),
       headers: {
         'Content-Type': 'application/json',
         'store': icms_store,
         'access_token': token ?? '',
         'mode': 'MOBILE',
-      },
-    });
+      }
+     });
 
     if (!res.ok) {
       console.warn('fetchInvoices failed:', res.status, await res.text().catch(()=>''));
@@ -75,8 +79,6 @@ export default function InvoiceList() {
   const [allInvoices, setAllInvoices] = useState([]);
   const [visibleInvoices, setVisibleInvoices] = useState([]);
   const [invoiceSearch, setInvoiceSearch] = useState('');
-  const [stepperVisible, setStepperVisible] = useState(false);
-  const [selectedInvoiceForStepper, setSelectedInvoiceForStepper] = useState(null);
 
   // sort state
   const [sortState, setSortState] = useState({ key: 'date', dir: 'desc' }); // 'inv' | 'date'
@@ -100,12 +102,6 @@ export default function InvoiceList() {
 
     // sort
     rows.sort((a, b) => {
-      const aIsNew = a?.InvoiceStatus === 'not_seen' ? 1 : 0;
-      const bIsNew = b?.InvoiceStatus === 'not_seen' ? 1 : 0;
-      if (aIsNew !== bIsNew) {
-        return bIsNew - aIsNew; // NEW rows first
-      }
-
       if (sortState.key === 'inv') {
         const av = normalizeInvNo(a), bv = normalizeInvNo(b);
         const an = Number(av), bn = Number(bv);
@@ -216,23 +212,6 @@ const onSelectVendor = async (v) => {
     );
   };
 
-  const openInvoice = (item) => {
-    const currentStep = Number(item?.StepGuider?.currentStep || 0);
-    const isCompleted = item?.StepGuider?.isCompleted === true;
-    const isReady = currentStep === 4 && isCompleted;
-    if (isReady) {
-      navigation.navigate('InvoiceDetails', {
-        invoiceNo: item?.SavedInvoiceNo,
-        invoiceName: item?.InvoiceName,
-        date: item?.SavedDate,
-        vendorDatabaseName: selectedVendor?.databaseName,
-      });
-      return;
-    }
-    setSelectedInvoiceForStepper(item);
-    setStepperVisible(true);
-  };
-
   return (
     <ImageBackground source={getImageSource(reportbg)} style={styles.screen} resizeMode="cover">
       <AppHeader Title="Invoice List" backgroundType="image" backgroundValue={reportbg} />
@@ -315,17 +294,19 @@ const onSelectVendor = async (v) => {
                 <Text style={[styles.col, styles.dateCol, styles.cellText]} numberOfLines={1}>
                   {item?.SavedDate ?? '-'}
                 </Text>
-                <View style={[styles.col, styles.actionCol]}>
+                <View style={[styles.col, styles.actionCol, { flexDirection: 'row', gap: 8 }]}>
+                  {item?.InvoiceStatus === 'not_seen' && (
+                    <View style={styles.badge}><Text style={styles.badgeText}>new</Text></View>
+                  )}
                   <TouchableOpacity
-                    style={styles.openBtnWrap}
-                    onPress={() => openInvoice(item)}
+                    onPress={() =>
+                      navigation.navigate('InvoiceDetails', {
+                        Invoice: item,
+                        vendorDatabaseName: selectedVendor?.databaseName,
+                      })
+                    }
                   >
-                    <Text style={styles.openBtnText}>Open</Text>
-                    {item?.InvoiceStatus === 'not_seen' && (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText}>new</Text>
-                      </View>
-                    )}
+                    <Text style={styles.link}>Open</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -340,23 +321,6 @@ const onSelectVendor = async (v) => {
         )}
         
       </View>
-      <InvoiceStepperModal
-        visible={stepperVisible}
-        onClose={() => setStepperVisible(false)}
-        invoiceItem={selectedInvoiceForStepper}
-        vendorDatabaseName={selectedVendor?.databaseName}
-        onCompleted={() => {
-          const inv = selectedInvoiceForStepper;
-          setStepperVisible(false);
-          if (!inv) return;
-          navigation.navigate('InvoiceDetails', {
-            invoiceNo: inv?.SavedInvoiceNo,
-            invoiceName: inv?.InvoiceName,
-            date: inv?.SavedDate,
-            vendorDatabaseName: selectedVendor?.databaseName,
-          });
-        }}
-      />
     </ImageBackground>
   );
 }
@@ -459,29 +423,9 @@ const styles = StyleSheet.create({
   actionCol: { flex: 0.9, alignItems: 'flex-start' },
   headerText: { fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3, color: '#1f1f1f' },
   cellText: { color: '#1f1f1f' },
-  openBtnWrap: {
-    minWidth: 76,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 10,
-    backgroundColor: '#e6f6ec',
-    borderWidth: 1,
-    borderColor: '#ccead6',
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  openBtnText: { color: '#256f3a', fontWeight: '700' },
-  badge: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#319241',
-    borderRadius: 12,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  badgeText: { color: 'white', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  badge: { backgroundColor: '#319241', borderRadius: 12, paddingHorizontal: 6, paddingVertical: 2 },
+  badgeText: { color: 'white', fontSize: 12 },
+  link: { color: '#319241', fontWeight: '600' },
   errorText: { marginTop: 6, color: '#d9534f', fontWeight: '600' },
   helperText: { textAlign: 'center', color: '#666' },
   emptyText: { textAlign: 'center', color: '#666', marginTop: 20 },
