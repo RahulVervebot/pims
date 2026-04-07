@@ -156,7 +156,7 @@ export default function PrintOptions({
   onClear,           // optional: callback to clear list after success
   containerStyle,    // optional style override
 }) {
-const [qty, setQty] = useState(1);  
+  const [qty, setQty] = useState(1);  
   const [addIpToggle, setAddIpToggle] = useState(false);
   const [ipAddress, setIpAddress] = useState('');
   const [btPrinters, setBtPrinters] = useState([]);
@@ -406,7 +406,7 @@ const times = Math.max(Number(qty) || 1, 1);
           <TextInput
             value={ipAddress}
             onChangeText={setIpAddress}
-            placeholder="TYPE IP:PORT or http://host:port"
+            placeholder={ipAddress || "TYPE IP:PORT or http://host:port"}
             placeholderTextColor="#adadad"
             style={styles.ipInput}
           />
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
   justifyContent: 'space-between',
 },
 qtyBtn: {
-  backgroundColor: '#2c1e70',
+  backgroundColor: '#9CA3AF',
   paddingVertical: 6,
   paddingHorizontal: 12,
   borderRadius: 5,

@@ -104,9 +104,16 @@ export default function POSScreen() {
             <View>
               <Row
                 icon={MixMatch}
-                label="Mix Match"
+                label="Mix Match Free Product"
                 isChild
-                onPress={() => navigation.navigate('MixMatchScreen')}
+                onPress={() => navigation.navigate('MixMatchFreeProductScreen')}
+                right={null}
+              />
+              <Row
+                icon={QuantityDiscount}
+                label="Mix Match Quantity Based Product"
+                isChild
+                onPress={() => navigation.navigate('MixMatchQuantityBasedOfferScreen')}
                 right={null}
               />
               <Row
@@ -179,7 +186,7 @@ export default function POSScreen() {
               />
               <Row
                 icon={CategoryList}
-                label="Archive Product List"
+                label="Deleted Product List"
                 isChild
                 isLast
                 onPress={() => navigation.navigate('ArchivedProductList')}

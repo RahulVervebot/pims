@@ -77,6 +77,7 @@ export default function SessionReports() {
       let data = [];
       if (tab === 'Today') {
         data = await getTodaySessions();
+        console.log("today data:",data);
       } else if (tab === 'Yesterday') {
         data = await getYesterdaySessions();
       } else {

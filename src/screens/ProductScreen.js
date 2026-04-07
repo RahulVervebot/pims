@@ -6,9 +6,7 @@ import {
   StyleSheet,
   StatusBar,
   SafeAreaView,
-  ScrollView,
   Image,
-  RefreshControl,
 } from "react-native";
 import CustomHeader from "../components/CustomHeader";
 import ProductSearch from "../components/ProductSearch";
@@ -23,7 +21,7 @@ import { SvgUri } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import PrinterIcon from '../assets/icons/Printericon.svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import reportbg from '../assets/images/report-bg.png';
 // Tab button supporting SVG or raster icon
 
 function TabButton({ label, iconUri, active, onPress, activeColor, inactiveColor = "#fff" }) {
@@ -65,10 +63,10 @@ export default function ProductScreen() {
 
   // Home pull-to-refresh state
   const [homeRefreshing, setHomeRefreshing] = useState(false);
-
+ 
   // Key to remount ProductList (so its useEffect runs even if category stays the same)
   const [listReloadKey, setListReloadKey] = useState(0);
-
+  const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
   // Initial categories load (and hiding the loader video when done)
 // replace your current useEffect body with this safer version
 useEffect(() => {
@@ -160,7 +158,7 @@ const currentBackground = useMemo(() => {
     <SafeAreaView
       style={{
         flex: 1,
-        backgroundColor: currentBackground.type === "color" ? currentBackground.value : "#fff",
+        backgroundColor: currentBackground.type === "color" ? currentBackground.value : "#319241",
       }}
     >
       <StatusBar
@@ -175,17 +173,17 @@ const currentBackground = useMemo(() => {
       </CustomHeader>
 
       <View style={styles.content}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={homeRefreshing} onRefresh={onHomeRefresh} />}
-          contentContainerStyle={{
-            flexGrow: 1,
+        <View
+          style={{
+            flex: 1,
             paddingBottom: 16 + insets.bottom,
+            backgroundColor: "#E9FDEB",
+               borderTopRightRadius: 18,
+               borderTopLeftRadius: 18,
           }}
         >
-
-          <CategoriesRow />
-        </ScrollView>
+          <CategoriesRow refreshing={homeRefreshing} onRefresh={onHomeRefresh} />
+        </View>
 
         {/* ✅ Global floating cart overlay */}
         {cart.length > 0 && (

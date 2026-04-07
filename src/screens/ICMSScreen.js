@@ -56,7 +56,7 @@ export default function ICMSScreen() {
           <TouchableOpacity activeOpacity={1} onPress={() => navigation.navigate('RedProducts')}>
             <Row icon={ProductsIcon} label="Unlinked Product" />
           </TouchableOpacity>
-          <TouchableOpacity activeOpacity={1} onPress={() => navigation.navigate('PedingInvoices')}>
+          <TouchableOpacity activeOpacity={1} onPress={() => navigation.navigate('PendingNewInvoices')}>
             <Row icon={Pending_invoice} label="Pending Invoice" />
           </TouchableOpacity>
         </ScrollView>

@@ -1,6 +1,6 @@
 // components/ReportHeader.js
-import React,{useEffect,useState} from 'react';
-import { View, StyleSheet, ImageBackground, TouchableOpacity,Image,Text  } from 'react-native';
+import React from 'react';
+import { View, StyleSheet, ImageBackground, TouchableOpacity, Text } from 'react-native';
 import Profile from "../assets/icons/Profile.svg";
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
@@ -38,27 +38,31 @@ const AppHeader = ({
 
 const renderContent = () => (
   <View style={styles.content}>
-
-      <TouchableOpacity  onPress={() => {
-       if (navigation.canGoBack()) {
-         navigation.goBack();
-       } else {
-         navigation.navigate('Tabs'); // fallback screen
-       }
-     }} style={styles.leftIcon}>
+    <TouchableOpacity
+      onPress={() => {
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        } else {
+          navigation.navigate('Tabs');
+        }
+      }}
+      style={styles.leftIcon}
+    >
       <Ionicons name="arrow-back-outline" size={24} color="#fff" />
-         </TouchableOpacity>
-    {/* Center (absolute) */}
-    <View style={styles.titleOverlay} pointerEvents="none">
+    </TouchableOpacity>
+
+    <View style={styles.titleWrap}>
       <Text
         style={styles.headerTitle}
-        numberOfLines={1}
-        ellipsizeMode="tail"
+        numberOfLines={2}
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
       >
         {Title}
       </Text>
     </View>
 
+    <View style={styles.rightSpacer} />
   </View>
 );
 
@@ -69,38 +73,42 @@ const renderContent = () => (
 const styles = StyleSheet.create({
   logo: { flexDirection: 'row' },
   headerContainer: {
-    paddingHorizontal: 25,
+    paddingHorizontal: 14,
     paddingVertical: 10,
   },
   content: {
-    position: 'relative',
-    minHeight: 48,                 // give the row some height to center against
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-     paddingTop: 30
+    paddingTop: 10,
   },
   rowIcon: { width: 36, height: 36 },
-
-  // ⬇️ Absolute centered title
-  titleOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
+  leftIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
-    paddingTop: 30
+    justifyContent: 'center',
+  },
+  rightSpacer: { width: 36, height: 36 },
+  titleWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '700',
     color: '#fff',
-    paddingHorizontal: 80,         // reserves space so it won’t overlap icons
     textAlign: 'center',
+    lineHeight: 22,
   },
 
   headerUser: { fontSize: 12, fontWeight: '400', color: '#000', paddingHorizontal: 10 },
   headerName: { fontSize: 16, fontWeight: '700', color: '#000', paddingHorizontal: 10 },
-  profileBtn: { },
+  profileBtn: {},
 });
 
 

@@ -10,25 +10,15 @@ import {
   Modal,
   Alert,
   Platform,
-  Image,
   Pressable,
 } from "react-native";
-import axios from "axios";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { Camera, CameraType } from "react-native-camera-kit";
-import { API_URL } from "@env";
 import { request, PERMISSIONS, RESULTS } from "react-native-permissions";
 import { CartContext } from "../context/CartContext";
 import { PrintContext } from "../context/PrintContext";
 import ProductModal from "./ProductModal";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-const THEME = {
-  primary: "#2C1E70",
-  accent: "#319241",
-  text: "#222",
-  muted: "#777",
-  success: "#27ae60",
-};
 const PLACEHOLDER = "#9AA3AF";
 
 export default function ProductSearch() {
@@ -48,10 +38,6 @@ export default function ProductSearch() {
   const [storeURL, setStoreurl] = useState('');
   // floating results position
   const [searchRowH, setSearchRowH] = useState(0);
-
-  // barcode result modal
-  const [resultModalVisible, setResultModalVisible] = useState(false);
-  const [scannedProduct, setScannedProduct] = useState(null);
 
   // ✅ bottom sheet ref
   const sheetRef = useRef(null);
@@ -81,7 +67,7 @@ setStoreurl(storeulr)
       setResults([]);
       return;
     }
-
+console.log("🔍 Searching for:", storeURL);
     typingTimeout.current = setTimeout(async () => {
       if (text.length >= 3) {
         try {
@@ -129,11 +115,14 @@ setStoreurl(storeulr)
   }
 
   const json = await res.json();
-  const list = Array.isArray(json?.products) ? json.products : [];
+      const list = Array.isArray(json?.products) ? json.products : [];
 
       if (list.length >= 1) {
-        setScannedProduct(list[0]);
-        setResultModalVisible(true);
+        setResults([]);
+        setSearchText(barcode);
+        setTimeout(() => {
+          sheetRef.current?.open(list[0]);
+        }, 180);
       } else {
         Alert.alert("Not found", "No product matched this barcode.");
       }
@@ -163,18 +152,14 @@ setStoreurl(storeulr)
   };
 
   const onAddToCart = (product) => {
-    const p = product || scannedProduct;
-    if (!p) return;
-    addToCart(p);
-    setResultModalVisible(false);
+    if (!product) return;
+    addToCart(product);
     Alert.alert("Added", "Item added to cart.");
   };
 
   const onAddToPrint = (product) => {
-    const p = product || scannedProduct;
-    if (!p) return;
-    addToPrint(p);
-    setResultModalVisible(false);
+    if (!product) return;
+    addToPrint(product);
     Alert.alert("Added", "Item added to print list.");
   };
 
@@ -300,51 +285,6 @@ setStoreurl(storeulr)
         )}
       </Modal>
 
-      {/* Result Modal (after scan) */}
-      <Modal
-        visible={resultModalVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setResultModalVisible(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.resultCard}>
-            {scannedProduct?.productImage ? (
-              <Image source={{ uri: `data:image/webp;base64,${scannedProduct.productImage}`}} style={styles.resultImage} />
-            ) : (
-              <View style={[styles.resultImage, styles.resultImagePlaceholder]}>
-                <Icon name="image" size={32} color="#bbb" />
-              </View>
-            )}
-
-            <Text style={styles.title}>{scannedProduct?.productName || "Product"}</Text>
-            <Text style={styles.metaText}>
-              {scannedProduct?.categoryName || "Category"} {scannedProduct?.productSize ? `• ${scannedProduct.productSize}` : ""}
-            </Text>
-            <Text style={styles.priceText}>
-              ₹{Number(scannedProduct?.price || 0).toFixed(2)}
-            </Text>
-            {scannedProduct?.barcode ? (
-              <Text style={styles.codeText}>Barcode: {scannedProduct.barcode}</Text>
-            ) : null}
-
-            <View style={styles.rowButtons}>
-              {/* <TouchableOpacity style={[styles.actionBtn, { backgroundColor: THEME.accent }]} onPress={() => onAddToCart()}>
-                <Text style={styles.actionText}>Add to Cart</Text>
-              </TouchableOpacity> */}
-
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: THEME.accent }]} onPress={() => onAddToPrint()}>
-                <Text style={styles.actionText}>Add to Print</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity style={styles.closeBtn} onPress={() => setResultModalVisible(false)}>
-              <Text style={styles.closeText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
       {/* ✅ Bottom Sheet for list item tap */}
       <ProductModal
         ref={sheetRef}
@@ -422,33 +362,4 @@ const styles = StyleSheet.create({
     flex: 1, justifyContent: "center", alignItems: "center", padding: 24,
   },
 
-  // Barcode result modal
-  modalBackdrop: {
-    flex: 1, backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center", alignItems: "center", padding: 20,
-  },
-  resultCard: {
-    width: "95%", maxWidth: 420,
-    backgroundColor: "#fff", borderRadius: 16, padding: 16,
-    alignItems: "center", elevation: 6,
-  },
-  resultImage: {
-    width: "100%", height: 180, borderRadius: 12, marginBottom: 12, resizeMode: "cover",
-  },
-  resultImagePlaceholder: { justifyContent: "center", alignItems: "center", backgroundColor: "#f2f2f2" },
-  title: { fontSize: 18, fontWeight: "700", color: THEME.text, textAlign: "center" },
-  metaText: { color: THEME.muted, marginTop: 4, textAlign: "center" },
-  priceText: { color: THEME.success, fontWeight: "700", fontSize: 18, marginTop: 8 },
-  codeText: { color: "#555", marginTop: 6 },
-
-  rowButtons: {
-    flexDirection: "row", gap: 12, marginTop: 16, width: "100%",
-  },
-  actionBtn: {
-    flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center",
-  },
-  actionText: { color: "#fff", fontWeight: "700" },
-
-  closeBtn: { marginTop: 12, paddingVertical: 10, paddingHorizontal: 16 },
-  closeText: { color: THEME.primary, fontWeight: "700" },
 });

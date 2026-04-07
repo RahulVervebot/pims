@@ -6,6 +6,7 @@ import Setting from "../assets/icons/Profile.svg";
 import TulsiLogo from '../assets/images/Tulsi.svg';
 import TulsiWhiteLogo from '../assets/icons/Tulsi_Icon_white.svg';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
 
@@ -16,10 +17,11 @@ const CustomHeader = ({
   children
 }) => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isCompact = width < 420;
   const isTablet = width >= 768;
-  const styles = getStyles({ isCompact, isTablet });
+  const styles = getStyles({ isCompact, isTablet, insetTop: insets.top });
   const [user_name, setUserName] = useState('');
   const [user_email, setUserEmail] = useState('');
   const [user_role, setUserRole] = useState('');
@@ -101,7 +103,7 @@ const renderContent = () => {
   return <View>{renderBackground()}</View>;
 };
 
-const getStyles = ({ isCompact, isTablet }) => {
+const getStyles = ({ isCompact, isTablet, insetTop }) => {
   const horizontalPadding = isTablet ? 28 : isCompact ? 16 : 22;
   const verticalPadding = isTablet ? 24 : isCompact ? 14 : 20;
   const iconSize = isTablet ? 42 : isCompact ? 30 : 36;
@@ -127,12 +129,12 @@ const getStyles = ({ isCompact, isTablet }) => {
     headerContainer: {
       paddingHorizontal: horizontalPadding,
       paddingVertical: verticalPadding,
-      paddingTop: isTablet ? 10 : isCompact ? 20 : 20,
+      paddingTop: insetTop + (isTablet ? 10 : isCompact ? 20 : 20),
     },
     headerContainerCompact: {
       paddingHorizontal: horizontalPadding,
       paddingVertical: verticalPadding,
-      paddingTop: isTablet ? 18 : isCompact ? 20 : 20,
+      paddingTop: insetTop + (isTablet ? 18 : isCompact ? 20 : 20),
     },
     content: {
       position: 'relative',

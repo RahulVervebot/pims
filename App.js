@@ -14,9 +14,11 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { initializeOneSignal, debugOneSignalStatus, forceEnablePushNotifications } from './src/config/OneSignalConfig';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import Dashboard from './src/screens/Dashboard';
@@ -41,18 +43,20 @@ import ICMS_VendorList from './src/screens/icms/ICMS_VendorList.js';
 import InvoiceDetails from './src/screens/icms/InvoiceDetails.js';
 import RedProductsScreen from './src/screens/icms/RedProductsScreen';
 import PendingInvoices from './src/components/icms/PendingInvoices';
+import PendingNewInvoices from './src/components/icms/pending_new_invoices';
 import ReportsByHours from './src/screens/HourlyReport.js';
 import TopSellingCategoriesReport from './src/screens/TopSellingCategoriesReport.js';
 import TopSellingProductsReportScreen from './src/screens/TopSellingProductsReport.js';
 import TopSellingCustomerReport from './src/screens/TopSellingCustomerReport.js';
 import SessionReports from './src/components/reports/SessionReports.js';
 import OrdersScreen from './src/components/orders/order.js';
-import MixMatchScreen from './src/screens/promotions/mixmatch.js';
+import MixMatchFreeProductScreen from './src/screens/promotions/mixmatchFreeProduct.js';
+import MixMatchQuantityBasedOfferScreen from './src/screens/promotions/mixmatchquantity_based_offer.js';
 import QuantityDiscountScreen from './src/screens/promotions/QuantityDiscount';
 import SalePrintScreen from './src/screens/SalePrintScreen';
 import ArchivedProductList from './src/components/ArchivedProductList';
 import HomeIcon from './src/assets/icons/HomeIcon.svg';
-import ProductIcon from './src/assets/icons/Icon-Product.svg';
+import ProductIcon from './src/assets/icons/Products_icon.svg';
 import ProductScreen from './src/screens/ProductScreen.js';
 import CartIcon from './src/assets/icons/inventory_1.svg';
 import POSIcon from './src/assets/icons/payment_2.svg';
@@ -173,10 +177,11 @@ function MainDrawer() {
     </Drawer.Navigator>
   );
 }
-function ChatOverlay() {
-  const insets = useSafeAreaInsets();
-  return <Chat style={{ bottom: 70 + insets.bottom, right: 16 }} />;
-}
+// function ChatOverlay() {
+//   const insets = useSafeAreaInsets();
+//   return <Chat style={{ bottom: 70 + insets.bottom, right: 16 }} />;
+// }
+
 
 function getActiveRouteName(state) {
   if (!state || !state.routes || state.index == null) return '';
@@ -187,11 +192,35 @@ function getActiveRouteName(state) {
 }
 
 export default function App() {
+  const [chatOpen, setChatOpen] = useState(false);
+
   const [initialRoute, setInitialRoute] = useState(null);
   const [activeRouteName, setActiveRouteName] = useState('');
   const navigationRef = useRef(null);
   const CHAT_HIDDEN_ROUTES = new Set(['Login', 'CategoryListScreen', 'CategoryProducts', 'ProductScreen']);
+function ChatOverlay() {
+  const insets = useSafeAreaInsets();
 
+  return (
+    <View
+      pointerEvents="box-none"
+      style={{
+        position: 'absolute',
+        right: 16,
+        bottom: 70 +insets.bottom,
+        zIndex: 9999,
+        elevation: 9999,
+      }}
+    >
+         <Chat
+        isOpen={chatOpen}
+        setIsOpen={setChatOpen}
+        hideFab={false}
+      />
+
+    </View>
+  );
+}
   useEffect(() => {
     const checkLogin = async () => {
       try {
@@ -202,6 +231,57 @@ export default function App() {
       }
     };
     checkLogin();
+  }, []);
+
+  useEffect(() => {
+    const setupOneSignal = async () => {
+      try {
+        console.log('\n🚀 ===== APP STARTING - INITIALIZING ONESIGNAL =====');
+        
+        // Delay OneSignal initialization to allow native module to fully initialize
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        if (initializeOneSignal && typeof initializeOneSignal === 'function') {
+          console.log('📱 Calling initializeOneSignal()...');
+          try {
+            await initializeOneSignal();
+            console.log('✅ initializeOneSignal() completed');
+          } catch (initError) {
+            console.log('⚠️ initializeOneSignal error (non-fatal):', initError);
+          }
+        }
+        
+        // Wait a moment for initialization to fully settle
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        console.log('\n📊 Checking OneSignal permission status after init...');
+        if (debugOneSignalStatus && typeof debugOneSignalStatus === 'function') {
+          await debugOneSignalStatus();
+        }
+        
+        // Check if device is subscribed - if not, try to force enable
+        try {
+          const OneSignal = require('react-native-onesignal');
+          if (OneSignal && OneSignal.getDeviceState) {
+            const deviceState = await OneSignal.getDeviceState();
+            if (deviceState && !deviceState.subscribed && deviceState.hasNotificationPermission) {
+              console.log('\n⚠️ Device has permission but not subscribed - attempting to fix...\n');
+              if (forceEnablePushNotifications && typeof forceEnablePushNotifications === 'function') {
+                await forceEnablePushNotifications();
+              }
+            }
+          }
+        } catch (e) {
+          // Silent fail - not critical
+        }
+        
+        console.log('\n✅ OneSignal setup complete - App ready for notifications\n');
+      } catch (error) {
+        console.log('⚠️ OneSignal setup warning (non-fatal):', error?.message);
+        // Don't crash app if OneSignal has issues
+      }
+    };
+    setupOneSignal();
   }, []);
 
   if (!initialRoute) {
@@ -239,16 +319,15 @@ export default function App() {
 <Stack.Screen name="TopSellingCustomerReport" component={TopSellingCustomerReport} /> 
 <Stack.Screen name="SessionReports" component={SessionReports} /> 
 <Stack.Screen name="OrdersScreen" component={OrdersScreen} /> 
-
-
-      <Stack.Screen name="OcrScreen" component={OcrScreen} />     
-      <Stack.Screen name="AddNewVendorInvoice" component={AddNewVendorInvoice} />
-       <Stack.Screen name="SettingScreen" component={SettingScreen} />    
-            <Stack.Screen name="CategoryListScreen" component={CategoryListScreen} />  
+ <Stack.Screen name="OcrScreen" component={OcrScreen} />     
+  <Stack.Screen name="AddNewVendorInvoice" component={AddNewVendorInvoice} />
+   <Stack.Screen name="SettingScreen" component={SettingScreen} />    
+     <Stack.Screen name="CategoryListScreen" component={CategoryListScreen} />  
      <Stack.Screen name="PrintScreen" component={PrintScreen} /> 
      <Stack.Screen name="SalePrintScreen" component={SalePrintScreen} />
      <Stack.Screen name="ArchivedProductList" component={ArchivedProductList} />
-    <Stack.Screen name="MixMatchScreen" component={MixMatchScreen} /> 
+    <Stack.Screen name="MixMatchFreeProductScreen" component={MixMatchFreeProductScreen} />
+    <Stack.Screen name="MixMatchQuantityBasedOfferScreen" component={MixMatchQuantityBasedOfferScreen} />
     <Stack.Screen name="QuantityDiscountScreen" component={QuantityDiscountScreen} />
 
      
@@ -298,7 +377,13 @@ export default function App() {
             component={PendingInvoices}
             options={{ title: 'Pending Invoices' }}
           />
+          <Stack.Screen
+            name="PendingNewInvoices"
+            component={PendingNewInvoices}
+            options={{ title: 'Pending New Invoices' }}
+          />
           </Stack.Navigator>
+
           {!CHAT_HIDDEN_ROUTES.has(activeRouteName) && <ChatOverlay />}
         </View>
         </NavigationContainer>
