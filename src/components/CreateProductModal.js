@@ -537,7 +537,9 @@ export default function CreateProductModal({
         {
           text: 'OK',
           onPress: () => {
-            onCreated?.(data || body);
+            // Send the body (form values) so LinkProduct can extract actual user-entered data
+            // Also include the API response for reference
+            onCreated?.({ ...body, apiResponse: data });
             resetForm();
             onClose?.();
           },

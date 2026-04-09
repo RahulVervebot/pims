@@ -40,12 +40,11 @@ const LinkProductModal =  ({
   const [createProductFlowActive, setCreateProductFlowActive] = useState(false);
   const [scannedBarcode, setScannedBarcode] = useState('');
   const [createPrefill, setCreatePrefill] = useState(null);
-
-  // const vender = await AsyncStorage.getItem('vendor');
   const day = invoice?.SavedDate;
   const InvNumber = invoice?.SavedInvoiceNo;
   const vendorName = invoice?.InvoiceName;
   const [storedVendor, setStoredVendor] = useState(null);
+
 
   useEffect(() => {
     const loadVendor = async () => {
@@ -227,48 +226,117 @@ const linkProduct = async (item, qty) => {
   };
 
   const extractCreatedProductForLinking = (payload) => {
-    const source = payload?.result || payload?.data?.result || payload?.data || payload || {};
-    const linkedName = String(source?.name || linkingItem?.description || '').trim();
-    const linkedBarcode = String(
-      source?.barcode ||
-      source?.upc ||
-      source?.product_barcode ||
-      scannedBarcode ||
-      searchTerm ||
-      ''
-    ).trim();
-    const linkedSize = String(source?.size || linkingItem?.size || '').trim();
-    const linkedDepartment = String(
-      source?.department ||
-      source?.department_name ||
-      linkingItem?.department ||
-      ''
-    ).trim();
-    const linkedUnitCost = String(
-      source?.standard_price ??
-      source?.cost ??
-      linkingItem?.unitPrice ??
-      ''
-    ).trim();
-    const linkedPrice = String(
-      source?.list_price ??
-      source?.price ??
-      source?.salePrice ??
-      ''
-    ).trim();
-    const linkedUnitInCase = String(
-      source?.unit_in_case ??
-      source?.units_in_case ??
-      source?.unitc ??
-      linkingItem?.qty ??
+    // Log the payload to see what we're receiving
+    console.log('📦 extractCreatedProductForLinking payload:', JSON.stringify(payload, null, 2));
+    
+    // CreateProductModal sends either API response (data) OR request body (body)
+    // Try multiple possible structures to find the actual form values
+    let source = {};
+    
+    // Check if it's the direct body (has the form fields directly)
+    if (payload?.name !== undefined || payload?.barcode !== undefined) {
+      source = payload;
+      console.log('📦 Using payload directly (request body)');
+    }
+    // Check if it's nested in result
+    else if (payload?.result && (payload.result.name !== undefined || payload.result.barcode !== undefined)) {
+      source = payload.result;
+      console.log('📦 Using payload.result');
+    }
+    // Check if it's in data
+    else if (payload?.data && (payload.data.name !== undefined || payload.data.barcode !== undefined)) {
+      source = payload.data;
+      console.log('📦 Using payload.data');
+    }
+    // Check if it's in data.result
+    else if (payload?.data?.result && (payload.data.result.name !== undefined || payload.data.result.barcode !== undefined)) {
+      source = payload.data.result;
+      console.log('📦 Using payload.data.result');
+    }
+    // Last resort: try to find any object with form fields
+    else {
+      source = payload?.result || payload?.data?.result || payload?.data || payload || {};
+      console.log('📦 Using fallback structure');
+    }
+    
+    console.log('📦 Extracted source:', JSON.stringify(source, null, 2));
+    
+    // Helper: Get first defined value (checks undefined/null, but empty strings are valid)
+    const getFirstDefined = (...values) => {
+      for (const val of values) {
+        if (val !== undefined && val !== null) {
+          return String(val).trim();
+        }
+      }
+      return '';
+    };
+    
+    // Extract actual form values from the created product - these are what the user entered
+    const linkedName = getFirstDefined(
+      source?.name,                      // User entered name in CreateProductModal
+      linkingItem?.description           // Fallback to invoice item description
+    );
+    
+    const linkedBarcode = getFirstDefined(
+      source?.barcode,                   // User entered barcode in CreateProductModal
+      source?.upc,
+      source?.product_barcode,
+      scannedBarcode,                    // Scanned barcode
+      searchTerm,                        // Search term
+      linkingItem?.barcode               // Fallback to invoice item barcode
+    );
+    
+    const linkedSize = getFirstDefined(
+      source?.size,                      // User entered size in CreateProductModal
+      source?.Size,
+      linkingItem?.size                  // Fallback to invoice item size
+    );
+    
+    // Department: CreateProductModal uses categ_id (category ID)
+    const linkedDepartment = getFirstDefined(
+      source?.categ_id,                  // User selected category in CreateProductModal
+      source?.department,
+      source?.department_name,
+      linkingItem?.department            // Fallback to invoice item department
+    );
+    
+    // Cost: standard_price is the unit cost field in CreateProductModal
+    const linkedUnitCost = getFirstDefined(
+      source?.standard_price,            // User entered cost in CreateProductModal
+      source?.cost,
+      linkingItem?.unitPrice             // Fallback to invoice item cost
+    );
+    
+    // Price: list_price is the selling price field in CreateProductModal
+    const linkedPrice = getFirstDefined(
+      source?.list_price,                // User entered price in CreateProductModal
+      source?.price,
+      source?.salePrice,
+      linkingItem?.extendedPrice         // Fallback to invoice item price
+    );
+    
+    // Unit in case: user enters this in CreateProductModal
+    const linkedUnitInCase = getFirstDefined(
+      source?.unit_in_case,              // User entered unit in case in CreateProductModal
+      source?.units_in_case,
+      source?.unitc,
+      linkingItem?.qty,                  // Fallback to invoice item qty
       '0'
-    ).trim();
+    );
 
-    return {
+    // SKU: generated or entered by user
+    const linkedSku = getFirstDefined(
+      source?.sku,
+      source?.default_code,
+      source?.product_code,
+      '0'
+    );
+
+    const extractedProduct = {
       name: linkedName,
       upc: linkedBarcode,
-      sku: String(source?.sku || source?.default_code || '0'),
-      description: linkedName,
+      sku: linkedSku,
+      description: linkedName,          // Use the same name as description
       size: linkedSize,
       department: linkedDepartment,
       cost: linkedUnitCost,
@@ -276,6 +344,18 @@ const linkProduct = async (item, qty) => {
       salePrice: linkedPrice,
       unitInCase: linkedUnitInCase || '0',
     };
+
+    console.log('✅ Extracted product for linking:', JSON.stringify(extractedProduct, null, 2));
+    console.log('🔍 Field-by-field comparison:');
+    console.log('  Name: source.name =', source?.name, '| extracted =', linkedName);
+    console.log('  Barcode: source.barcode =', source?.barcode, '| extracted =', linkedBarcode);
+    console.log('  Size: source.size =', source?.size, '| extracted =', linkedSize);
+    console.log('  Cost: source.standard_price =', source?.standard_price, '| extracted =', linkedUnitCost);
+    console.log('  Price: source.list_price =', source?.list_price, '| extracted =', linkedPrice);
+    console.log('  UnitInCase: source.unit_in_case =', source?.unit_in_case, '| extracted =', linkedUnitInCase);
+    console.log('  Department: source.categ_id =', source?.categ_id, '| extracted =', linkedDepartment);
+
+    return extractedProduct;
   };
 
   const handleCreatedProduct = async (createdPayload) => {

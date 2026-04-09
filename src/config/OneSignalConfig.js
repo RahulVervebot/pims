@@ -161,10 +161,6 @@ export const removeOneSignalTagsOnLogout = async () => {
     OneSignal.deleteTags(tagsToRemove);
     console.log('🗑️ deleteTags called for:', tagsToRemove.join(', '));
 
-    // Clear local storage
-    await AsyncStorage.multiRemove(['storeurl', 'userrole']);
-    console.log('🗑️ Cleared storeurl & userrole from AsyncStorage');
-
     // Give SDK time to sync
     await wait(2000);
 

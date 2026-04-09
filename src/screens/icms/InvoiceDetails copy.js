@@ -79,7 +79,7 @@ export default function InvoiceDetails() {
   const [posUpdateLoading, setPosUpdateLoading] = useState(false);
   const [loadingConfirmAiId, setLoadingConfirmAiId] = useState(null);
   const [loadingUnlinkId, setLoadingUnlinkId] = useState(null);
- const [isicmsstore, setIsICMSStore] = useState(null);
+  const [isicmsstore, setIsICMSStore] = useState(null);
   const route = useRoute();
   const params = route?.params ?? {};
   const fallbackInvoice = params?.Invoice ?? null;
@@ -101,6 +101,7 @@ export default function InvoiceDetails() {
       await initICMSBase();
       const token = await AsyncStorage.getItem('access_token');
       const icms_store = await AsyncStorage.getItem('icms_store');
+       const storeurl = await AsyncStorage.getItem('storeurl');
        setIsICMSStore(icms_store);
       const bodyPayload = {
         invoiceNo: invoiceNoParam,
@@ -114,6 +115,7 @@ export default function InvoiceDetails() {
         headers: {
          'Content-Type': 'application/json',
           store: icms_store ?? '',
+          app_url: storeurl,
           access_token: token ?? '',
           mode: 'MOBILE',
         },
@@ -237,11 +239,12 @@ console.log("resonse details:",json);
     setLinkModalVisible(true);
   };
 
-  const handleProductSelect = product => {
+  const handleProductSelect = async (product) => {
     console.log(
       `Link ${product.name} to invoice item ${linkingItem.ProductId}`,
     );
-    // TODO: Save linking to DB
+    // Refresh invoice data after successful linking
+    await fetchInvoiceData();
   };
 
   const closeModal = useCallback(() => {
@@ -324,6 +327,7 @@ console.log("resonse details:",json);
           access_token: token ?? '',
           pos_access_token: token ?? '',
           pos_api: `${storeurl}/api/v1`,
+          app_url: storeurl,
           mode: 'MOBILE',
           store: icms_store,
           // vendordetails: storedVendor ? JSON.stringify(storedVendor) : '',
@@ -381,6 +385,7 @@ console.log("resonse details:",json);
           'Content-Type': 'application/json',
           access_token: token ?? '',
           mode: 'MOBILE',
+          app_url: storeurl,
           store: icms_store,
         },
         body: JSON.stringify({
@@ -408,12 +413,15 @@ console.log("resonse details:",json);
     try {
       const token = await AsyncStorage.getItem('access_token');
       const icms_store = await AsyncStorage.getItem('icms_store');
+     const storeurl = await AsyncStorage.getItem('storeurl');
+      
       const res = await fetch(API_ENDPOINTS.SEARCHVENDOR, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           access_token: token ?? '',
           mode: 'MOBILE',
+         app_url: storeurl,
           store: icms_store ?? '',
         },
         body: JSON.stringify({ q: vendorName }),
@@ -442,6 +450,7 @@ console.log("resonse details:",json);
       await initICMSBase();
       const token = await AsyncStorage.getItem('access_token');
       const icms_store = await AsyncStorage.getItem('icms_store');
+      const storeurl = await AsyncStorage.getItem('storeurl');
       const invoiceDb = await fetchVendorDbName();
       const payload = {
         invoiceName: invoiceDb || vendorDatabaseName || '',
@@ -456,6 +465,7 @@ console.log("resonse details:",json);
           access_token: token ?? '',
           mode: 'MOBILE',
           store: icms_store ?? '',
+          app_url: storeurl ?? '',
         },
         body: JSON.stringify(payload),
       });
@@ -515,6 +525,7 @@ console.log('Filtered tableData:', tableData);
       tableData: tableData || [],
       email,
     };
+     const app_url = await AsyncStorage.getItem('storeurl');
     const res = await fetch(API_ENDPOINTS.QUANTITY_SP_COSTUPDATE, {
       method: 'PUT',
       headers: {
@@ -523,6 +534,7 @@ console.log('Filtered tableData:', tableData);
         pos_access_token: token ?? '',
         pos_api: `${storeurl}/api/v1` ?? '',
         mode: 'MOBILE',
+       app_url: app_url ?? '',
       },
       body: JSON.stringify(body),
       });
@@ -602,15 +614,15 @@ console.log('Filtered tableData:', tableData);
                 idx === 0
                   ? { width: 28 }
                   : idx === 1
-                  ? { flex: 0.8, marginHorizontal: 4 }
+                  ? { flex: 0.8 }
                   : idx === 2
-                  ? { flex: 2.8, marginHorizontal: 4 }
+                  ? { flex: 2.8 }
                   : idx === 3
-                  ? { flex: 0.8, marginHorizontal: 4 }
+                  ? { flex: 0.8 }
                   : idx === 4
-                  ? { flex: 0.8, marginHorizontal: 4 }
+                  ? { flex: 0.8 }
                   : idx === 5
-                  ? { flex: 0.8, marginHorizontal: 4 }
+                  ? { flex: 0.8 }
                   : undefined,
                 idx === 0 && { color: '#DC2626', textAlign: 'center' },
               ]}
@@ -650,7 +662,7 @@ console.log('Filtered tableData:', tableData);
         onPriceUpdate={handlePriceUpdate}
         loadingConfirmAiId={loadingConfirmAiId}
         loadingUnlinkId={loadingUnlinkId}
-        isicmsstore={isicmsstore}
+         isicmsstore={isicmsstore}
       />
     ),
     [expandedId, toggleExpand, handleToggleSelect, selectedIds, handleConfirmAiLinking, handleRemoveLinkedItem, categoryMetaByDept, handlePriceUpdate, loadingConfirmAiId, loadingUnlinkId],

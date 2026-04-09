@@ -21,6 +21,8 @@ import POSIcon from '../assets/icons/payment_2.svg';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import TulsiIcon from '../assets/icons/inventory_1.svg';
 import { dbPromise } from '../firebaseConfig';
+import Profile from '../assets/icons/Profile.svg';
+
 import Chat from '../components/Chat';
  import { tagDeviceWithStoreUrl } from '../config/OneSignalConfig';
 const LIGHT_GREEN = '#e6f6ec';
@@ -54,6 +56,13 @@ const cards = [
     subtitle: 'Inventory Management',
     icon: TulsiIcon,
     target: 'ICMSScreen',
+  },
+    {
+    key: 'user-list',
+    title: 'User Management',
+    subtitle: 'Manage All Users on Click',
+    icon: Profile,
+    target: 'UserList',
   },
 ];
 
@@ -390,6 +399,17 @@ export default function Dashboard() {
   }, [userName]);
 
   const prettyRole = useMemo(() => (userRole ? userRole.replace(/_/g, ' ') : ''), [userRole]);
+  
+  const visibleCards = useMemo(() => {
+    return cards.filter((card) => {
+      // Only show user-list card if user is administrator
+      if (card.key === 'user-list') {
+        return userRole?.toLowerCase() === 'administrator';
+      }
+      return true;
+    });
+  }, [userRole]);
+  
   const statusBg = headerBg.type === 'image' ? 'transparent' : headerBg.value;
   const statusStyle = headerBg.type === 'image' ? 'light-content' : 'dark-content';
 
@@ -446,7 +466,7 @@ export default function Dashboard() {
 
         <View style={styles.grid}>
 
-          {cards.map((card) => {
+          {visibleCards.map((card) => {
             const Icon = card.icon;
             return (
               <TouchableOpacity

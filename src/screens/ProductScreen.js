@@ -166,12 +166,9 @@ const currentBackground = useMemo(() => {
         barStyle="light-content"
         translucent={currentBackground.type === "image"}
       />
-
       <CustomHeader backgroundType={currentBackground.type} backgroundValue={currentBackground.value}>
         <ProductSearch />
-
       </CustomHeader>
-
       <View style={styles.content}>
         <View
           style={{
@@ -257,7 +254,6 @@ const currentBackground = useMemo(() => {
         )}
 
       </View>
-
       <TouchableOpacity
         onPress={() => setShowCreate(true)}
         activeOpacity={0.85}
@@ -279,7 +275,7 @@ const currentBackground = useMemo(() => {
           setListReloadKey((k) => k + 1);
         }}
       />
-
+      
     </SafeAreaView>
   );
 }

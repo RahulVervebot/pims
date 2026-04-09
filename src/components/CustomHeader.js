@@ -76,7 +76,7 @@ const renderContent = () => {
         <View style={styles.logoTextWrap}>
           <Text style={styles.headerUser}>Hello,</Text>
           <Text style={styles.headerName} numberOfLines={1} ellipsizeMode="tail">
-            {user_name}
+         {user_name ? user_name.split(' ')[0] : ''}
           </Text>
         </View>
       </View>
