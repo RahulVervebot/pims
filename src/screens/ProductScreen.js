@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
-  SafeAreaView,
   Image,
 } from "react-native";
 import CustomHeader from "../components/CustomHeader";
@@ -14,14 +13,13 @@ import ProductList from "../components/ProductList";
 import CreateProductModal from "../components/CreateProductModal";
 import { getTopCategories, looksLikeSvg, capitalizeWords } from "../functions/product-function";
 import CategoriesRow from "../components/CategoriesRow";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { CartContext } from "../context/CartContext";
 import { PrintContext } from "../context/PrintContext";
 import { SvgUri } from "react-native-svg";
 import { useNavigation } from "@react-navigation/native";
 import PrinterIcon from '../assets/icons/Printericon.svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import reportbg from '../assets/images/report-bg.png';
 // Tab button supporting SVG or raster icon
 
 function TabButton({ label, iconUri, active, onPress, activeColor, inactiveColor = "#fff" }) {
@@ -43,13 +41,17 @@ function TabButton({ label, iconUri, active, onPress, activeColor, inactiveColor
 }
 
 export default function ProductScreen() {
+  const HEADER_FALLBACK = "#ffffff";
   const navigation = useNavigation();
+  const [headerBg, setHeaderBg] = useState({ type: "color", value: HEADER_FALLBACK });
   const [showCreate, setShowCreate] = useState(false);
+  const [isProductEditPermission, setIsProductEditPermission] = useState(false);
   // Loader state
   const [showScreen, setShowScreen] = useState(false);
   const [showdefaulttopbanner, setShowDefaultTopBanner] = useState('');
     const [showdefaultbottombanner, setShowDefaultBottomBanner] = useState('');
   const insets = useSafeAreaInsets();
+  const tabBarOffset = 84 + insets.bottom;
   const { cart } = useContext(CartContext);
   const { print } = useContext(PrintContext);
   
@@ -63,10 +65,39 @@ export default function ProductScreen() {
 
   // Home pull-to-refresh state
   const [homeRefreshing, setHomeRefreshing] = useState(false);
- 
+
   // Key to remount ProductList (so its useEffect runs even if category stays the same)
   const [listReloadKey, setListReloadKey] = useState(0);
-  const getImageSource = (val) => (typeof val === 'number' ? val : { uri: val });
+
+  useEffect(() => {
+    const loadHeader = async () => {
+      try {
+        const topBanner = await AsyncStorage.getItem('topabanner');
+
+        if (topBanner) {
+          setHeaderBg({ type: 'image', value: topBanner });
+        } else {
+          setHeaderBg({ type: 'color', value: HEADER_FALLBACK });
+        }
+      } catch (e) {
+        setHeaderBg({ type: 'color', value: HEADER_FALLBACK });
+      }
+    };
+    loadHeader();
+  }, []);
+
+  useEffect(() => {
+    const loadPermission = async () => {
+      try {
+        const editPerm = await AsyncStorage.getItem('is_product_edit_permission_in_app');
+        setIsProductEditPermission(editPerm === 'true');
+      } catch (error) {
+        console.log('Error loading product edit permission:', error);
+      }
+    };
+    loadPermission();
+  }, []);
+
   // Initial categories load (and hiding the loader video when done)
 // replace your current useEffect body with this safer version
 useEffect(() => {
@@ -131,14 +162,6 @@ useEffect(() => {
 
   const currentTab = useMemo(() => tabs.find((t) => t.value === activeTab), [tabs, activeTab]);
 
-// Header background: use topbanner image if present, else color
-const currentBackground = useMemo(() => {
-  if (currentTab?.topbanner) {
-    return { type: 'image', value: `data:image/png;base64,${currentTab.topbanner}` };
-  }
-  return { type: 'image', value: showdefaulttopbanner || '' };
-}, [currentTab, showdefaulttopbanner]);
-
   // Home pull-to-refresh handler:
   // 1) Show top spinner
   // 2) Remount ProductList via key so it re-fetches (no changes to ProductList needed)
@@ -156,126 +179,55 @@ const currentBackground = useMemo(() => {
 
   return (
     <SafeAreaView
+      edges={["left", "right"]}
       style={{
         flex: 1,
-        backgroundColor: currentBackground.type === "color" ? currentBackground.value : "#319241",
+        backgroundColor: headerBg.type === "color" ? headerBg.value : "#319241",
       }}
     >
       <StatusBar
-        backgroundColor={currentBackground.type === "color" ? currentBackground.value : "transparent"}
-        barStyle="light-content"
-        translucent={currentBackground.type === "image"}
+        backgroundColor={headerBg.type === "color" ? headerBg.value : "transparent"}
+        barStyle={headerBg.type === "image" ? "light-content" : "dark-content"}
+        translucent={headerBg.type === "image"}
       />
-      <CustomHeader backgroundType={currentBackground.type} backgroundValue={currentBackground.value}>
-        <ProductSearch />
+
+      <CustomHeader backgroundType={headerBg.type} backgroundValue={headerBg.value}>
+  <View style={{ overflow: 'visible', zIndex: 999, elevation: 9999 }}>
+  <ProductSearch />
+</View>
+
       </CustomHeader>
+
       <View style={styles.content}>
-        <View
-          style={{
-            flex: 1,
-            paddingBottom: 16 + insets.bottom,
-            backgroundColor: "#E9FDEB",
-               borderTopRightRadius: 18,
-               borderTopLeftRadius: 18,
-          }}
-        >
-          <CategoriesRow refreshing={homeRefreshing} onRefresh={onHomeRefresh} />
-        </View>
-
-        {/* ✅ Global floating cart overlay */}
-        {cart.length > 0 && (
-          <View
-            pointerEvents="box-none"
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-            }}
-          >
-            <TouchableOpacity
-              onPress={() => navigation.navigate("Cart")}
-              style={{
-                alignSelf: "flex-end",
-                marginRight: 16,
-                marginBottom: 12 + insets.bottom,
-                backgroundColor: "#2c1e70",
-                paddingVertical: 12,
-                paddingHorizontal: 16,
-                borderRadius: 30,
-                elevation: 6,
-                shadowColor: "#000",
-                shadowOpacity: 0.25,
-                shadowRadius: 8,
-                shadowOffset: { width: 0, height: 4 },
-                zIndex: 9999,
-              }}
-            >
-              <Text style={{ color: "#fff", fontWeight: "700" }}>🛒 {cart.length}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
+        <View style={styles.listArea}>
+          <CategoriesRow />
+         </View>
          {/* ✅ Global floating Print overlay */}
-        {print.length > 0 && (
-          <View
-            pointerEvents="box-none"
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-            }}
-          >
-                  
-            <TouchableOpacity
-              onPress={() => navigation.navigate("PrintScreen")}
-              style={{
-                alignSelf: "flex-start",
-                marginLeft: 16,
-                marginBottom: 12 + insets.bottom,
-                backgroundColor: "#16A34A",
-                paddingVertical: 12,
-                paddingHorizontal: 16,
-                borderRadius: 30,
-                elevation: 6,
-                shadowColor: "#000",
-                shadowOpacity: 0.25,
-                shadowRadius: 8,
-                shadowOffset: { width: 0, height: 4 },
-                zIndex: 9999,
-                flexDirection:'row'
-              }}
-            >
-            <PrinterIcon width={20} height={20} fill={"#fff"}/>
-             <Text style={{ color: "#fff", fontWeight: "700" }}> {print.length}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+ 
 
       </View>
-      <TouchableOpacity
-        onPress={() => setShowCreate(true)}
-        activeOpacity={0.85}
-        style={[
-          styles.createFab,
-          {
-            bottom: (cart.length > 0 ? 84 : 16) + insets.bottom,
-          },
-        ]}
-      >
-        <Text style={styles.createFabText}>+</Text>
-      </TouchableOpacity>
 
-      <CreateProductModal
-        visible={showCreate}
-        onClose={() => setShowCreate(false)}
-        onCreated={() => {
-          setShowCreate(false);
-          setListReloadKey((k) => k + 1);
-        }}
-      />
-      
+      {isProductEditPermission && (
+        <TouchableOpacity
+          onPress={() => setShowCreate(true)}
+          activeOpacity={0.85}
+          style={[styles.createFab, { bottom: 16 + insets.bottom }]}
+        >
+          <Text style={styles.createFabText}>+</Text>
+        </TouchableOpacity>
+      )}
+
+      {isProductEditPermission && (
+        <CreateProductModal
+          visible={showCreate}
+          onClose={() => setShowCreate(false)}
+          onCreated={() => {
+            setShowCreate(false);
+            setListReloadKey((k) => k + 1);
+          }}
+        />
+      )}
+
     </SafeAreaView>
   );
 }
@@ -316,12 +268,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#fff"
   },
-  content: { flex: 1 },
+  content: { flex: 1, },
+  listArea: {
+    flex: 1,
+    backgroundColor: "#E9FDEB",
+    borderTopRightRadius: 18,
+    borderTopLeftRadius: 18,
+    paddingBottom: 12,
+  },
   createFab: {
     position: "absolute",
     right: 16,
     width: 54,
     height: 54,
+    borderRadius: 27,
+    backgroundColor: "#319241",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+   createPrint: {
+    flexDirection: "row",
+    position: "absolute",
+    left: 16,
+    width: 54,
+    height: 40,
     borderRadius: 27,
     backgroundColor: "#319241",
     alignItems: "center",

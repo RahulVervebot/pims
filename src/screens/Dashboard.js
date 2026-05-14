@@ -10,6 +10,7 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,7 +22,6 @@ import POSIcon from '../assets/icons/payment_2.svg';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import TulsiIcon from '../assets/icons/inventory_1.svg';
 import { dbPromise } from '../firebaseConfig';
-import Profile from '../assets/icons/Profile.svg';
 
 import Chat from '../components/Chat';
  import { tagDeviceWithStoreUrl } from '../config/OneSignalConfig';
@@ -57,13 +57,6 @@ const cards = [
     icon: TulsiIcon,
     target: 'ICMSScreen',
   },
-    {
-    key: 'user-list',
-    title: 'User Management',
-    subtitle: 'Manage All Users on Click',
-    icon: Profile,
-    target: 'UserList',
-  },
 ];
 
 
@@ -74,6 +67,8 @@ export default function Dashboard() {
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [userRole, setUserRole] = useState('');
+  const [isUserSettingVisible, setIsUserSettingVisible] = useState(false);
+  const [isAllowTulsiAi, setIsAllowTulsiAi] = useState(false);
   const [storeOptions, setStoreOptions] = useState([]);
   const [selectedStore, setSelectedStore] = useState(null);
   const [storeModalVisible, setStoreModalVisible] = useState(false);
@@ -87,6 +82,7 @@ export default function Dashboard() {
   const inFlightRef = useRef(false);
   const chatAuthInFlightRef = useRef(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [developerMode, setDeveloperMode] = useState(false);
 
   useEffect(() => {
     const loadHeader = async () => {
@@ -116,6 +112,7 @@ export default function Dashboard() {
       if (data?.bottombanner) await AsyncStorage.setItem('bottombanner', data.bottombanner);
       if (data?.topabanner) await AsyncStorage.setItem('topabanner', data.topabanner);
       if (data?.icmsurl) await AsyncStorage.setItem('icms_url', data.icmsurl);
+      if (data?.local_icms_url) await AsyncStorage.setItem('local_icms_url', data.local_icms_url);
       if (data?.tulsi_websocket) await AsyncStorage.setItem('tulsi_websocket', data.tulsi_websocket);
       if (data?.tulsi_ai_backend) await AsyncStorage.setItem('tulsi_ai_backend', data.tulsi_ai_backend);
       if (data?.tulsifrontendurl) await AsyncStorage.setItem('tulsifrontendurl', data.tulsifrontendurl);
@@ -313,7 +310,11 @@ export default function Dashboard() {
       console.log('Switch login request URL:', url);
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+         headers: { 
+        'Content-Type': 'application/json',
+         'credentials': 'omit',
+          'Cookie': 'session_id'
+         },
         body: JSON.stringify({
           db: selectedStore.dbname,
           login: userEmail,
@@ -333,7 +334,7 @@ export default function Dashboard() {
         return;
       }
 
-      const { pos_role, access_token, expiry, user_full_name, user_context } = data.result || {};
+      const { pos_role, access_token, expiry, user_full_name, user_context, is_user_setting_visible_in_app, is_allow_tulsi_ai, is_allow_icms, is_allow_tulsi_chat_support, is_promotion_accessible, is_product_edit_permission_in_app } = data.result || {};
       await AsyncStorage.multiSet([
         ['userRole', String(pos_role || '')],
         ['access_token', String(access_token || '')],
@@ -344,6 +345,12 @@ export default function Dashboard() {
         ['userLang', String(user_context?.lang || '')],
         ['password', String(passwordToUse || '')],
         ['storepin', String(selectedStore.storepin || '')],
+        ['is_user_setting_visible_in_app', String(is_user_setting_visible_in_app || 'false')],
+        ['is_allow_tulsi_ai', String(is_allow_tulsi_ai || 'false')],
+        ['is_allow_icms', String(is_allow_icms || 'false')],
+        ['is_allow_tulsi_chat_support', String(is_allow_tulsi_chat_support || 'false')],
+        ['is_promotion_accessible', String(is_promotion_accessible || 'false')],
+        ['is_product_edit_permission_in_app', String(is_product_edit_permission_in_app || 'false')],
       ]);
 
       // Register device with OneSignal using the new store's URL
@@ -357,6 +364,8 @@ export default function Dashboard() {
 
       setUserName(String(user_full_name || ''));
       setUserRole(String(pos_role || ''));
+      setIsUserSettingVisible(is_user_setting_visible_in_app === true || is_user_setting_visible_in_app === 'true');
+      setIsAllowTulsiAi(is_allow_tulsi_ai === true || is_allow_tulsi_ai === 'true');
       setSwitchPassword('');
       setSwitchPin('');
       setSwitchError('');
@@ -380,13 +389,22 @@ export default function Dashboard() {
         const storedName = await AsyncStorage.getItem('userName');
         const storedEmail = await AsyncStorage.getItem('userEmail');
         const storedRole = await AsyncStorage.getItem('userRole');
+        const storedSettingVisible = await AsyncStorage.getItem('is_user_setting_visible_in_app');
+        const storedAllowTulsiAi = await AsyncStorage.getItem('is_allow_tulsi_ai');
+        const storedDeveloperMode = await AsyncStorage.getItem('developer_mode');
         setUserName(storedName || '');
         setUserEmail(storedEmail || '');
         setUserRole(storedRole || '');
+        setIsUserSettingVisible(storedSettingVisible === 'true');
+        setIsAllowTulsiAi(storedAllowTulsiAi === 'true');
+        setDeveloperMode(storedDeveloperMode === 'true');
       } catch (e) {
         setUserName('');
         setUserEmail('');
         setUserRole('');
+        setIsUserSettingVisible(false);
+        setIsAllowTulsiAi(false);
+        setDeveloperMode(false);
       }
     };
     loadUser();
@@ -400,15 +418,25 @@ export default function Dashboard() {
 
   const prettyRole = useMemo(() => (userRole ? userRole.replace(/_/g, ' ') : ''), [userRole]);
   
+  const handleDeveloperModeToggle = useCallback(async (value) => {
+    try {
+      setDeveloperMode(value);
+      await AsyncStorage.setItem('developer_mode', String(value));
+    } catch (error) {
+      console.error('Failed to save developer mode:', error);
+      Alert.alert('Error', 'Failed to save developer mode setting.');
+    }
+  }, []);
+  
   const visibleCards = useMemo(() => {
     return cards.filter((card) => {
-      // Only show user-list card if user is administrator
-      if (card.key === 'user-list') {
-        return userRole?.toLowerCase() === 'administrator';
+      // Only show tulsi-ai card if user has permission
+      if (card.key === 'tulsi-ai') {
+        return isAllowTulsiAi;
       }
       return true;
     });
-  }, [userRole]);
+  }, [isAllowTulsiAi]);
   
   const statusBg = headerBg.type === 'image' ? 'transparent' : headerBg.value;
   const statusStyle = headerBg.type === 'image' ? 'light-content' : 'dark-content';
@@ -421,10 +449,7 @@ export default function Dashboard() {
 	        contentContainerStyle={[styles.content, { paddingBottom: 104 + insets.bottom }]}
 	        showsVerticalScrollIndicator={false}
 	      >
-        <TouchableOpacity
-          style={styles.userCard}
-          activeOpacity={0.85}
-        >
+        <View style={styles.userCard}>
           <View style={styles.userRow}>
             <View style={styles.userAvatar}>
               <Text style={styles.userAvatarText}>{initials}</Text>
@@ -443,13 +468,15 @@ export default function Dashboard() {
               )}
             </View>
             <View style={styles.userActions}>
-              <TouchableOpacity
-                style={styles.settingsButton}
-                onPress={() => navigation.navigate('SettingScreen')}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.settingsButtonText}>Settings</Text>
-              </TouchableOpacity>
+              {isUserSettingVisible && (
+                <TouchableOpacity
+                  style={styles.settingsButton}
+                  onPress={() => navigation.navigate('UserList')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.settingsButtonText}>User Setting</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={styles.switchAccountButton}
                 onPress={handleSwitchAccountPress}
@@ -462,7 +489,27 @@ export default function Dashboard() {
               </TouchableOpacity>
             </View>
           </View>
-        </TouchableOpacity>
+          
+          {isUserSettingVisible && (
+            <View style={styles.developerModeSection}>
+              <View style={styles.developerModeContent}>
+                <View style={styles.developerModeInfo}>
+                  <Text style={styles.developerModeLabel}>Developer Mode</Text>
+                  <Text style={styles.developerModeDescription}>
+                    {developerMode ? 'Advanced features enabled' : 'Enable advanced features'}
+                  </Text>
+                </View>
+                <Switch
+                  value={developerMode}
+                  onValueChange={handleDeveloperModeToggle}
+                  trackColor={{ false: '#d1d5db', true: '#86efac' }}
+                  thumbColor={developerMode ? '#2a8a4f' : '#f3f4f6'}
+                  ios_backgroundColor="#d1d5db"
+                />
+              </View>
+            </View>
+          )}
+        </View>
 
         <View style={styles.grid}>
 
@@ -531,7 +578,7 @@ export default function Dashboard() {
               />
             )}
             {switchError ? <Text style={styles.passwordErrorText}>{switchError}</Text> : null}
-            {switchAuthMode === 'pin' ? (
+            {/* {switchAuthMode === 'pin' ? (
               <TouchableOpacity
                 style={styles.passwordLinkWrap}
                 onPress={() => {
@@ -540,7 +587,7 @@ export default function Dashboard() {
                 }}>
                 <Text style={styles.passwordLinkText}>Enter store password</Text>
               </TouchableOpacity>
-            ) : null}
+            ) : null} */}
             <View style={styles.passwordActions}>
               <TouchableOpacity
                 style={[styles.passwordActionBtn, styles.passwordCancelBtn]}
@@ -675,6 +722,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#2a8a4f',
     textTransform: 'capitalize',
+  },
+  developerModeSection: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#e8f5ec',
+  },
+  developerModeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  developerModeInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  developerModeLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#163e25',
+    marginBottom: 2,
+  },
+  developerModeDescription: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#6b7f73',
   },
   sectionTitle: {
     fontSize: 18,

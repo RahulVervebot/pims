@@ -237,7 +237,7 @@ export default function QuantityDiscountScreen() {
   const handleSearchProducts = (text) => {
     setProductQuery(text);
     if (productDebounceRef.current) clearTimeout(productDebounceRef.current);
-    if (text.trim().length < 2) {
+    if (text.trim().length < 3) {
       setProductResults([]);
       setProductDropdownVisible(false);
       return;
@@ -245,26 +245,34 @@ export default function QuantityDiscountScreen() {
     productDebounceRef.current = setTimeout(async () => {
       try {
         const results = await searchProductsByBarcode(text.trim());
-        const normalized = Array.isArray(results)
-          ? results.map((p) => ({
+        let list = [];
+        
+        // Check if first product has variants array
+        if (Array.isArray(results) && results.length > 0) {
+          const firstProduct = results[0];
+          if (Array.isArray(firstProduct?.variants) && firstProduct.variants.length > 0) {
+            // Show variants instead of parent product
+            list = firstProduct.variants.map((v) => ({
+              id: Number(v.id ?? v.product_id ?? v._id),
+              name: v.productName ?? v.name ?? v.product_name ?? 'Variant',
+              barcode: v.barcode,
+              salePrice: v.salePrice ?? v.sale_price ?? '',
+              parentId: Number(firstProduct.id ?? firstProduct.product_id ?? firstProduct._id),
+              parentName: firstProduct.productName ?? firstProduct.name ?? 'Product',
+            }));
+          } else {
+            // Show regular products
+            list = results.map((p) => ({
               id: Number(p.id ?? p.product_id ?? p._id),
-              name: p.productName ?? p.product_name ?? p.name ?? 'Product',
-              barcode: p.barcode || '',
+              name: p.productName ?? p.name ?? p.product_name ?? 'Product',
+              barcode: p.barcode,
               salePrice: p.salePrice ?? p.sale_price ?? '',
-            }))
-          : [];
-          console.log("search products results,", results);
-        const searchTerm = text.trim().toLowerCase();
-        const filtered = normalized.filter((p) => {
-          if (!Number.isFinite(p.id)) return false;
-          const nameMatch = String(p.name).toLowerCase().includes(searchTerm);
-          const barcodeMatch = String(p.barcode).toLowerCase().includes(searchTerm);
-          const priceMatch = String(p.salePrice).toLowerCase().includes(searchTerm);
-          return nameMatch || barcodeMatch || priceMatch;
-        });
-        setProductResults(filtered);
- 
-        setProductDropdownVisible(filtered.length > 0);
+            }));
+          }
+        }
+        
+        setProductResults(list.filter((p) => Number.isFinite(p.id)));
+        setProductDropdownVisible(true);
       } catch (e) {
         setProductResults([]);
         setProductDropdownVisible(false);
@@ -616,8 +624,10 @@ const filteredRows = useMemo(() => {
                         setProductQuery('');
                       }}
                     >
-                      <Text style={styles.dropdownTitle}>{p.name}</Text>
-                      <Text style={styles.dropdownMeta}>Barcode: {p.barcode || '-'}</Text>
+                      <Text style={styles.dropdownTitle}>
+                        {p.parentId ? `Parent: ${p.parentName} (ID: ${p.parentId}) • ID: ${p.id} • Barcode: ${p.barcode || '-'}` : `ID: ${p.id} • Barcode: ${p.barcode || '-'}`}
+                      </Text>
+                      <Text style={styles.dropdownMeta}>{p.name}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -627,7 +637,9 @@ const filteredRows = useMemo(() => {
       :''    }
             {selectedProduct && (
               <View style={[styles.card, { marginTop: 8 }]}>
-                <Text style={styles.cardTitle}>{selectedProduct?.name || 'Product'}</Text>
+                <Text style={styles.cardTitle}>
+                  {selectedProduct.parentId ? `${selectedProduct.name} (Parent ID: ${selectedProduct.parentId})` : selectedProduct.name}
+                </Text>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Barcode</Text>
                   <Text style={styles.detailValue}>{selectedProduct?.barcode || '-'}</Text>

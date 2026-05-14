@@ -122,11 +122,12 @@ export default function InvoiceDetails() {
       });
 
       const json = await res.json().catch(() => null);
+         console.log("resonse details:",json);
       if (!res.ok) {
         const msg = json?.message || json?.error?.message || 'Failed to fetch invoice details';
         throw new Error(msg);
       }
-console.log("resonse details:",json);
+   
       const normalized = Array.isArray(json) ? (json[0] ?? null) : json;
       const normalizedInvoice = isItemRow(normalized)
         ? {
@@ -499,16 +500,30 @@ console.log("resonse details:",json);
     const email = invoice?.UserDetailInfo?.InvoiceUpdatedby || (await AsyncStorage.getItem('userEmail')) || '';
     const invoiceDb = await fetchVendorDbName();
 
-console.log('icms_store value from AsyncStorage:', icms_store);
-console.log('All items:', itemsRef.current.map(item => ({ source: item?.source, itemNo: item?.itemNo })));
+     console.log('icms_store value from AsyncStorage:', icms_store);
+     console.log('All items:', itemsRef.current.map(item => ({ source: item?.source, itemNo: item?.itemNo })));
+     console.log('Selected IDs:', Array.from(selectedIds));
+     console.log('Has selections:', selectedIds.size > 0);
 
 const tableData = itemsRef.current
   .filter(item => {
     const source = String(item?.source ?? '').trim().toLowerCase();
     const storeValue = String(icms_store ?? '').trim().toLowerCase();
-    const matches = source === storeValue;
-    console.log(`Item ${item?.itemNo} - source: "${item?.source}" -> normalized: "${source}" vs store: "${storeValue}" -> matches: ${matches}`);
-    return matches;
+       const isStockUpdated = item?.isStockUpdated === true || item?.isStockUpdated === 'true';
+    const sourceMatches = source === storeValue && !isStockUpdated;
+    
+    // If rows are selected, only include selected rows
+    // If no rows are selected, include all rows that match source
+    if (selectedIds.size > 0) {
+      const itemId = item?.ProductId || item?.itemNo;
+      const isSelected = selectedIds.has(itemId);
+      const bothMatch = sourceMatches && isSelected;
+      console.log(`Item ${item?.itemNo} - source: ${sourceMatches}, selected: ${isSelected}, included: ${bothMatch}`);
+      return bothMatch;
+    } else {
+      console.log(`Item ${item?.itemNo} - source: ${sourceMatches}, no selection filter, included: ${sourceMatches}`);
+      return sourceMatches;
+    }
   })
   .map(item => ({
     ...item,
@@ -525,7 +540,8 @@ console.log('Filtered tableData:', tableData);
       tableData: tableData || [],
       email,
     };
-     const app_url = await AsyncStorage.getItem('storeurl');
+
+    const app_url = await AsyncStorage.getItem('storeurl');
     const res = await fetch(API_ENDPOINTS.QUANTITY_SP_COSTUPDATE, {
       method: 'PUT',
       headers: {
@@ -546,8 +562,8 @@ console.log('Filtered tableData:', tableData);
       throw new Error(t || `Quantity/Price update failed (${res.status})`);
     }
 
-    console.log("pos update res",res);
-  }, [InvNumber, day, fetchVendorDbName, invoice, vendorName]);
+    console.log("pos update res",res.json());
+  }, [InvNumber, day, fetchVendorDbName, invoice, vendorName, selectedIds]);
 
   const handlePosUpdateConfirm = useCallback(() => {
     Alert.alert(

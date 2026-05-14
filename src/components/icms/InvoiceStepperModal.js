@@ -242,18 +242,24 @@ export default function InvoiceStepperModal({
     const invoiceDb = await fetchVendorDbName();
     
     // Filter: only linked rows where source equals icms_store (or no source field)
-    const linkedRows = (rows || []).filter((r) => {
-      const hasBarcode = String(r?.barcode ?? '').trim().length > 0;
-      if (!hasBarcode) return false;
-      
-      // If source exists, only include if it matches icms_store
-      if (r?.source) {
-        return String(r.source).trim() === String(icms_store).trim();
-      }
-      
-      // If no source field, include the product
-      return true;
-    });
+    const linkedRows = (rows || [])
+      .filter((r) => {
+        const hasBarcode = String(r?.barcode ?? '').trim().length > 0;
+        if (!hasBarcode) return false;
+        
+        // If source exists, only include if it matches icms_store
+        if (r?.source) {
+          return String(r.source).trim() === String(icms_store).trim();
+        }
+        
+        // If no source field, include the product
+        return true;
+      })
+      .map((item) => ({
+        ...item,
+        isStockUpdated: item?.isStockUpdated ?? false,
+        tableDataCopyElement: { ...item }
+      }));
     
     const body = {
       invoiceName,
@@ -280,7 +286,7 @@ export default function InvoiceStepperModal({
       const t = await res.text().catch(() => '');
       throw new Error(t || `Quantity/Price update failed (${res.status})`);
     }
-    console.log("quantity udpate in pos:",res);
+    console.log("quantity udpate in pos:",res.json());
 
   };
 
@@ -822,8 +828,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmLinkBtn: {
-
-        marginTop: 8,
+    marginTop: 8,
     alignSelf: 'flex-start',
     backgroundColor: '#0F766E',
     borderRadius: 8,

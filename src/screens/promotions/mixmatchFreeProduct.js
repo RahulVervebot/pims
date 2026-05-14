@@ -435,14 +435,31 @@ export default function MixMatchScreen() {
     productDebounceRef.current = setTimeout(async () => {
       try {
         const results = await searchProductsByBarcode(text.trim());
-        const normalized = Array.isArray(results)
-          ? results.map((p) => ({
+        let list = [];
+        
+        // Check if first product has variants array
+        if (Array.isArray(results) && results.length > 0) {
+          const firstProduct = results[0];
+          if (Array.isArray(firstProduct?.variants) && firstProduct.variants.length > 0) {
+            // Show variants instead of parent product
+            list = firstProduct.variants.map((v) => ({
+              id: Number(v.id ?? v.product_id ?? v._id),
+              name: v.productName ?? v.name ?? v.product_name ?? 'Variant',
+              barcode: v.barcode,
+              parentId: Number(firstProduct.id ?? firstProduct.product_id ?? firstProduct._id),
+              parentName: firstProduct.productName ?? firstProduct.name ?? 'Product',
+            }));
+          } else {
+            // Show regular products
+            list = results.map((p) => ({
               id: Number(p.id ?? p.product_id ?? p._id),
               name: p.productName ?? p.name ?? p.product_name ?? 'Product',
               barcode: p.barcode,
-            }))
-          : [];
-        setProductResults(normalized.filter((p) => Number.isFinite(p.id)));
+            }));
+          }
+        }
+        
+        setProductResults(list.filter((p) => Number.isFinite(p.id)));
         setProductDropdownVisible(true);
       } catch (e) {
         setProductResults([]);
@@ -462,14 +479,31 @@ export default function MixMatchScreen() {
     discountDebounceRef.current = setTimeout(async () => {
       try {
         const results = await searchProductsByBarcode(text.trim());
-        const normalized = Array.isArray(results)
-          ? results.map((p) => ({
+        let list = [];
+        
+        // Check if first product has variants array
+        if (Array.isArray(results) && results.length > 0) {
+          const firstProduct = results[0];
+          if (Array.isArray(firstProduct?.variants) && firstProduct.variants.length > 0) {
+            // Show variants instead of parent product
+            list = firstProduct.variants.map((v) => ({
+              id: Number(v.id ?? v.product_id ?? v._id),
+              name: v.productName ?? v.name ?? v.product_name ?? 'Variant',
+              barcode: v.barcode,
+              parentId: Number(firstProduct.id ?? firstProduct.product_id ?? firstProduct._id),
+              parentName: firstProduct.productName ?? firstProduct.name ?? 'Product',
+            }));
+          } else {
+            // Show regular products
+            list = results.map((p) => ({
               id: Number(p.id ?? p.product_id ?? p._id),
               name: p.productName ?? p.name ?? p.product_name ?? 'Product',
               barcode: p.barcode,
-            }))
-          : [];
-        setDiscountResults(normalized.filter((p) => Number.isFinite(p.id)));
+            }));
+          }
+        }
+        
+        setDiscountResults(list.filter((p) => Number.isFinite(p.id)));
         setDiscountDropdownVisible(true);
       } catch (e) {
         setDiscountResults([]);
@@ -717,7 +751,10 @@ export default function MixMatchScreen() {
                       }}
                     >
                       <Text style={styles.dropdownTitle}>{p.name}</Text>
-                      <Text style={styles.dropdownMeta}>Barcode: {p.barcode || '-'}</Text>
+                      <Text style={styles.dropdownMeta}>
+                        {p.parentId ? `Parent: ${p.parentName} (ID: ${p.parentId}) • ` : ''}
+                        ID: {p.id} • Barcode: {p.barcode || '-'}
+                      </Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -727,7 +764,10 @@ export default function MixMatchScreen() {
               <View style={styles.selectedWrap}>
                 {selectedProducts.map((p) => (
                   <View key={`prod-${p.id}`} style={styles.chip}>
-                    <Text style={styles.chipText}>{p.name}</Text>
+                    <Text style={styles.chipText}>
+                      {p.name}
+                      {p.parentId ? ` (Parent ID: ${p.parentId})` : ''}
+                    </Text>
                     <TouchableOpacity
                       onPress={() => setSelectedProducts((prev) => prev.filter((x) => x.id !== p.id))}
                     >
@@ -798,7 +838,10 @@ export default function MixMatchScreen() {
                       }}
                     >
                       <Text style={styles.dropdownTitle}>{p.name}</Text>
-                      <Text style={styles.dropdownMeta}>Barcode: {p.barcode || '-'}</Text>
+                      <Text style={styles.dropdownMeta}>
+                        {p.parentId ? `Parent: ${p.parentName} (ID: ${p.parentId}) • ` : ''}
+                        ID: {p.id} • Barcode: {p.barcode || '-'}
+                      </Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -808,7 +851,10 @@ export default function MixMatchScreen() {
               <View style={styles.selectedWrap}>
                 {selectedDiscountProducts.map((p) => (
                   <View key={`disc-${p.id}`} style={styles.chip}>
-                    <Text style={styles.chipText}>{p.name}</Text>
+                    <Text style={styles.chipText}>
+                      {p.name}
+                      {p.parentId ? ` (Parent ID: ${p.parentId})` : ''}
+                    </Text>
                     <TouchableOpacity
                       onPress={() => setSelectedDiscountProducts((prev) => prev.filter((x) => x.id !== p.id))}
                     >

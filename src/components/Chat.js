@@ -1166,6 +1166,37 @@ const loadMessages = async (conversationId) => {
     return { mime: EXPORT_MIME, fallbackExt: 'xlsx' };
   };
 
+  const checkStoragePermission = async () => {
+    if (Platform.OS !== 'android') return true;
+    
+    try {
+      // For Android 13+ (API 33+), check READ_MEDIA_DOCUMENTS
+      if (Platform.Version >= 33) {
+        // Note: Downloads via Download Manager don't require runtime permissions
+        // We only need this for reading already downloaded files
+        return true;
+      } else {
+        // For Android 12 and below, check READ_EXTERNAL_STORAGE
+        const permission = PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE;
+        const result = await request(permission);
+        if (result === RESULTS.GRANTED) {
+          return true;
+        } else if (result === RESULTS.DENIED) {
+          Alert.alert(
+            'Storage Permission Required',
+            'Please grant storage permission to download and open files.',
+            [{ text: 'OK' }]
+          );
+          return false;
+        }
+        return result === RESULTS.GRANTED;
+      }
+    } catch (error) {
+      console.warn('Storage permission check error:', error);
+      return true; // Proceed anyway as Download Manager might not need explicit permission
+    }
+  };
+
   const downloadExport = async (url) => {
     const full = String(url || '');
     if (!full) return null;
@@ -1175,7 +1206,7 @@ const loadMessages = async (conversationId) => {
       if (Platform.OS === 'android') {
         const downloadDir = RNBlobUtil.fs.dirs.DownloadDir;
         const path = `${downloadDir}/${fileName}`;
-        await RNBlobUtil.config({
+        const res = await RNBlobUtil.config({
           addAndroidDownloads: {
             useDownloadManager: true,
             notification: true,
@@ -1186,11 +1217,13 @@ const loadMessages = async (conversationId) => {
             mediaScannable: true,
           },
         }).fetch('GET', full);
-        return path;
+        
+        // Return the download info including the path
+        return { path, mime: meta.mime };
       }
       const path = `${RNBlobUtil.fs.dirs.DocumentDir}/${fileName}`;
       const res = await RNBlobUtil.config({ path, fileCache: true }).fetch('GET', full);
-      return res.path();
+      return { path: res.path(), mime: meta.mime };
     } catch (error) {
       console.warn('Export download failed:', error);
       return null;
@@ -1213,16 +1246,46 @@ const loadMessages = async (conversationId) => {
           }
         });
       } else if (Platform.OS === 'android') {
-        // For Android, use RNBlobUtil
+        // For Android, use RNBlobUtil actionViewIntent
         const filePath = localPath.startsWith('file://') ? localPath.substring(7) : localPath;
+        console.log('Opening file on Android:', filePath, 'mime:', mime);
+        
+        // First check if file exists
+        const exists = await RNBlobUtil.fs.exists(filePath);
+        if (!exists) {
+          console.warn('File does not exist:', filePath);
+          Alert.alert('Error', 'File not found. Please try downloading again.');
+          return;
+        }
+        
         if (RNBlobUtil.android?.actionViewIntent) {
-          await RNBlobUtil.android.actionViewIntent(filePath, mime || EXPORT_MIME);
+          try {
+            await RNBlobUtil.android.actionViewIntent(filePath, mime || EXPORT_MIME);
+          } catch (intentError) {
+            console.warn('actionViewIntent failed:', intentError);
+            // Fallback: Show alert with option to open Downloads folder
+            Alert.alert(
+              'File Downloaded',
+              'File has been downloaded to your Downloads folder. Please open it from there.',
+              [
+                { text: 'OK', style: 'default' }
+              ]
+            );
+          }
         } else {
-          await Linking.openURL(fileUrl);
+          // Fallback for older Android versions
+          Alert.alert(
+            'File Downloaded',
+            'File has been downloaded to your Downloads folder.',
+            [
+              { text: 'OK', style: 'default' }
+            ]
+          );
         }
       }
     } catch (error) {
       console.warn('Open export failed:', error);
+      Alert.alert('Error', 'Failed to open file. Please check your Downloads folder.');
     }
   };
 
@@ -1230,6 +1293,13 @@ const loadMessages = async (conversationId) => {
     const full = useBaseUrl ? withFrontBase(url) : String(url || '');
     console.log("full url:",full);
     if (!full) return;
+    
+    // Check storage permission first
+    const hasPermission = await checkStoragePermission();
+    if (!hasPermission) {
+      return;
+    }
+    
     const meta = getExportMeta(full);
     const existing = downloadedExports[full];
     if (existing) {
@@ -1246,10 +1316,15 @@ const loadMessages = async (conversationId) => {
     }
     try {
       setDownloadingUrls((prev) => ({ ...prev, [full]: true }));
-      const path = await downloadExport(full);
-      if (path) {
-        setDownloadedExports((prev) => ({ ...prev, [full]: path }));
+      const result = await downloadExport(full);
+      if (result && result.path) {
+        setDownloadedExports((prev) => ({ ...prev, [full]: result.path }));
+        // Automatically open the file after download
+        await openLocalExport(result.path, result.mime);
       }
+    } catch (error) {
+      console.warn('Export download/open error:', error);
+      Alert.alert('Error', 'Failed to download or open file. Please try again.');
     } finally {
       setDownloadingUrls((prev) => {
         const next = { ...prev };

@@ -9,7 +9,16 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
+import { GestureHandlerRootView, PinchGestureHandler, PanGestureHandler, State } from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedGestureHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  withSpring,
+} from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import API_ENDPOINTS, { initICMSBase, setICMSBase } from '../../../icms_config/api';
 
@@ -31,6 +40,13 @@ const OCRPreviewComponent = ({
   const [previewError, setPreviewError] = useState('');
   const isFetchingRef = useRef(false);
   // lastFetchedFilesRef removed - now using parent's lastFetchedPreviewRef
+  
+  // Zoom and pan shared values
+  const scale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const focalX = useSharedValue(0);
+  const focalY = useSharedValue(0);
   
   // Create stable key based on actual content, not array reference
   const filesKey = useMemo(() => {
@@ -111,11 +127,11 @@ const OCRPreviewComponent = ({
         const response = await fetch(API_ENDPOINTS.PREVIEW_OCR, {
           method: 'POST',
           headers: {
-         'Content-Type': 'application/json',
+            'Content-Type': 'application/json',
          'store': icms_store,
-         'access_token': token,
-         'app_url': storeurl ?? '',
-         'mode': 'MOBILE',
+        'access_token': token,
+        'app_url': storeurl ?? '',
+        'mode': 'MOBILE',
           },
           body: JSON.stringify(payload),
         });
@@ -144,12 +160,64 @@ const OCRPreviewComponent = ({
 
     generatePreview();
   }, [filesKey]); // Use stable memoized key instead of array references
+
+  // Pinch gesture handler for zoom
+  const pinchHandler = useAnimatedGestureHandler({
+    onStart: (event, ctx) => {
+      ctx.startScale = scale.value;
+    },
+    onActive: (event, ctx) => {
+      scale.value = Math.max(1, Math.min(ctx.startScale * event.scale, 5));
+    },
+    onEnd: () => {
+      if (scale.value < 1) {
+        scale.value = withSpring(1);
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+      }
+    },
+  });
+
+  // Pan gesture handler for moving zoomed image
+  const panHandler = useAnimatedGestureHandler({
+    onStart: (event, ctx) => {
+      ctx.startX = translateX.value;
+      ctx.startY = translateY.value;
+    },
+    onActive: (event, ctx) => {
+      if (scale.value > 1) {
+        translateX.value = ctx.startX + event.translationX;
+        translateY.value = ctx.startY + event.translationY;
+      }
+    },
+  });
+
+  // Animated style for image
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { translateX: translateX.value },
+        { translateY: translateY.value },
+        { scale: scale.value },
+      ],
+    };
+  });
+
+  // Reset zoom values
+  const resetZoom = () => {
+    scale.value = withTiming(1);
+    translateX.value = withTiming(0);
+    translateY.value = withTiming(0);
+  };
+
   const openModal = image => {
+    resetZoom();
     setSelectedImage(image);
     setModalVisible(true);
   };
 
   const closeModal = () => {
+    resetZoom();
     setModalVisible(false);
     setSelectedImage(null);
   };
@@ -204,17 +272,30 @@ const OCRPreviewComponent = ({
       </View>
       {/* Modal to preview selected image */}
       <Modal visible={modalVisible} transparent={true} animationType="fade">
-        <View style={styles.modalBackground}>
-          <TouchableOpacity style={styles.closeArea} onPress={closeModal} />
-          <TouchableOpacity style={styles.modalCloseBtn} onPress={closeModal}>
-            <Text style={styles.modalCloseBtnText}>Close</Text>
-          </TouchableOpacity>
-          <Image
-            source={{ uri: selectedImage }}
-            style={styles.fullImage}
-            resizeMode="contain"
-          />
-        </View>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <View style={styles.modalBackground}>
+            <TouchableOpacity style={styles.closeArea} onPress={closeModal} />
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={closeModal}>
+              <Text style={styles.modalCloseBtnText}>✕</Text>
+            </TouchableOpacity>
+            <PanGestureHandler onGestureEvent={panHandler}>
+              <Animated.View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <PinchGestureHandler onGestureEvent={pinchHandler}>
+                  <Animated.View style={[styles.imageContainer, animatedStyle]}>
+                    <Animated.Image
+                      source={{ uri: selectedImage }}
+                      style={styles.fullImage}
+                      resizeMode="contain"
+                    />
+                  </Animated.View>
+                </PinchGestureHandler>
+              </Animated.View>
+            </PanGestureHandler>
+            <View style={styles.zoomHintContainer}>
+              <Text style={styles.zoomHint}>Pinch to zoom in/out</Text>
+            </View>
+          </View>
+        </GestureHandlerRootView>
       </Modal>
     </View>
   );
@@ -332,20 +413,39 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 44,
     right: 16,
-    zIndex: 2,
+    zIndex: 10,
     backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalCloseBtnText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 20,
     fontWeight: '700',
   },
+  imageContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   fullImage: {
-    width: '90%',
-    height: '80%',
-    borderRadius: 10,
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height * 0.8,
+  },
+  zoomHintContainer: {
+    position: 'absolute',
+    bottom: 30,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  zoomHint: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

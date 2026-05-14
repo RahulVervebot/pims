@@ -4,7 +4,7 @@ import React, {
 } from 'react';
 import {
   View, Text, Image, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Alert, Platform, Modal, Switch, useColorScheme
+  TextInput, Alert, Platform, Modal, Switch, useColorScheme, KeyboardAvoidingView
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
@@ -111,12 +111,25 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
   const [submitting, setSubmitting] = useState(false);
   const [archiving, setArchiving] = useState(false);
 
+  const [isProductEditPermission, setIsProductEditPermission] = useState(true);
+  const [isProductBillingPermission, setIsProductBillingPermission] = useState(true);
+  const [isShowCostPrice, setIsShowCostPrice] = useState(true);
+
+  // Price Calculator states
+  const [pricingMethod, setPricingMethod] = useState('margin'); // 'margin', 'markup', or 'profit'
+  const [pricingValue, setPricingValue] = useState('');
+  const [calculatedPrice, setCalculatedPrice] = useState(null);
+  const [showPriceCalculator, setShowPriceCalculator] = useState(false);
+
   useEffect(() => {
     (async () => {
       try {
-        const [s, t] = await Promise.all([
+        const [s, t, editPerm, billingPerm, costPerm] = await Promise.all([
           AsyncStorage.getItem('storeurl'),
           AsyncStorage.getItem('access_token'),
+          AsyncStorage.getItem('is_product_edit_permission_in_app'),
+          AsyncStorage.getItem('is_product_billing_in_app'),
+          AsyncStorage.getItem('is_show_cost_price'),
         ]);
 
         if (!s || !t) {
@@ -125,6 +138,9 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
         }
         setStoreUrl(s);
         setToken(t);
+        setIsProductEditPermission(editPerm === 'true');
+        setIsProductBillingPermission(billingPerm === 'true');
+        setIsShowCostPrice(costPerm === 'true');
       } catch {
         Alert.alert('Error', 'Failed to load credentials.');
       }
@@ -178,6 +194,21 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
     })();
   }, []);
 
+  // Load saved pricing method on mount
+  useEffect(() => {
+    const loadPricingMethod = async () => {
+      try {
+        const savedMethod = await AsyncStorage.getItem('pricingMethod');
+        if (savedMethod) {
+          setPricingMethod(savedMethod);
+        }
+      } catch (error) {
+        console.log('Error loading pricing method:', error);
+      }
+    };
+    loadPricingMethod();
+  }, []);
+
   useImperativeHandle(ref, () => ({
     open: (p) => {
       setProduct(p || null);
@@ -190,7 +221,7 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
         setNewBarcode('');
         setPrice(p.salePrice != null ? String(p.salePrice) : '');
         setCost(p.costPrice != null ? String(p.costPrice) : '');
-         setQtyAvailable(p.qtyAvailable != null ? String(p.qtyAvailable) : '');
+        setQtyAvailable(p.qtyAvailable != null ? String(p.qtyAvailable) : '');
         setUnitc(p.unitInCase != null ? String(p.unitInCase) : '');
         setCaseCost(p.caseCost != null ? String(p.caseCost) : '');
         setCategoryId(p.categoryId != null ? String(p.categoryId) : '');
@@ -341,7 +372,6 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const dd = String(date.getDate()).padStart(2, '0');
     setQdStartDate(`${yyyy}-${mm}-${dd} 00:00:00`);
-    if (Platform.OS === 'ios') setQdShowStartPicker(false);
   };
 
   const handleQdEndDateChange = (_, date) => {
@@ -351,7 +381,6 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const dd = String(date.getDate()).padStart(2, '0');
     setQdEndDate(`${yyyy}-${mm}-${dd} 23:59:59`);
-    if (Platform.OS === 'ios') setQdShowEndPicker(false);
   };
 
   const openQdModal = () => {
@@ -501,6 +530,56 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
     setCost((cc / uc).toFixed(2));
   };
 
+  // Calculate new price based on pricing method
+  const calculateNewPrice = () => {
+    const costValue = parseFloat(cost);
+    const value = parseFloat(pricingValue);
+
+    if (!costValue || !value || value < 0) {
+      Alert.alert('Invalid Input', 'Please enter valid cost and value');
+      return;
+    }
+
+    let newPrice = 0;
+
+    switch (pricingMethod) {
+      case 'margin':
+        // Margin: Sale Price = Cost / (1 - Margin%)
+        if (value >= 100) {
+          Alert.alert('Invalid Margin', 'Margin cannot be 100% or more');
+          return;
+        }
+        newPrice = costValue / (1 - value / 100);
+        break;
+      
+      case 'markup':
+        // Markup: Sale Price = Cost * (1 + Markup%)
+        newPrice = costValue * (1 + value / 100);
+        break;
+      
+      default:
+        newPrice = costValue;
+    }
+
+    setCalculatedPrice(newPrice.toFixed(2));
+  };
+
+  // Accept calculated price
+  const acceptCalculatedPrice = async () => {
+    if (calculatedPrice) {
+      setPrice(calculatedPrice);
+      // Save selected pricing method
+      try {
+        await AsyncStorage.setItem('pricingMethod', pricingMethod);
+      } catch (error) {
+        console.log('Error saving pricing method:', error);
+      }
+      setShowPriceCalculator(false);
+      setCalculatedPrice(null);
+      setPricingValue('');
+    }
+  };
+
   const sortedCategories = useMemo(() => (
     (Array.isArray(allCats) ? allCats : [])
       .slice()
@@ -604,9 +683,9 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
         const vendors = await VendorList(text);
         const normalized = Array.isArray(vendors)
           ? vendors.map(v => ({
-              id: String(v.id ?? v.vendorId ?? v._id ?? ''),
-              name: String(v.name ?? v.vendorName ?? ''),
-            }))
+            id: String(v.id ?? v.vendorId ?? v._id ?? ''),
+            name: String(v.name ?? v.vendorName ?? ''),
+          }))
           : [];
         setVendorList(normalized);
         setShowVendorDropdown(true);
@@ -641,17 +720,16 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
       Alert.alert('Error', 'Missing product id.');
       return;
     }
-    
+
     // Extract vendor IDs from selectedVendors
-    const vendorIds = selectedVendors.length > 0 
+    const vendorIds = selectedVendors.length > 0
       ? selectedVendors.map(v => Number(v.id ?? v.vendorId ?? v._id))
       : undefined;
-    
+
     const body = {
       id: Number(id),
       new_price: (price ?? '').trim(),
       new_std_price: (cost ?? '').trim(),
-      new_qty: (qtyavailable ?? '').trim(),
       new_name: (name ?? '').trim(),
       size: (size ?? '').trim(),
       unit_in_case: (unitc ?? '').trim(),
@@ -678,7 +756,11 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
       setSubmitting(true);
       const res = await fetch(`${storeUrl}/pos/app/product/update`, {
         method: 'PUT',
-        headers: { access_token: token },
+        headers: {
+          access_token: token,
+          credentials: 'omit',
+          Cookie: 'session_id',
+        },
         body: JSON.stringify(body),
       });
 
@@ -703,9 +785,9 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
         categoryId: body.categ_id ?? product.categoryId,
         productTaxes: body.taxes_id?.length
           ? body.taxes_id.map(tid => ({
-              taxId: tid,
-              taxName: taxList.find(t => Number(t.id) === Number(tid))?.name || ''
-            }))
+            taxId: tid,
+            taxName: taxList.find(t => Number(t.id) === Number(tid))?.name || ''
+          }))
           : product.productTaxes,
         availableInPos: body.available_in_pos === 'true',
         isEbtProduct: body.is_ebt_product === 'true',
@@ -816,10 +898,10 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                 )}
 
                 <View style={[styles.row, { marginTop: 8 }]}>
-                  <TouchableOpacity style={[styles.smallBtn, styles.ghost]} onPress={pickFromGallery}>
+                  <TouchableOpacity style={[styles.smallBtn, styles.ghost]} onPress={pickFromGallery} disabled={!isProductEditPermission}>
                     <Text style={styles.ghostText}>Pick from Gallery</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.smallBtn} onPress={takePhoto}>
+                  <TouchableOpacity style={styles.smallBtn} onPress={takePhoto} disabled={!isProductEditPermission}>
                     <Text style={styles.smallBtnText}>Take Photo</Text>
                   </TouchableOpacity>
                 </View>
@@ -834,6 +916,7 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                         placeholderTextColor={placeholderColor}
                         value={name}
                         onChangeText={setName}
+                        editable={isProductEditPermission}
                       />
                     </View>
                     <View style={styles.fieldCol}>
@@ -844,6 +927,7 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                         placeholderTextColor={placeholderColor}
                         value={size}
                         onChangeText={setSize}
+                        editable={isProductEditPermission}
                       />
                     </View>
                   </View>
@@ -859,7 +943,7 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
 
                   <View style={[styles.rowGap, { marginTop: 10 }]}>
                     <View style={styles.fieldCol}>
-                      <Text style={styles.fieldLabel}>Price</Text>
+                      <Text style={styles.fieldLabel}>Sell Price</Text>
                       <TextInput
                         style={[styles.inputCol, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
                         placeholder="Price"
@@ -867,29 +951,211 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                         value={price}
                         onChangeText={setPrice}
                         keyboardType="decimal-pad"
+                        editable={isProductEditPermission}
                       />
                     </View>
-                    <View style={styles.fieldCol}>
-                      <Text style={styles.fieldLabel}>Cost</Text>
-                      <TextInput
-                        style={[styles.inputCol, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
-                        placeholder="Cost"
-                        placeholderTextColor={placeholderColor}
-                        value={cost}
-                        onChangeText={setCost}
-                        keyboardType="decimal-pad"
-                      />
-                    </View>
+                    {isShowCostPrice && (
+                      <View style={styles.fieldCol}>
+                        <Text style={styles.fieldLabel}>Cost</Text>
+                        <TextInput
+                          style={[styles.inputCol, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
+                          placeholder="Cost"
+                          placeholderTextColor={placeholderColor}
+                          value={cost}
+                          onChangeText={setCost}
+                          keyboardType="decimal-pad"
+                          editable={isProductEditPermission}
+                        />
+                      </View>
+                    )}
                   </View>
+
+                  {/* Price Calculator Section */}
+                  {isShowCostPrice && isProductEditPermission && (
+                    <View
+                      style={{
+                        borderWidth: 1,
+                        borderColor: '#319241',
+                        borderRadius: 12,
+                        padding: 15,
+                        marginTop: 15,
+                        backgroundColor: '#F9FAFB',
+                      }}>
+                      <TouchableOpacity
+                        onPress={() => setShowPriceCalculator(!showPriceCalculator)}
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}>
+                        <Text style={{ fontSize: 18, fontWeight: '600', color: '#319241' }}>
+                          Selling Price Calculator
+                        </Text>
+                        <Text style={{ fontSize: 20, color: '#319241' }}>
+                          {showPriceCalculator ? '▼' : '▶'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {showPriceCalculator && (
+                        <View style={{ marginTop: 15 }}>
+                          <Text style={{ fontSize: 14, color: '#6B7280', marginBottom: 10 }}>
+                            Calculate new Sell price based on cost
+                          </Text>
+
+                          {/* Pricing Method Selector */}
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              marginBottom: 15,
+                            }}>
+                            <TouchableOpacity
+                              onPress={() => setPricingMethod('margin')}
+                              style={{
+                                flex: 1,
+                                padding: 10,
+                                marginRight: 5,
+                                borderRadius: 8,
+                                borderWidth: 2,
+                                borderColor: pricingMethod === 'margin' ? '#319241' : '#E5E7EB',
+                                backgroundColor: pricingMethod === 'margin' ? '#E8F5E9' : '#fff',
+                              }}>
+                              <Text
+                                style={{
+                                  textAlign: 'center',
+                                  color: pricingMethod === 'margin' ? '#319241' : '#6B7280',
+                                  fontWeight: pricingMethod === 'margin' ? '600' : '400',
+                                }}>
+                                Margin
+                              </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              onPress={() => setPricingMethod('markup')}
+                              style={{
+                                flex: 1,
+                                padding: 10,
+                                marginLeft: 5,
+                                borderRadius: 8,
+                                borderWidth: 2,
+                                borderColor: pricingMethod === 'markup' ? '#319241' : '#E5E7EB',
+                                backgroundColor: pricingMethod === 'markup' ? '#E8F5E9' : '#fff',
+                              }}>
+                              <Text
+                                style={{
+                                  textAlign: 'center',
+                                  color: pricingMethod === 'markup' ? '#319241' : '#6B7280',
+                                  fontWeight: pricingMethod === 'markup' ? '600' : '400',
+                                }}>
+                                Markup
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          {/* Input Fields */}
+                          <View style={{ marginBottom: 15 }}>
+                            <Text style={{ fontSize: 14, fontWeight: '500', marginBottom: 5, color: inputTextColor }}>
+                              Cost Price: ${cost || '0.00'}
+                            </Text>
+                            
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                marginTop: 10,
+                              }}>
+                              <Text style={{ fontSize: 14, fontWeight: '500', marginRight: 10, color: inputTextColor }}>
+                                {pricingMethod === 'margin' ? 'Margin' : 'Markup'} %:
+                              </Text>
+                              <TextInput
+                                keyboardType="numeric"
+                                placeholder="Enter %"
+                                placeholderTextColor={placeholderColor}
+                                value={pricingValue}
+                                onChangeText={setPricingValue}
+                                style={{
+                                  flex: 1,
+                                  borderWidth: 1,
+                                  borderColor: '#D1D5DB',
+                                  borderRadius: 8,
+                                  padding: 10,
+                                  backgroundColor: '#fff',
+                                  color: inputTextColor,
+                                }}
+                              />
+                            </View>
+                          </View>
+
+                          {/* Calculate Button */}
+                          <TouchableOpacity
+                            onPress={calculateNewPrice}
+                            style={{
+                              backgroundColor: '#319241',
+                              padding: 12,
+                              borderRadius: 8,
+                              marginBottom: 10,
+                            }}>
+                            <Text
+                              style={{
+                                color: '#fff',
+                                textAlign: 'center',
+                                fontWeight: '600',
+                              }}>
+                              Calculate Price
+                            </Text>
+                          </TouchableOpacity>
+
+                          {/* Calculated Price Display */}
+                          {calculatedPrice && (
+                            <View
+                              style={{
+                                backgroundColor: '#E8F5E9',
+                                padding: 15,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: '#319241',
+                              }}>
+                              <Text
+                                style={{
+                                  fontSize: 16,
+                                  fontWeight: '600',
+                                  color: '#1B5E20',
+                                  textAlign: 'center',
+                                  marginBottom: 10,
+                                }}>
+                                New Sell Price: ${calculatedPrice}
+                              </Text>
+                              <TouchableOpacity
+                                onPress={acceptCalculatedPrice}
+                                style={{
+                                  backgroundColor: '#319241',
+                                  padding: 10,
+                                  borderRadius: 8,
+                                }}>
+                                <Text
+                                  style={{
+                                    color: '#fff',
+                                    textAlign: 'center',
+                                    fontWeight: '600',
+                                  }}>
+                                  Accept & Update Sell Price
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  )}
 
                   <View style={[styles.rowGap, { marginTop: 10, alignItems: 'flex-end' }]}>
                     <View style={styles.fieldCol}>
                       <Text style={styles.fieldLabel}>Case Cost</Text>
                       <View style={[styles.readonlyField, { borderColor: inputBorder, backgroundColor: inputBg }]}>
-                      <Text style={[styles.readonlyText, { color: inputTextColor }]}>
-                        {casecost || '-'}
-                      </Text>
-                    </View>
+                        <Text style={[styles.readonlyText, { color: inputTextColor }]}>
+                          {casecost || '-'}
+                        </Text>
+                      </View>
                       {/* <TextInput
                         style={[styles.inputCol, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
                         placeholder="Case Cost"
@@ -902,46 +1168,31 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                     <View style={styles.fieldCol}>
                       <Text style={styles.fieldLabel}>Units in Case</Text>
                       <View style={[styles.readonlyField, { borderColor: inputBorder, backgroundColor: inputBg }]}>
-                      <Text style={[styles.readonlyText, { color: inputTextColor }]}>
-                        {unitc || '-'}
-                      </Text>
+                        <Text style={[styles.readonlyText, { color: inputTextColor }]}>
+                          {unitc || '-'}
+                        </Text>
+                      </View>
+
                     </View>
-                      {/* <TextInput
-                        style={[styles.inputCol, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
-                        placeholder="Units in Case"
-                        placeholderTextColor={placeholderColor}
-                        value={unitc}
-                        onChangeText={setUnitc}
-                        keyboardType="number-pad"
-                      /> */}
-                    </View>
-                    {/* <TouchableOpacity style={styles.calcBtn} onPress={calculateUnitCost}>
-                      <Text style={styles.calcBtnText}>Calculate</Text>
-                    </TouchableOpacity> */}
+
                   </View>
 
                   <View style={[styles.rowGap, { marginTop: 10 }]}>
                     <View style={styles.fieldCol}>
                       <Text style={styles.fieldLabel}>Net QTY</Text>
-                        <View style={[styles.readonlyField, { borderColor: inputBorder, backgroundColor: inputBg }]}>
-                      <Text style={[styles.readonlyText, { color: inputTextColor }]}>
-                        {qtyavailable || '-'}
-                      </Text>
-                    </View>
-                      {/* <TextInput
-                        style={[styles.inputCol, { color: inputTextColor, backgroundColor: inputBg, borderColor: inputBorder }]}
-                        placeholder="Net QTY"
-                        placeholderTextColor={placeholderColor}
-                        value={qtyavailable}
-                        onChangeText={setQtyAvailable}
-                        keyboardType="decimal-pad"
-                      /> */}
+                      <View style={[styles.readonlyField, { borderColor: inputBorder, backgroundColor: inputBg }]}>
+                        <Text style={[styles.readonlyText, { color: inputTextColor }]}>
+                          {qtyavailable || '-'}
+                        </Text>
+                      </View>
+
                     </View>
                     <View style={styles.fieldCol}>
                       <Text style={styles.fieldLabel}>Category</Text>
                       <TouchableOpacity
                         style={[styles.selectBox, { borderColor: inputBorder, backgroundColor: inputBg, marginTop: 0 }]}
                         onPress={() => setCategoryModalVisible(true)}
+                        disabled={!isProductEditPermission}
                       >
                         <Text style={[styles.selectValue, { color: inputTextColor }]} numberOfLines={2}>
                           {categorySummary}
@@ -956,18 +1207,20 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                       <TouchableOpacity
                         style={[styles.selectBox, { borderColor: inputBorder, backgroundColor: inputBg, marginTop: 0 }]}
                         onPress={() => setTaxModalVisible(true)}
+                        disabled={!isProductEditPermission}
                       >
                         <Text style={[styles.selectValue, { color: inputTextColor }]} numberOfLines={2}>
                           {taxSummary}
                         </Text>
                       </TouchableOpacity>
                     </View>
-                    {!isUomLockedByServer && (
+                    {!isUomLockedByServer && !in_store_label_product && (
                       <View style={styles.fieldCol}>
                         <Text style={styles.fieldLabel}>Unit of Measurement</Text>
                         <TouchableOpacity
                           style={[styles.selectBox, { borderColor: inputBorder, backgroundColor: inputBg, marginTop: 0 }]}
                           onPress={() => setUomModalVisible(true)}
+                          disabled={!isProductEditPermission}
                         >
                           <Text style={[styles.selectValue, { color: inputTextColor }]} numberOfLines={2}>
                             {uomSummary}
@@ -982,25 +1235,26 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                     <TouchableOpacity
                       style={[styles.inputFlex, { borderColor: inputBorder, backgroundColor: inputBg, paddingVertical: 10, paddingHorizontal: 12 }]}
                       onPress={() => setVendorModalVisible(true)}
+                      disabled={!isProductEditPermission}
                     >
                       <Text style={{ color: placeholderColor }}>
                         {selectedVendors.length > 0 ? `${selectedVendors.length} vendor(s) selected` : 'Tap to add vendor'}
                       </Text>
                     </TouchableOpacity>
-   
+
                   </View>
 
                   <Text style={styles.subTitle}>Settings:</Text>
                   <View style={styles.switchGrid}>
-                    <View style={styles.switchCell}><Text style={styles.switchLabel}>In POS</Text><Switch value={availablePOS} onValueChange={setAvailablePOS} /></View>
-                    <View style={styles.switchCell}><Text style={styles.switchLabel}>InStore Label</Text><Switch value={in_store_label_product} onValueChange={setin_store_label_product} /></View>
+                    <View style={styles.switchCell}><Text style={styles.switchLabel}>In POS</Text><Switch value={availablePOS} onValueChange={setAvailablePOS} disabled={!isProductEditPermission} /></View>
+                    <View style={styles.switchCell}><Text style={styles.switchLabel}>InStore Label</Text><Switch value={in_store_label_product} onValueChange={setin_store_label_product} disabled={!isProductEditPermission} /></View>
                   </View>
                   <View style={styles.switchGrid}>
-                    <View style={styles.switchCell}><Text style={styles.switchLabel}>EBT Eligible</Text><Switch value={isEBT} onValueChange={setIsEBT} /></View>
-                    <View style={styles.switchCell}><Text style={styles.switchLabel}>eWIC Eligible</Text><Switch value={ewic} onValueChange={setEwic} /></View>
+                    <View style={styles.switchCell}><Text style={styles.switchLabel}>EBT Eligible</Text><Switch value={isEBT} onValueChange={setIsEBT} disabled={!isProductEditPermission} /></View>
+                    <View style={styles.switchCell}><Text style={styles.switchLabel}>eWIC Eligible</Text><Switch value={ewic} onValueChange={setEwic} disabled={!isProductEditPermission} /></View>
                   </View>
                   <View style={styles.switchGrid}>
-                    <View style={styles.switchCell}><Text style={styles.switchLabel}>OTC Product</Text><Switch value={otc} onValueChange={setOtc} /></View>
+                    <View style={styles.switchCell}><Text style={styles.switchLabel}>OTC Product</Text><Switch value={otc} onValueChange={setOtc} disabled={!isProductEditPermission} /></View>
                     {variantsList.length > 0 && (
                       <TouchableOpacity style={[styles.switchCell, styles.variantToggleBtn]} onPress={openVariantsModal}>
                         <Text style={styles.variantToggleText}>View Variants ({variantsList.length})</Text>
@@ -1009,7 +1263,7 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                   </View>
                 </View>
 
-                {userrole !== 'customer' && (
+                {userrole !== 'customer' && isProductEditPermission && (
                   <View>
                     <View style={[styles.row, { marginTop: 20, marginBottom: 8 }]}>
                       <TouchableOpacity style={[styles.btn, styles.btnPrimary]} onPress={openVariantModal}>
@@ -1038,7 +1292,7 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                   </View>
                 )}
 
-                {userrole === 'customer' ? (
+               {isProductBillingPermission && (
                   <View style={[styles.row, { marginTop: 12 }]}>
                     {inCart ? (
                       <View style={styles.qtyRow}>
@@ -1052,7 +1306,7 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                       </TouchableOpacity>
                     )}
                   </View>
-                ) : (
+               )}
                   <View style={[styles.row, { marginTop: 12 }]}>
                     {inPrint ? (
                       <TouchableOpacity
@@ -1069,11 +1323,9 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                         <Text style={styles.btnText}>Add to Print List</Text>
                       </TouchableOpacity>
                     )}
-                    <TouchableOpacity style={[styles.btn, styles.btnAccent]} onPress={openQdModal}>
-                      <Text style={styles.btnText}>Create Qty Discount</Text>
-                    </TouchableOpacity>
+
                   </View>
-                )}
+               
               </ScrollView>
             )}
 
@@ -1102,13 +1354,13 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
-                     <View style={styles.optionFooter}>
-        <TouchableOpacity
-          style={[styles.btn, styles.btnPrimary, styles.optionDoneBtn]} 
-          onPress={() => setCategoryModalVisible(false)} >
-        <Text style={styles.btnText}>Done</Text>
-        </TouchableOpacity>
-      </View>
+                  <View style={styles.optionFooter}>
+                    <TouchableOpacity
+                      style={[styles.btn, styles.btnPrimary, styles.optionDoneBtn]}
+                      onPress={() => setCategoryModalVisible(false)} >
+                      <Text style={styles.btnText}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             )}
@@ -1134,14 +1386,14 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
-                               <View style={styles.optionFooter}>
-        <TouchableOpacity
-          style={[styles.btn, styles.btnPrimary, styles.optionDoneBtn]} 
-          onPress={() => setTaxModalVisible(false)} >
-                 
-                    <Text style={styles.btnText}>Done</Text>
-                  </TouchableOpacity>
-                </View>
+                  <View style={styles.optionFooter}>
+                    <TouchableOpacity
+                      style={[styles.btn, styles.btnPrimary, styles.optionDoneBtn]}
+                      onPress={() => setTaxModalVisible(false)} >
+
+                      <Text style={styles.btnText}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             )}
@@ -1162,17 +1414,17 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                         <Text style={styles.optionLabel}>{item.name}</Text>
                         <Switch
                           value={String(selectedUomId) === String(item.id)}
-                           onValueChange={() => toggleUom(item.id)}
+                          onValueChange={() => toggleUom(item.id)}
                         />
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
-                     <View style={styles.optionFooter}>
+                  <View style={styles.optionFooter}>
                     <TouchableOpacity
-                     style={[styles.btn, styles.btnPrimary, styles.optionDoneBtn]} 
-                     onPress={() => setUomModalVisible(false)} >
-                    <Text style={styles.btnText}>Done</Text>
-                  </TouchableOpacity>
+                      style={[styles.btn, styles.btnPrimary, styles.optionDoneBtn]}
+                      onPress={() => setUomModalVisible(false)} >
+                      <Text style={styles.btnText}>Done</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </View>
@@ -1188,7 +1440,7 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                 />
                 <View style={[styles.modalCard, styles.innerOverlayCard]}>
                   <Text style={styles.modalTitle}>Add Vendor</Text>
-                  
+
                   {selectedVendors.length > 0 && (
                     <View style={{ backgroundColor: '#ECFDF5', borderRadius: 8, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#BBF7D0' }}>
                       <Text style={{ fontSize: 11, fontWeight: '700', color: '#166534', marginBottom: 6 }}>Added Vendors ({selectedVendors.length})</Text>
@@ -1208,7 +1460,7 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                       })}
                     </View>
                   )}
-                  
+
                   <TextInput
                     style={styles.modalInput}
                     value={searchText}
@@ -1216,6 +1468,7 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                     placeholder="Search vendor (min 3 chars)"
                     placeholderTextColor="#9CA3AF"
                     autoCapitalize="none"
+                    editable={isProductEditPermission}
                   />
 
                   {showVendorDropdown && vendorList.length > 0 && (
@@ -1261,53 +1514,65 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                   activeOpacity={1}
                   onPress={() => setVariantModalVisible(false)}
                 />
-                <View style={[styles.modalCard, styles.innerOverlayCard]}>
-                  <Text style={styles.modalTitle}>Create Variant Product</Text>
-                  <TextInput
-                    style={styles.modalInput}
-                    value={variantName}
-                    onChangeText={setVariantName}
-                    placeholder="Name"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                  <TextInput
-                    style={styles.modalInput}
-                    value={variantCode}
-                    onChangeText={setVariantCode}
-                    placeholder="Default Code"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                  <TextInput
-                    style={styles.modalInput}
-                    value={variantBarcode}
-                    onChangeText={setVariantBarcode}
-                    placeholder="Barcode"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                  <TextInput
-                    style={styles.modalInput}
-                    value={variantPrice}
-                    onChangeText={setVariantPrice}
-                    placeholder="Price"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="decimal-pad"
-                  />
-                  <View style={styles.modalBtnRow}>
-                    <TouchableOpacity
-                      style={[styles.btn, styles.variantBtn]}
-                      onPress={handleCreateVariant}
-                      disabled={variantSubmitting}
+                <KeyboardAvoidingView
+                  behavior={Platform.select({ ios: 'padding', android: 'height' })}
+                  style={styles.variantKeyboardAvoidWrapper}
+                >
+                  <View style={[styles.modalCard, styles.innerOverlayCard]}>
+                    <Text style={styles.modalTitle}>Create Variant Product</Text>
+                    <ScrollView
+                      style={{ maxHeight: 280, marginBottom: 16 }}
+                      contentContainerStyle={{ paddingHorizontal: 0 }}
+                      keyboardShouldPersistTaps="handled"
+                      showsVerticalScrollIndicator={true}
                     >
-                      <Text style={styles.btnText}>{variantSubmitting ? 'Submitting...' : 'Submit'}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.btn, styles.modalCancelBtn]}
-                      onPress={() => setVariantModalVisible(false)}
-                    >
-                      <Text style={styles.btnText}>Cancel</Text>
-                    </TouchableOpacity>
+                      <TextInput
+                        style={styles.modalInput}
+                        value={variantName}
+                        onChangeText={setVariantName}
+                        placeholder="Name"
+                        placeholderTextColor="#9CA3AF"
+                      />
+                      <TextInput
+                        style={styles.modalInput}
+                        value={variantCode}
+                        onChangeText={setVariantCode}
+                        placeholder="Default Code"
+                        placeholderTextColor="#9CA3AF"
+                      />
+                      <TextInput
+                        style={styles.modalInput}
+                        value={variantBarcode}
+                        onChangeText={setVariantBarcode}
+                        placeholder="Barcode"
+                        placeholderTextColor="#9CA3AF"
+                      />
+                      <TextInput
+                        style={styles.modalInput}
+                        value={variantPrice}
+                        onChangeText={setVariantPrice}
+                        placeholder="Price"
+                        placeholderTextColor="#9CA3AF"
+                        keyboardType="decimal-pad"
+                      />
+                    </ScrollView>
+                    <View style={styles.modalBtnRow}>
+                      <TouchableOpacity
+                        style={[styles.btn, styles.variantBtn]}
+                        onPress={handleCreateVariant}
+                        disabled={variantSubmitting}
+                      >
+                        <Text style={styles.btnText}>{variantSubmitting ? 'Submitting...' : 'Submit'}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.btn, styles.modalCancelBtn]}
+                        onPress={() => setVariantModalVisible(false)}
+                      >
+                        <Text style={styles.btnText}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
+                </KeyboardAvoidingView>
               </View>
             )}
 
@@ -1323,92 +1588,113 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                     setQdShowEndPicker(false);
                   }}
                 />
-                <View style={[styles.modalCard, styles.innerOverlayCard]}>
-                  <Text style={styles.modalTitle}>Create Quantity Discount</Text>
+                <KeyboardAvoidingView
+                  behavior={Platform.select({ ios: 'padding', android: 'height' })}
+                  style={styles.qdKeyboardAvoidWrapper}
+                >
+                  <View style={[styles.modalCard, styles.innerOverlayCard]}>
+                    <Text style={styles.modalTitle}>Create Quantity Discount</Text>
 
-                  <TextInput
-                    style={styles.modalInput}
-                    value={qdBuyQty}
-                    onChangeText={setQdBuyQty}
-                    placeholder="No. of products to buy"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="number-pad"
-                  />
-                  <TextInput
-                    style={styles.modalInput}
-                    value={qdDiscount}
-                    onChangeText={setQdDiscount}
-                    placeholder="Discount amount"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="decimal-pad"
-                  />
-
-                  <TouchableOpacity
-                    style={styles.dateInput}
-                    onPress={() => {
-                      setQdShowEndPicker(false);
-                      setQdShowStartPicker(true);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.dateInputLabel}>Start Date</Text>
-                    <Text style={qdStartDate ? styles.dateInputText : styles.dateInputPlaceholder}>
-                      {qdStartDate ? formatDateOnly(qdStartDate) : 'Select date'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.dateInput}
-                    onPress={() => {
-                      setQdShowStartPicker(false);
-                      setQdShowEndPicker(true);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.dateInputLabel}>End Date</Text>
-                    <Text style={qdEndDate ? styles.dateInputText : styles.dateInputPlaceholder}>
-                      {qdEndDate ? formatDateOnly(qdEndDate) : 'Select date'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {qdShowStartPicker && (
-                    <DateTimePicker
-                      value={toDate(qdStartDate)}
-                      mode="date"
-                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                      onChange={handleQdStartDateChange}
-                    />
-                  )}
-
-                  {qdShowEndPicker && (
-                    <DateTimePicker
-                      value={toDate(qdEndDate)}
-                      mode="date"
-                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                      onChange={handleQdEndDateChange}
-                    />
-                  )}
-
-                  <View style={styles.modalBtnRow}>
-                    <TouchableOpacity
-                      style={[styles.btn, styles.modalCancelBtn]}
-                      onPress={() => {
-                        setQdModalVisible(false);
-                        setQdShowStartPicker(false);
-                        setQdShowEndPicker(false);
-                      }}
+                    <ScrollView
+                      style={{ maxHeight: 320, marginBottom: 16 }}
+                      contentContainerStyle={{ paddingHorizontal: 0 }}
+                      keyboardShouldPersistTaps="handled"
+                      showsVerticalScrollIndicator={true}
                     >
-                      <Text style={styles.btnText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.btn, styles.btnSuccess, qdSubmitting && { opacity: 0.6 }]}
-                      onPress={handleCreateQuantityDiscount}
-                      disabled={qdSubmitting}
-                    >
-                      <Text style={styles.btnText}>{qdSubmitting ? 'Saving…' : 'Create'}</Text>
-                    </TouchableOpacity>
+                      <TextInput
+                        style={styles.modalInput}
+                        value={qdBuyQty}
+                        onChangeText={setQdBuyQty}
+                        placeholder="No. of products to buy"
+                        placeholderTextColor="#9CA3AF"
+                        keyboardType="number-pad"
+                      />
+                      <TextInput
+                        style={styles.modalInput}
+                        value={qdDiscount}
+                        onChangeText={setQdDiscount}
+                        placeholder="Discount amount"
+                        placeholderTextColor="#9CA3AF"
+                        keyboardType="decimal-pad"
+                      />
+
+                      <TouchableOpacity
+                        style={styles.qdDateInput}
+                        onPress={() => {
+                          setQdShowEndPicker(false);
+                          setQdShowStartPicker(true);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <View style={styles.qdDateInputHeader}>
+                          <Icon name="event" size={16} color="#319241" />
+                          <Text style={styles.qdDateInputLabel}>Start Date</Text>
+                        </View>
+                        <Text style={qdStartDate ? styles.qdDateInputText : styles.qdDateInputPlaceholder}>
+                          {qdStartDate ? formatDateOnly(qdStartDate) : 'Select'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.qdDateInput}
+                        onPress={() => {
+                          setQdShowStartPicker(false);
+                          setQdShowEndPicker(true);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <View style={styles.qdDateInputHeader}>
+                          <Icon name="event" size={16} color="#D9534F" />
+                          <Text style={styles.qdDateInputLabel}>End Date</Text>
+                        </View>
+                        <Text style={qdEndDate ? styles.qdDateInputText : styles.qdDateInputPlaceholder}>
+                          {qdEndDate ? formatDateOnly(qdEndDate) : 'Select'}
+                        </Text>
+                      </TouchableOpacity>
+                    </ScrollView>
+
+                    <View style={styles.qdModalBtnRow}>
+                      <TouchableOpacity
+                        style={[styles.qdBtn, styles.qdBtnCancel]}
+                        onPress={() => {
+                          setQdModalVisible(false);
+                          setQdShowStartPicker(false);
+                          setQdShowEndPicker(false);
+                        }}
+                      >
+                        <Text style={styles.qdBtnCancelText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.qdBtn, styles.qdBtnConfirm, qdSubmitting && { opacity: 0.6 }]}
+                        onPress={handleCreateQuantityDiscount}
+                        disabled={qdSubmitting}
+                      >
+                        <Text style={styles.qdBtnConfirmText}>{qdSubmitting ? 'Saving…' : 'Create'}</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {qdShowStartPicker && (
+                      <DateTimePicker
+                        value={toDate(qdStartDate)}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={handleQdStartDateChange}
+                        textColor="#111"
+                        themeVariant="light"
+                      />
+                    )}
+                    {qdShowEndPicker && (
+                      <DateTimePicker
+                        value={toDate(qdEndDate)}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={handleQdEndDateChange}
+                        textColor="#111"
+                        themeVariant="light"
+                      />
+                    )}
                   </View>
-                </View>
+                </KeyboardAvoidingView>
               </View>
             )}
 
@@ -1440,7 +1726,7 @@ const ProductModal = forwardRef(({ onAddToCart, onAddToPrint }, ref) => {
                                 style={styles.modalInput}
                                 value={editingVariantPrice}
                                 onChangeText={setEditingVariantPrice}
-                                placeholder="Sale Price"
+                                placeholder="Sell Price"
                                 placeholderTextColor="#9CA3AF"
                                 keyboardType="decimal-pad"
                               />
@@ -1824,6 +2110,16 @@ const styles = StyleSheet.create({
     zIndex: 1000,
     elevation: 60,
   },
+  qdKeyboardAvoidWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  variantKeyboardAvoidWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   vendorChipsContainer: {
     flexDirection: 'row',
@@ -1902,8 +2198,120 @@ const styles = StyleSheet.create({
     color: '#111',
   },
 
-optionDoneBtn: {
-  flex: 0,
-  width: '100%',
-},
+  optionDoneBtn: {
+    flex: 0,
+    width: '100%',
+  },
+  qdDateInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: '#F9FAFB',
+    marginBottom: 12,
+  },
+  qdDateInputHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6
+  },
+  qdDateInputLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '700'
+  },
+  qdDateInputText: {
+    fontSize: 14,
+    color: '#111',
+    fontWeight: '700'
+  },
+  qdDateInputPlaceholder: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontWeight: '500'
+  },
+  qdDatePickerModal: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  qdDatePickerBackdrop: {
+    flex: 1,
+  },
+  qdDatePickerContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 0,
+    maxHeight: '70%',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: -4 },
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  qdDatePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  qdDatePickerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111',
+  },
+  qdDatePickerContent: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  qdDatePickerFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  qdModalBtnRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  qdBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qdBtnCancel: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  qdBtnConfirm: {
+    backgroundColor: '#319241',
+  },
+  qdBtnCancelText: {
+    color: '#666',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  qdBtnConfirmText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
 });

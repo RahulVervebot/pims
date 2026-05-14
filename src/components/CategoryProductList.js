@@ -19,7 +19,7 @@ import { archiveProduct, getCategoryProducts, getLatestProducts } from '../funct
 import ProductModal from './ProductModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import PrinterIcon from '../assets/icons/Printericon.svg'; 
-import CartIcon from "../assets/icons/Carticon.svg"
+import CartIcon from "../assets/icons/cart.svg"
 
 export default function CategoryProductList({ id, category, showFloatingCart = false }) {
   const navigation = useNavigation();
@@ -30,7 +30,7 @@ export default function CategoryProductList({ id, category, showFloatingCart = f
   const { cart, addToCart, increaseQty, decreaseQty } = useContext(CartContext);
   const { print, addToPrint, increasePrintQty, decreasePrintQty, removeFromprint } = useContext(PrintContext);
   const sheetRef = useRef(null);
-
+  const [isProductBillingPermission, setIsProductBillingPermission] = useState(true);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
 
@@ -52,8 +52,11 @@ export default function CategoryProductList({ id, category, showFloatingCart = f
     try {
       const userRole = await AsyncStorage.getItem('userRole');
       setUserRole(userRole);
+            const billingPerm = await AsyncStorage.getItem('is_product_billing_in_app');
+       setIsProductBillingPermission(billingPerm === 'true');
+       console.log('Billing Permission:', billingPerm);
       setRefreshing(true);
-
+  
       const data =
         category === 'latest'
           ? await getLatestProducts()
@@ -135,14 +138,14 @@ export default function CategoryProductList({ id, category, showFloatingCart = f
               />
             )}
 
-            <Text style={styles.productName} numberOfLines={1}>
+            <Text style={styles.productName} numberOfLines={1} ellipsizeMode="tail">
               {item.productName}
             </Text>
 
             <View style={styles.bottomRow}>
               <View style={styles.priceWrap}>
                 <Text style={styles.price}>
-                  ₹{Number(item.salePrice || 0).toFixed(2)}
+                  ${Number(item.salePrice || 0).toFixed(2)}
                 </Text>
                 {!!item.productSize && (
                   <Text style={styles.sizeText}>
@@ -150,11 +153,11 @@ export default function CategoryProductList({ id, category, showFloatingCart = f
                   </Text>
                 )}
               </View>
-
-              <View>
-                {userrole === 'customer' ? (
-                  inCart ? (
-                    <View style={styles.qtyRow}>
+                <View style={styles.bottomRow}>
+                  {isProductBillingPermission && (
+                    <>
+                  {inCart ? (
+                  <View style={styles.qtyRow}>
                       <TouchableOpacity
                         style={styles.qtyBtn}
                         onPress={() => decreaseQty(item.product_id)}
@@ -171,20 +174,23 @@ export default function CategoryProductList({ id, category, showFloatingCart = f
                         <Text style={styles.qtyText}>+</Text>
                       </TouchableOpacity>
                     </View>
-                  ) : (
-                    <TouchableOpacity onPress={() => addToCart(item)}>
-                      <CartIcon width={28} height={28} fill="#f57200" />
+                ) : (
+                <TouchableOpacity onPress={() => addToCart(item)}>
+                      <CartIcon width={28} height={28} fill="#16A34A" />
                     </TouchableOpacity>
-                  )
-                ) : inPrint ? (
+                )}
+                </>
+                )}
+
+                {inPrint ? (
                   <TouchableOpacity
                     style={styles.removePrintBtn}
                     onPress={() => removeFromprint(item.product_id)}
                   >
-                    <Icon name="delete" size={20} color="#fff" />
+                      <PrinterIcon width={18} height={28} fill="#fff" />
                   </TouchableOpacity>
                 ) : (
-                  <TouchableOpacity onPress={() => addToPrint(item)}>
+                  <TouchableOpacity onPress={() => addToPrint(item)}  style={styles.addPrintBtn} >
                     <PrinterIcon width={28} height={28} fill="#16A34A" />
                   </TouchableOpacity>
                 )}
@@ -331,9 +337,23 @@ const styles = StyleSheet.create({
   },
 
   removePrintBtn: {
-    backgroundColor: '#D9534F',
-    padding: 6,
-    borderRadius: 6,
+    backgroundColor: '#16A34A',
+    zIndex: 3,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+
+  addPrintBtn:{
+    zIndex: 3,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   floatingCart: {

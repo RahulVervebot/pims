@@ -37,12 +37,12 @@ function EditProduct({ visible, item, InvoiceDate, InvNumber, vendorName, onClos
     if (field === 'qty') setQtyText(text);
     if (field === 'unitPrice') setUnitPriceText(text);
     if (field === 'extendedPrice') setExtendedPriceText(text);
-
+    const newcost = Number((parseNum(field === 'unitPrice' ? text : unitPriceText) / editedItem.pieces).toFixed(2));
     const next = {
       qty: parseNum(field === 'qty' ? text : qtyText),
       unitPrice: parseNum(field === 'unitPrice' ? text : unitPriceText),
       extendedPrice: parseNum(field === 'extendedPrice' ? text : extendedPriceText),
-      cp: parseNum(editedItem?.unitPrice / editedItem?.pieces),
+      cp: newcost,
     };
 
     if (field === 'qty') {

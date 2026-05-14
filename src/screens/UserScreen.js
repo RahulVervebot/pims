@@ -64,7 +64,6 @@ export default function UserScreen({ navigation }) {
   return raw === 'administrator' || pretty === 'administrator';
 }, [user_role, prettyRole]);
 
-
   return (
     <View style={styles.screen}>
       <AppHeader Title="PROFILE" backgroundType="image" backgroundValue={reportbg} />
@@ -112,10 +111,10 @@ export default function UserScreen({ navigation }) {
   {isAdmin && (
     <TouchableOpacity
       style={[styles.button, styles.secondary]}
-      onPress={() => navigation.navigate('SettingScreen')}
+      onPress={() => navigation.navigate('UserList')}
       activeOpacity={0.85}
     >
-      <Text style={styles.buttonText}>Settings</Text>
+      <Text style={styles.buttonText}>User Setting</Text>
     </TouchableOpacity>
   )}
 

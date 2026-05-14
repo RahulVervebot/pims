@@ -11,9 +11,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   Linking,
+  Share,
   useWindowDimensions,
   Image,
-  Alert
+  Alert,
+  RefreshControl
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Voice from '@react-native-voice/voice';
@@ -104,6 +106,7 @@ export default function Chat({ style, buttonStyle, isOpen: externalIsOpen, setIs
   const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalOpen;
  const setIsOpen = externalSetIsOpen || setInternalOpen;
   const [conversations, setConversations] = useState([]);
+  const [loadingConversations, setLoadingConversations] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState('');
@@ -125,6 +128,7 @@ export default function Chat({ style, buttonStyle, isOpen: externalIsOpen, setIs
   const [apiBase, setApiBase] = useState('');
   const [frontBase, setFrontBase] = useState('');
   const [downloadedExports, setDownloadedExports] = useState({});
+  const [downloadingUrls, setDownloadingUrls] = useState({});
   const [wsBase, setWsBase] = useState('');
   const [recording, setRecording] = useState(false);
   const [micGranted, setMicGranted] = useState(false);
@@ -144,6 +148,8 @@ export default function Chat({ style, buttonStyle, isOpen: externalIsOpen, setIs
   const loadedConversationRef = useRef(null);
   const aiPollingRef = useRef(null);
   const typingIntervalRef = useRef(null);
+  const accessTokenRef = useRef('');
+  const authBootstrapRef = useRef(Promise.resolve(false));
 
   const isAuthenticated = !!accessToken;
   const showAttachments = true;
@@ -213,7 +219,7 @@ export default function Chat({ style, buttonStyle, isOpen: externalIsOpen, setIs
 );
 
   useEffect(() => {
-    (async () => {
+    authBootstrapRef.current = (async () => {
       const entries = await AsyncStorage.multiGet([
         'chatai_access',
         'chatai_full_name',
@@ -231,18 +237,34 @@ export default function Chat({ style, buttonStyle, isOpen: externalIsOpen, setIs
       const apiUrl = getEntry('tulsi_ai_backend');
       const frontUrl = getEntry('tulsifrontendurl');
       const wsUrl = getEntry('tulsi_websocket');
+      console.log("access_token chat",token);
+      console.log('[Chat] storage snapshot:', {
+        hasAccessToken: !!token,
+        accessTokenPreview: token ? `${String(token).slice(0, 12)}...` : '',
+        hasApiUrl: !!apiUrl,
+        apiUrl,
+        hasFrontUrl: !!frontUrl,
+        frontUrl,
+        hasWsUrl: !!wsUrl,
+        wsUrl,
+      });
       setAccessToken(token || '');
       setUserName(fullName || userHandle || userEmail || 'You');
       setApiBase(normalizeBaseUrl(apiUrl));
       setFrontBase(normalizeBaseUrl(frontUrl));
-    
+      accessTokenRef.current = token || '';
       setWsBase(normalizeWsUrl(wsUrl));
+      return !!token;
     })();
   }, []);
 
   useEffect(() => {
     messageRef.current = message;
   }, [message]);
+
+  useEffect(() => {
+    accessTokenRef.current = accessToken || '';
+  }, [accessToken]);
 
   useEffect(() => {
     showTypeSelectorRef.current = showTypeSelector;
@@ -397,6 +419,20 @@ export default function Chat({ style, buttonStyle, isOpen: externalIsOpen, setIs
       }
       return msg;
     });
+  const activeConversations = conversations.filter(
+    (c) => c.status !== 'closed' && c.status !== 'resolved'
+  );
+
+  const ensureAuthenticated = async () => {
+    if (accessTokenRef.current) return true;
+    try {
+      const hydrated = await authBootstrapRef.current;
+      return hydrated || !!accessTokenRef.current;
+    } catch (error) {
+      console.warn('Auth bootstrap failed:', error);
+      return false;
+    }
+  };
 
   useEffect(() => {
     if (waitingForAI && selectedConversation && accessToken && endpoints) {
@@ -575,22 +611,44 @@ export default function Chat({ style, buttonStyle, isOpen: externalIsOpen, setIs
   };
 
   useEffect(() => {
-    if (isOpen && isAuthenticated && accessToken && endpoints) {
-      loadConversations();
-    }
-  }, [isOpen, isAuthenticated, accessToken, endpoints]);
+    if (!isOpen || !endpoints) return;
+    let cancelled = false;
+
+    (async () => {
+      const authenticated = await ensureAuthenticated();
+      if (!cancelled && authenticated) {
+        loadConversations();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, endpoints]);
 
   useEffect(() => {
-    if (selectedConversation && accessToken && endpoints) {
-      if (loadedConversationRef.current !== selectedConversation.id) {
+    if (!selectedConversation || !endpoints) {
+      if (!selectedConversation && loadedConversationRef.current !== null) {
+        setMessages([]);
+        loadedConversationRef.current = null;
+      }
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      const authenticated = await ensureAuthenticated();
+      if (!cancelled && authenticated && loadedConversationRef.current !== selectedConversation.id) {
         loadedConversationRef.current = selectedConversation.id;
         loadMessages(selectedConversation.id);
       }
-    } else if (!selectedConversation && loadedConversationRef.current !== null) {
-      setMessages([]);
-      loadedConversationRef.current = null;
-    }
-  }, [selectedConversation?.id, accessToken, endpoints]);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedConversation?.id, endpoints]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollToEnd?.({ animated: true });
@@ -648,10 +706,11 @@ export default function Chat({ style, buttonStyle, isOpen: externalIsOpen, setIs
     }
   }, [messages]);
 
-  const loadConversations = async () => {
+const loadConversations = async () => {
   try {
     if (!accessToken || !endpoints) return;
 
+    setLoadingConversations(true);
     const res = await fetch(endpoints.conversations, {
       method: 'GET',
       headers: authHeaders,
@@ -660,6 +719,7 @@ export default function Chat({ style, buttonStyle, isOpen: externalIsOpen, setIs
     if (!res.ok) {
       const text = await res.text();
       console.warn('loadConversations failed:', res.status, endpoints.conversations, text.slice(0, 300));
+      setConversations([]);
       return;
     }
 
@@ -667,6 +727,9 @@ export default function Chat({ style, buttonStyle, isOpen: externalIsOpen, setIs
     setConversations(normalizeList(data));
   } catch (error) {
     console.error('Failed to load conversations:', error);
+    setConversations([]);
+  } finally {
+    setLoadingConversations(false);
   }
 };
 
@@ -1139,14 +1202,24 @@ const loadMessages = async (conversationId) => {
     const localPath = String(path);
     const fileUrl = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
     try {
-      if (Platform.OS === 'android' && RNBlobUtil.android?.actionViewIntent) {
-        await RNBlobUtil.android.actionViewIntent(localPath, mime || EXPORT_MIME);
-        return;
-      }
-      if (await Linking.canOpenURL(fileUrl)) {
-        await Linking.openURL(fileUrl);
-      } else {
-        await Linking.openURL(fileUrl);
+      if (Platform.OS === 'ios') {
+        // For iOS, use Share API to properly open file:// URLs
+        await Share.share({
+          url: fileUrl,
+          message: 'Exported File',
+        }).catch((error) => {
+          if (error.message !== 'User did not share') {
+            console.warn('Share failed:', error);
+          }
+        });
+      } else if (Platform.OS === 'android') {
+        // For Android, use RNBlobUtil
+        const filePath = localPath.startsWith('file://') ? localPath.substring(7) : localPath;
+        if (RNBlobUtil.android?.actionViewIntent) {
+          await RNBlobUtil.android.actionViewIntent(filePath, mime || EXPORT_MIME);
+        } else {
+          await Linking.openURL(fileUrl);
+        }
       }
     } catch (error) {
       console.warn('Open export failed:', error);
@@ -1171,13 +1244,25 @@ const loadMessages = async (conversationId) => {
         return next;
       });
     }
-    const path = await downloadExport(full);
-    if (path) {
-      setDownloadedExports((prev) => ({ ...prev, [full]: path }));
+    try {
+      setDownloadingUrls((prev) => ({ ...prev, [full]: true }));
+      const path = await downloadExport(full);
+      if (path) {
+        setDownloadedExports((prev) => ({ ...prev, [full]: path }));
+      }
+    } finally {
+      setDownloadingUrls((prev) => {
+        const next = { ...prev };
+        delete next[full];
+        return next;
+      });
     }
   };
 
-  // if (!isAuthenticated) return null;
+  // if (!isAuthenticated) {
+  //   console.warn('[Chat] FAB hidden because chatai_access is missing. Check chat login response and AsyncStorage.');
+  //   return null;
+  // }
 
   const hasFeedbackRequest = messages.some(
     (msg) => msg.message_type === 'system' && msg.metadata && msg.metadata.type === 'feedback_request'
@@ -1188,15 +1273,14 @@ const loadMessages = async (conversationId) => {
 
   return (
     <SafeAreaView
+        pointerEvents="box-none"
         edges={["left", "right"]}
-        style={{
-          flex: 1,
-        }}
+        style={[styles.overlayRoot, style]}
       >
-      {!hideFab && !isOpen && (
+      {!isOpen && (
         <TouchableOpacity
              activeOpacity={0.85}
-           style={[styles.createFab, { bottom: 16 + insets.bottom }]}
+           style={[styles.createFab, { bottom: 16 + insets.bottom }, buttonStyle]}
           onPress={() => setIsOpen(true)}
         >
           <Icon name="support-agent" size={30} color="#fff" />
@@ -1263,12 +1347,14 @@ const loadMessages = async (conversationId) => {
                 />
               ) : !selectedConversation ? (
                 <ScrollView contentContainerStyle={styles.emptyWrap}>
-                  {conversations.filter((c) => c.status !== 'closed' && c.status !== 'resolved').length > 0 ? (
+                  {loadingConversations ? (
+                    <View style={styles.emptyLoaderWrap}>
+                      
+                      <ActivityIndicator size="large" color="#319241" />
+                    </View>
+                  ) : activeConversations.length > 0 ? (
                     <View style={{ gap: 10 }}>
-                   
-                      {conversations
-                        .filter((c) => c.status !== 'closed' && c.status !== 'resolved')
-                        .map((conv) => (
+                      {activeConversations.map((conv) => (
                           <TouchableOpacity
                             key={conv.id}
                             style={styles.conversationCard}
@@ -1323,8 +1409,25 @@ const loadMessages = async (conversationId) => {
                       </TouchableOpacity>
                     </View>
                   ) : (
-                     <View style={styles.emptyLoaderWrap}>
-                      <ActivityIndicator size="large" color="#319241" />
+                    <View style={{ gap: 12 }}>
+                      <View style={styles.emptyLoaderWrap}>
+                        <Text style={styles.emptyTitle}>Start a conversation</Text>
+                        <Text style={styles.emptyText}>No active conversations found.</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.startBtn}
+                        onPress={() => {
+                          setSelectedConversation(null);
+                          setMessages([]);
+                          setShowTypeSelector(true);
+                          setWaitingForAI(false);
+                        }}
+                      >
+                        <View style={styles.startBtnIcon}>
+                          <Icon name="add-circle" size={18} color="#fff" />
+                        </View>
+                        <Text style={styles.startBtnText}>Start New Conversation</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
                 </ScrollView>
@@ -1452,12 +1555,21 @@ const loadMessages = async (conversationId) => {
                                 Download Excel ({msg.ai_data.results?.total_rows?.toLocaleString()} records)
                               </Text>
                               <TouchableOpacity
-                                style={styles.exportBtn}
+                                style={[styles.exportBtn, downloadingUrls[exportUrl] && styles.exportBtnDisabled]}
                                 onPress={() => handleExportPress(msg.ai_data.export_url)}
+                                disabled={downloadingUrls[exportUrl]}
                               >
-                                <Icon name={isDownloaded ? 'open-in-new' : 'download'} size={14} color="#fff" />
-                                <Text style={styles.exportBtnText}>{isDownloaded ? 'Open' : 'Download'}</Text>
-
+                                {downloadingUrls[exportUrl] ? (
+                                  <>
+                                    <ActivityIndicator size="small" color="#fff" />
+                                    <Text style={styles.exportBtnText}>Downloading...</Text>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Icon name={isDownloaded ? 'open-in-new' : 'download'} size={14} color="#fff" />
+                                    <Text style={styles.exportBtnText}>{isDownloaded ? 'Open' : 'Download'}</Text>
+                                  </>
+                                )}
                               </TouchableOpacity>
                             </View>
                           )}
@@ -1467,12 +1579,21 @@ const loadMessages = async (conversationId) => {
                                 Download PDF ({msg.ai_data.results?.total_rows?.toLocaleString()} records)
                               </Text>
                               <TouchableOpacity
-                                style={styles.exportBtn}
+                                style={[styles.exportBtn, downloadingUrls[pdfUrl] && styles.exportBtnDisabled]}
                                 onPress={() => handleExportPress(msg.ai_data.pdf_url, { useBaseUrl: false })}
+                                disabled={downloadingUrls[pdfUrl]}
                               >
-                                <Icon name={isPdfDownloaded ? 'open-in-new' : 'download'} size={14} color="#fff" />
-                                <Text style={styles.exportBtnText}>{isPdfDownloaded ? 'Open' : 'Download'}</Text>
-
+                                {downloadingUrls[pdfUrl] ? (
+                                  <>
+                                    <ActivityIndicator size="small" color="#fff" />
+                                    <Text style={styles.exportBtnText}>Downloading...</Text>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Icon name={isPdfDownloaded ? 'open-in-new' : 'download'} size={14} color="#fff" />
+                                    <Text style={styles.exportBtnText}>{isPdfDownloaded ? 'Open' : 'Download'}</Text>
+                                  </>
+                                )}
                               </TouchableOpacity>
                             </View>
                           )}
@@ -1617,7 +1738,7 @@ const loadMessages = async (conversationId) => {
 
 const styles = StyleSheet.create({
   container: { position: 'absolute', bottom: 90, right: 16 },
-    overlayRoot: {
+  overlayRoot: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 9999,
   },
@@ -1637,7 +1758,7 @@ const styles = StyleSheet.create({
     elevation: 10,
     zIndex: 10000,
   },
-    createFab: {
+  createFab: {
     position: "absolute",
     right: 16,
     width: 54,
@@ -1652,7 +1773,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
   },
-  emptyLoaderWrap: { paddingVertical: 32, alignItems: 'center', justifyContent: 'center' },
+
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheetWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   sheet: {
@@ -1688,6 +1809,7 @@ const styles = StyleSheet.create({
 
   messagesPanel: { flex: 1, backgroundColor: '#F5F5F5' },
   emptyWrap: { paddingVertical: 16, paddingHorizontal: 12, alignItems: 'stretch', justifyContent: 'center' },
+  emptyLoaderWrap: { paddingVertical: 32, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 6,textAlign:"center" },
   emptyText: { fontSize: 13, color: '#666', textAlign: 'center' },
   conversationCard: {
@@ -1862,6 +1984,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   exportBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  exportBtnDisabled: { opacity: 0.6 },
 
   inputWrap: { borderTopWidth: 1, borderTopColor: '#E5E7EB', padding: 10, backgroundColor: '#fff' },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
